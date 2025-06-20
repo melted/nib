@@ -1,0 +1,10 @@
+[package]
+name = "nibble"
+version = "0.0.1"
+edition = "2024"
+
+[dependencies]
+anyhow = "*"
+thiserror = "*"
+log = "*"
+env_logger = "*"

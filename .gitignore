@@ -1,0 +1,11 @@
+.vscode
+.idea
+
+target
+
+*.exe
+*~
+*.o
+*.obj
+*.a
+*.lib
