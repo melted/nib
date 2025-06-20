@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use std::{fmt::Display, io};
 
 use thiserror::Error;
 
@@ -36,5 +36,11 @@ pub type Result<T> = std::result::Result<T, Error>;
 impl From<anyhow::Error> for Error {
     fn from(value: anyhow::Error) -> Self {
         Error::General { err: value }
+    }
+}
+
+impl From<Error> for io::Error {
+    fn from(value: Error) -> io::Error {
+        io::Error::other(value)
     }
 }

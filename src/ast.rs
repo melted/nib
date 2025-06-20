@@ -10,6 +10,16 @@ pub struct Metadata {
     pub newlines: Vec<usize>,
 }
 
+impl Metadata {
+    pub fn new(file: Option<String>) -> Self {
+         Metadata { file: file, 
+            trivia: Vec::new(),
+            annotations: HashMap::new(),
+            locations: HashMap::new(),
+            newlines: Vec::new() }
+    }
+}
+
 pub type Node = u32;
 
 #[derive(Debug, Clone, PartialEq)]
