@@ -1,9 +1,24 @@
+use unicode_categories::UnicodeCategories;
+
 use crate::common::Error;
 use crate::common::Location;
 use crate::common::Result;
 
 impl<'a> super::ParserState<'a> {
+    pub(super) fn peek_next_token(&mut self) -> Result<Token> {
+        let tok = self.get_next_token()?;
+        self.stashed_token = Some(tok.clone());
+        Ok(tok)
+    }
+
     pub(super) fn get_next_token(&mut self) -> Result<Token> {
+        let stashed = self.stashed_token.take();
+        match stashed {
+            Some(t) => {
+                return Ok(t);
+            },
+            _ => {}
+        };
         while let Some((p, c)) = self.chars.peek() {
             self.token_start = *p;
             let tok = match *c {
@@ -57,9 +72,8 @@ impl<'a> super::ParserState<'a> {
                 '"' => Some(self.read_string()?),
                 '\'' => Some(self.read_char()?),
                 _ if c.is_numeric() => Some(self.read_number()?),
-                _ if identifier_initial_char(*c) => {
-                    Some(self.read_identifier()?)
-                },
+                _ if identifier_initial_char(*c) => Some(self.read_identifier()?),
+                _ if c.is_symbol() || c.is_ascii_punctuation() =>  Some(self.read_operator()?),
                 _ => {
                     let ch = *c;
                     self.lex_error(format!("Lexing failed at illegal char: {}", ch).as_str())?;
@@ -90,6 +104,21 @@ impl<'a> super::ParserState<'a> {
             }
         } else {
             self.lex_error("Expected a valid identifier")
+        }
+    }
+
+    fn read_operator(&mut self) -> Result<Token> {
+        let first = self.pos;
+        if let Ok(last) = self.snarf(|c| c.is_symbol() || c.is_ascii_punctuation()) {
+            let id = &self.src[first..last];
+            match id {
+                "->" => Ok(self.token(TokenValue::RightArrow)),
+                _ => {
+                    Ok(self.token(TokenValue::Operator(id.to_string())))
+                }
+            }
+        } else {
+            self.lex_error("Expected a valid operator")
         }
     }
 
@@ -331,27 +360,33 @@ pub enum TokenValue {
     Float(f64),
     Char(char),
     String(String),
-    LeftParen,
-    RightParen,
+    // punctuation
     Comma,
     Period,
     Semicolon,
+    // Brackets
+    LeftParen,
+    RightParen,
     LeftBracket,
     RightBracket,
     LeftBrace,
     RightBrace,
+    // Keywords
     As,
+    At,
     Do,
     If,
     Use,
     Module,
+    Nil,
     Where,
+    // Symbols
     Underscore,
     Ellipsis,
     Equals,
     Backslash,
     RightArrow,
-    At,
+    // Layout
     Indent(usize),
     Eof,
 }

@@ -5,7 +5,11 @@ use crate::common::{Error, Location, Result};
 use crate::ast::{Metadata, Node};
 use crate::parser::lexer::{Token, TokenValue};
 
-mod lexer;
+mod expression;
+mod helpers;
+pub(crate) mod lexer;
+mod tests;
+
 
 
 pub fn parse(code: &str) -> Result<()> {
@@ -42,6 +46,7 @@ struct ParserState<'a> {
     chars: Peekable<CharIndices<'a>>,
     token_start: usize,
     pos: usize,
+    stashed_token: Option<Token>,
     counter: Node
 }
 
@@ -52,6 +57,7 @@ impl<'a> ParserState<'a> {
             chars: code.char_indices().peekable(),
             token_start: 0,
             pos: 0,
+            stashed_token: None,
             counter: 0 }
     }
 
