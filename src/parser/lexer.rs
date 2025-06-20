@@ -54,6 +54,9 @@ impl<'a> super::ParserState<'a> {
                             } else {
                                 return self.lex_error("not a valid symbol");
                             }
+                        } else if *ch == '[' {
+                            self.next();
+                            Some(self.token(TokenValue::HashLeftBracket))
                         } else {
                             Some(self.token(TokenValue::Operator("#".to_string())))
                         }
@@ -367,6 +370,7 @@ pub enum TokenValue {
     // Brackets
     LeftParen,
     RightParen,
+    HashLeftBracket, // #[
     LeftBracket,
     RightBracket,
     LeftBrace,
