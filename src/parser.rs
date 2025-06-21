@@ -61,7 +61,7 @@ impl<'a> ParserState<'a> {
             counter: 0 }
     }
 
-    pub(self) fn error(&self, msg: &str) -> Error {
+    pub(self) fn new_error(&self, msg: &str) -> Error {
         Error::Syntax {
             msg: msg.to_string(),
             loc: Location::Offset {
@@ -69,6 +69,10 @@ impl<'a> ParserState<'a> {
                 end: self.pos,
             },
         }
+    }
+
+    pub(self) fn error<T>(&self, msg: &str) -> Result<T> {
+        Err(self.new_error(msg))
     }
 }
 

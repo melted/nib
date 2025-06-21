@@ -46,22 +46,22 @@ impl<'a> super::ParserState<'a> {
                 },
                 '#' => {
                     self.next();
-                    if let Some((_, ch)) = self.chars.peek() {
-                        if identifier_initial_char(*ch) {
+                    match self.chars.peek() {
+                        Some((_, ch)) if identifier_initial_char(*ch) => {
                             let tok = self.read_identifier()?;
                             if let TokenValue::Identifier(id) = tok.value {
                                 Some(self.token(TokenValue::Symbol(id)))
                             } else {
                                 return self.lex_error("not a valid symbol");
                             }
-                        } else if *ch == '[' {
+                        },
+                        Some((_, ch)) if *ch == '[' => {
                             self.next();
                             Some(self.token(TokenValue::HashLeftBracket))
-                        } else {
+                        }, 
+                        _ => {
                             Some(self.token(TokenValue::Operator("#".to_string())))
                         }
-                    } else {
-                        Some(self.token(TokenValue::Operator("#".to_string())))
                     }
                 },
                 '/' => {
@@ -74,7 +74,7 @@ impl<'a> super::ParserState<'a> {
                 },
                 '"' => Some(self.read_string()?),
                 '\'' => Some(self.read_char()?),
-                _ if c.is_numeric() => Some(self.read_number()?),
+                _ if c.is_numeric() => Some(self.read_number(false)?),
                 _ if identifier_initial_char(*c) => Some(self.read_identifier()?),
                 _ if c.is_symbol() || c.is_ascii_punctuation() =>  Some(self.read_operator()?),
                 _ => {
@@ -116,6 +116,12 @@ impl<'a> super::ParserState<'a> {
             let id = &self.src[first..last];
             match id {
                 "->" => Ok(self.token(TokenValue::RightArrow)),
+                "-" => {
+                    match self.chars.peek() {
+                        Some((_, ch)) if ch.is_numeric() => self.read_number(true),
+                        _ => Ok(self.token(TokenValue::Operator(id.to_string())))
+                    }
+                },
                 _ => {
                     Ok(self.token(TokenValue::Operator(id.to_string())))
                 }
@@ -200,7 +206,8 @@ impl<'a> super::ParserState<'a> {
         }
     }
 
-    fn read_number(&mut self) -> Result<Token> {
+    fn read_number(&mut self, neg:bool) -> Result<Token> {
+        let sign = if neg { -1 } else { 1 };
         if self.check_prefix("0x") || self.check_prefix("0X") {
             self.advance(2);
             let start = self.pos;
@@ -209,7 +216,7 @@ impl<'a> super::ParserState<'a> {
                 Ok(c) => c,
                 Err(_) => return self.lex_error("Invalid hex numeral"),
             };
-            return Ok(self.token(TokenValue::Integer(bigint)));
+            return Ok(self.token(TokenValue::Integer(sign*bigint)));
         }
         let mut stop = self.snarf(char::is_ascii_digit)?;
         let res = self.peek();
@@ -228,18 +235,18 @@ impl<'a> super::ParserState<'a> {
                     }
                     stop = self.snarf(char::is_ascii_digit)?;
                 }
-                let float = match self.src[self.token_start..stop].parse() {
+                let float = match self.src[self.token_start..stop].parse::<f64>() {
                     Ok(c) => c,
                     Err(_) => return self.lex_error("Invalid float literal"),
                 };
-                return Ok(self.token(TokenValue::Float(float)));
+                return Ok(self.token(TokenValue::Float(if neg { -float } else { float })));
             }
         }
         let int = match i64::from_str_radix(&self.src[self.token_start..stop], 16) {
             Ok(c) => c,
             Err(_) => return self.lex_error("Invalid integer literal"),
         };
-        Ok(self.token(TokenValue::Integer(int)))
+        Ok(self.token(TokenValue::Integer(sign*int)))
     }
 
     fn handle_newline(&mut self) -> Result<Token> {

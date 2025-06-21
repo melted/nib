@@ -1,4 +1,5 @@
-use crate::common::{Error, Result};
+
+use crate::{ast::{self, Literal}, common::{Error, Result}};
 
 use super::{ParserState, lexer::TokenValue};
 
@@ -8,7 +9,7 @@ impl<'a> ParserState<'a> {
         pub(super) fn expect(&mut self, t: TokenValue) -> Result<()> {
         let next = self.get_next_token()?;
         if t != next.value {
-            Err(self.error(&format!("expected {:?}, got {:?}", t, next.value)))
+            self.error(&format!("expected {:?}, got {:?}", t, next.value))
         } else {
             Ok(())
         }
@@ -145,4 +146,47 @@ impl<'a> ParserState<'a> {
         }
     }
 
+    pub(super) fn parse_name(&mut self) -> Result<NameOrOperator> {
+        let first = self.get_next_token()?;
+        let mut id = match first.value {
+            TokenValue::Identifier(id) => id,
+            TokenValue::Operator(id) => {
+                return Ok(NameOrOperator::Operator(ast::Operator::Plain(id)))
+            }
+            _ => {
+                return self.error(&format!("Expected identifier or operator, got {:?}", &first.value));
+            }
+        };
+        let mut path = Vec::new();
+        while self.is_next(TokenValue::Period)? {
+            path.push(id);
+            let next = self.get_next_token()?;
+            id = match next.value {
+                TokenValue::Identifier(id) => id,
+                TokenValue::Operator(id) => {
+                    return Ok(NameOrOperator::Operator(ast::Operator::Qualified(path, id)))
+                }
+                _ => {
+                    return self.error(&format!("Expected identifier or operator, got {:?}", &next.value));
+                }
+            };
+        }
+        let ret = if path.is_empty() { 
+                            ast::Name::Plain(id)
+                        } else {
+                            ast::Name::Qualified(path, id)
+                        };
+        Ok(NameOrOperator::Name(ret))
+    }
+
+    pub(super) fn parse_unit_nil(&mut self) -> Result<Literal> {
+        self.expect(TokenValue::LeftParen)?;
+        self.expect(TokenValue::RightParen)?;
+        Ok(Literal::Nil)
+    }
+}
+
+pub enum NameOrOperator {
+    Name(ast::Name),
+    Operator(ast::Operator)
 }

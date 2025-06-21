@@ -131,7 +131,8 @@ pub enum Literal {
     Integer(u64),
     Real(f64),
     String(String),
-    Symbol(String)
+    Symbol(String),
+    Bytearray(Vec<u8>)
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
