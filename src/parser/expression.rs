@@ -12,7 +12,8 @@ impl<'a> ParserState<'a> {
     }
 
     pub(super) fn parse_inner_expression(&mut self, min_pred:i32, in_paren:bool) -> Result<Expression> {
-        let indent = if in_paren { -1 } else { self.indent() };
+        let indent = if in_paren { -1 } else { self.indent() }; // TODO: maybe it's reasonable that
+                                                                     // paren expressions have to indent too?
         self.indent_stack.push(indent);
         let mut lhs = self.parse_left_expression()?;
         loop {
@@ -43,13 +44,14 @@ impl<'a> ParserState<'a> {
                     }
                 },
                 _ => {
+                    // This one is right leaning
                     if min_pred < 9 {
                         let expr = self.try_parse(&mut |s|s.parse_inner_expression(9, false))?;
                         match expr {
                             Some(e) => self.app_expression(lhs, e),
                             None => {
                                 break;
-                            }   
+                            }
                         }
                     } else {
                         break;

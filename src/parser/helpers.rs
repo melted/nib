@@ -1,5 +1,6 @@
 
-use crate::{ast::{self, Binding, Binop, Cond, Expression, Literal, Operator}, common::{Error, Result}};
+use crate::{ ast::{self, Binding, Binop, Cond, Expression, Literal, Operator}, 
+            common::{Error, Result}, parser::lexer::Token};
 
 use super::{ParserState, lexer::TokenValue};
 
@@ -180,7 +181,40 @@ impl<'a> ParserState<'a> {
     }
 
     pub(super) fn parse_literal(&mut self) -> Result<Literal> {
-        todo!()
+        let token = self.get_next_token()?;
+        match token.value {
+            TokenValue::Integer(n) => Ok(Literal::Integer(n)),
+            TokenValue::Float(x) => Ok(Literal::Real(x)),
+            TokenValue::Char(ch) => Ok(Literal::Char(ch)),
+            TokenValue::String(s) => Ok(Literal::String(s)),
+            TokenValue::Symbol(s) => Ok(Literal::Symbol(s)),
+            TokenValue::HashLeftBracket => {
+                let mut bytes = Vec::new();
+                loop {
+                    if let TokenValue::Integer(b) = self.peek_next_token()?.value {
+                        self.get_next_token()?;
+                        let v:u8 =b.try_into().map_err(|e|self.new_error(&format!("Invalid bytearray literal: {b:?}")))?;
+                        bytes.push(v);
+                    } else {
+                        self.expect(TokenValue::RightBracket)?;
+                        break;
+                    }
+                    match self.get_next_token()?.value {
+                        TokenValue::Comma => {},
+                        TokenValue::RightBracket => {
+                            break;
+                        }
+                        x => {
+                            return self.error(&format!("Expected ',' or ']' in bytearray literal, got {x:?} "));
+                        }
+                    }
+                }
+                Ok(Literal::Bytearray(bytes))
+            },
+            _ => {
+                self.error(&format!("Expected a literal got token {token:?}"))
+            }
+        }
     }
 
     pub(super) fn parse_unit_nil(&mut self) -> Result<Literal> {

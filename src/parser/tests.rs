@@ -2,7 +2,7 @@
 
 
 mod tests {
-    use crate::ast::Name;
+    use crate::ast::{Literal, Name};
     use crate::common::Result;
     use crate::parser::helpers::NameOrOperator;
     use crate::parser::{lex, ParserState};
@@ -38,6 +38,30 @@ mod tests {
             },
             _ => assert!(false)
         }
+        Ok(())
+    }
+
+    #[test]
+    fn parse_string_literal() -> Result<()> {
+        let mut state = ParserState::new("\"hello, world\"");
+        let lit = state.parse_literal()?;
+        assert!(Literal::String("hello, world".to_string()) == lit);
+        Ok(())
+    }
+
+        #[test]
+    fn parse_bytearray_literal() -> Result<()> {
+        let mut state = ParserState::new("#[123,133,123]");
+        let lit = state.parse_literal()?;
+        assert!(Literal::Bytearray(vec![123,133,123]) == lit);
+        Ok(())
+    }
+
+    #[test]
+    fn parse_invalid_bytearray_literal() -> Result<()> {
+        let mut state = ParserState::new("#[123,333,123]");
+        let lit = state.parse_literal();
+        assert!(lit.is_err());
         Ok(())
     }
 }

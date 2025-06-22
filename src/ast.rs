@@ -137,8 +137,9 @@ pub struct Cond {
 pub enum Literal {
     Nil,
     Bool(bool),
-    Integer(u64),
+    Integer(i64),
     Real(f64),
+    Char(char),
     String(String),
     Symbol(String),
     Bytearray(Vec<u8>)
