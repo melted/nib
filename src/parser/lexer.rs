@@ -33,7 +33,18 @@ impl<'a> super::ParserState<'a> {
                 ')' => Some(self.simple_token(TokenValue::RightParen)),
                 '[' => Some(self.simple_token(TokenValue::LeftBracket)),
                 ']' => Some(self.simple_token(TokenValue::RightBracket)),
-                '`' => None,
+                '`' => {
+                    self.next();
+                    let TokenValue::Identifier(id) = self.read_identifier()?.value else {
+                        return self.lex_error("Expected valid identifier in '`' operator");
+                    };
+                    if let Some((_, '`')) = self.chars.peek() {
+                        self.next();
+                        Some(self.token(TokenValue::Operator(id)))
+                    } else {
+                        return self.lex_error("Unterminated '`' operator");
+                    }
+                },
                 ',' => Some(self.simple_token(TokenValue::Comma)),
                 ';' => Some(self.simple_token(TokenValue::Semicolon)),
                 '.' => {
@@ -96,8 +107,8 @@ impl<'a> super::ParserState<'a> {
         if let Ok(last) = self.snarf(|c| identifier_char(*c)) {
             let id = &self.src[first..last];
             match id {
-                "as" => Ok(self.token(TokenValue::As)),
                 "module" => Ok(self.token(TokenValue::Module)),
+                "nil" => Ok(self.token(TokenValue::Nil)),
                 "use" => Ok(self.token(TokenValue::Use)),
                 "do" => Ok(self.token(TokenValue::Do)),
                 "_" => Ok(self.token(TokenValue::Underscore)),
@@ -115,6 +126,7 @@ impl<'a> super::ParserState<'a> {
         if let Ok(last) = self.snarf(|c| c.is_symbol() || c.is_ascii_punctuation()) {
             let id = &self.src[first..last];
             match id {
+                "@" => Ok(self.token(TokenValue::As)),
                 "->" => Ok(self.token(TokenValue::RightArrow)),
                 "-" => {
                     match self.chars.peek() {

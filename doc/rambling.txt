@@ -1,0 +1,189 @@
+every type has an associated dynamic table.
+
+by putting records of functions in there we can have a typeclass-like mechanism in a dynamically typed language
+
+
+for example show
+
+int.show x = atoi x
+
+text.show = id
+
+every file is a module, like lua.
+
+
+global.(+) a b = (type a).num.add a b
+global.(-) a b = (type a).num.sub a b
+
+
+fib n = go n 0 0
+    where
+        go 0 _ acc = acc
+        go n a b = go (n-1) b (a+b)
+
+select todo + syntax where
+    todo = java && comment.containing "TODO"
+
+int.is x = x.type == int
+
+pair = record { first, second }
+
+xy = pair.make 1 2
+
+record fields = rid where
+    rid = {}
+    rid.eq x y = ref compare by default?
+    rid.make ...vals = v where
+        v = array fields.length |> 
+
+
+How could we allow using the dot operator on values? We want to be able to do
+a.first and not need pair.first.
+
+a.type => type a
+p.x = point.x p
+
+
+Maybe a special table in the type for fields that should be exposed on instances of the 
+type (type.methods?)
+
+How to handle zero argument functions? Should they take unit, or should they get called by default when named. In that case, how to name it without calling it? Or should there be a special syntax for calling it?
+
+Guess it has to take something, or there would need to be a special syntax for definitions too. 
+
+But the p.x example has a method that takes a self argument that is on the left side of the dot. Can that syntax work, if the syntax is general, there never need to be definition that has an argument-free function.
+
+bare symbol #blue
+
+# Lambdas
+
+{} is an anonymous function, _,_1, _2, _3 etc are arguments. _args is an array of all arguments. _rest is the args after the last named.
+
+Lambdas can contain explicitly named arguments in a pattern, in which case the implicit argument names are a
+syntax error.
+
+{ x -> 2*x }
+
+{ x ..y -> x + 2*sum y }
+
+the argument pattern can be accessed, so a match function could be implemented taking a bunch of one argument lambdas, and running the first one that matches the selector. That would require pattern guards.
+
+Should it be possible to make lambdas with several clauses? Sounds reasonable since we we want functions with several clauses.
+
+syntax for that
+{ [a,b] -> a+b; _ -> error "expect a pair" }
+
+# Patterns
+
+Literals: 1 "hello" #symbol 1.5 
+Arrays: [1,2,3] [1,2,...] [...,2,1] [1,2,...,9,10] [...]
+Bindings: [a, ...] x 
+Alias: [...] as a
+Custom Pattern: (pair x y) (does this need something extra to mark it? say (?pair))
+Guard: (pair x y) | x < 5
+Wildcard: _ (other identifiers starting with _ are bindings), wildcard matches anything but doesn't bind
+
+
+# expressions
+
+Parens (exp)
+Literals num string char? symbol nil
+Variables x y z
+Arrays [(exp,)* exp]
+Applications exp exp+
+Binops exp op exp
+Lambdas {[v*] -> exp }
+Where exp where bindings+
+Case (maybe could be done by sugar)
+
+# bindings
+
+pattern = exp
+
+name [pattern*] [|exp] = exp
+
+pattern operator pattern [|exp] = exp
+
+
+
+
+if false _ e = e ()
+if x t _ = t x
+
+#Top Level
+
+module qualified.name
+
+says we're in module `qualified.name` by default. There are two special module names, `global` for universally visible names and `current` to access the current scope from inside where-clauses.
+
+import qualified.name
+
+makes the module `qualified.name` accessible. `global` is always accessible.
+
+Modules are tables.
+
+# Tables
+
+A table is a map from symbols to values. 
+
+# Symbols
+
+A symbol literal is #<name>, symbols with literals are always well-known and can be used globally.
+
+An anonymous symbol is created with the `symbol` function, it is unique and is only accessible to the extent that it is shared.
+
+
+# Enums
+
+color = enum #red #blue #green
+
+red `is` color == true
+
+is v t = v.type == t
+
+No need to build that into the language enum symbols* -> enum-type
+
+
+# Binops
+
+Can turn a function of two args into a binop by enclosing its name in ``
+
+Binops names must otherwise be symbolic. Binops can be turned into prefix by enclosing in parentheses.
+
+defined by 
+
+a + b = add a b
+or 
+(+) a b = add a b
+
+All binops have the same precedence and folds left.
+
+#Types
+
+What primitive types are needed
+
+boolean
+integer
+float
+character?
+bigint?
+bytearray (a piece of memory, using byte may give the wrong impression that it can't be used to get other types)
+
+for FFI:
+pointers
+
+There is one semi-primitive type:
+symbol
+
+Symbol is an unique pointer to a reference to a metadata block. A fresh anonymous symbol doesn't have that block and just points to nil, since you can use it without and the metadata can be created on demand. A well-known pointer will be created with metadata.
+
+TODO: How to do reverse mapping to ensure well-known symbols are unique?
+
+There are two composite types:
+Array, a fixed length array of arbitrary values
+Table, a dynamic table with arbitrary values and symbols as keys
+(maybe allow a wider range of keys and just allow dot-access for
+symbols?)
+
+
+
