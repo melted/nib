@@ -346,7 +346,6 @@ impl<'a> super::ParserState<'a> {
         .into())
     }
 
-        
     fn token(&mut self, token: TokenValue) -> Token {
         Token {
             value: token,
@@ -426,6 +425,17 @@ impl Token {
         }
     }
 
+}
+
+impl TokenValue {
+    pub(super) fn is_literal(&self) -> bool {
+        match self {
+            TokenValue::Char(_) | TokenValue::String(_) |
+            TokenValue::Float(_) | TokenValue::Integer(_) |
+            TokenValue::Symbol(_) | TokenValue::HashLeftBracket => true,
+            _ => false
+        }
+    }
 }
 
 impl From<TokenValue> for Token {

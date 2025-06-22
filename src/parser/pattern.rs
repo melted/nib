@@ -11,9 +11,7 @@ impl<'a> ParserState<'a> {
                 self.get_next_token()?;
                 Pattern::Wildcard
             },
-            TokenValue::Char(_) | TokenValue::String(_) |
-            TokenValue::Float(_) | TokenValue::Integer(_) |
-            TokenValue::Symbol(_) | TokenValue::HashLeftBracket => {
+            x if x.is_literal() => {
                 let lit = self.parse_literal()?;
                 Pattern::Literal(lit)
             },

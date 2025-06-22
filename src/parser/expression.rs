@@ -68,9 +68,7 @@ impl<'a> ParserState<'a> {
     pub(super) fn parse_left_expression(&mut self) -> Result<Expression> {
         let tok = self.peek_next_token()?;
         match tok.value {
-            TokenValue::Char(_) | TokenValue::String(_) |
-            TokenValue::Float(_) | TokenValue::Integer(_) |
-            TokenValue::Symbol(_) | TokenValue::HashLeftBracket => {
+            x if x.is_literal() => {
                 let lit = self.parse_literal()?;
                 Ok(self.literal_expression(lit))
             },
