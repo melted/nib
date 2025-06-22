@@ -189,31 +189,24 @@ impl<'a> ParserState<'a> {
             TokenValue::String(s) => Ok(Literal::String(s)),
             TokenValue::Symbol(s) => Ok(Literal::Symbol(s)),
             TokenValue::HashLeftBracket => {
-                let mut bytes = Vec::new();
-                loop {
-                    if let TokenValue::Integer(b) = self.peek_next_token()?.value {
-                        self.get_next_token()?;
-                        let v:u8 =b.try_into().map_err(|e|self.new_error(&format!("Invalid bytearray literal: {b:?}")))?;
-                        bytes.push(v);
-                    } else {
-                        self.expect(TokenValue::RightBracket)?;
-                        break;
-                    }
-                    match self.get_next_token()?.value {
-                        TokenValue::Comma => {},
-                        TokenValue::RightBracket => {
-                            break;
-                        }
-                        x => {
-                            return self.error(&format!("Expected ',' or ']' in bytearray literal, got {x:?} "));
-                        }
-                    }
-                }
+                let bytes = self.parse_separated_by(&mut Self::parse_byte,TokenValue::Comma)?;
+                self.expect(TokenValue::RightBracket)?;
                 Ok(Literal::Bytearray(bytes))
             },
             _ => {
                 self.error(&format!("Expected a literal got token {token:?}"))
             }
+        }
+    }
+
+    pub(super) fn parse_byte(&mut self) -> Result<u8> {
+        if let TokenValue::Integer(b) = self.peek_next_token()?.value {
+            self.get_next_token()?;
+            let v:u8 =b.try_into().map_err(|e|self.new_error(&format!("Invalid bytearray literal: {b:?}")))?;
+            Ok(v)
+        } else {
+            let tok = self.get_next_token()?
+            self.error(&format!("Illegal token {tok:?} in bytearray literal"))
         }
     }
 

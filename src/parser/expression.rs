@@ -1,4 +1,4 @@
-use crate::ast::Expression;
+use crate::ast::{Expression, Literal};
 use crate::common::Result;
 use crate::parser::helpers::NameOrOperator;
 use crate::parser::lexer::TokenValue;
@@ -110,6 +110,24 @@ impl<'a> ParserState<'a> {
     }
 
     pub(super) fn parse_paren_expression(&mut self) -> Result<Expression> {
-        todo!()
+        self.get_next_token()?;
+        let token = self.peek_next_token()?;
+        let exp = match token.value {
+            TokenValue::RightParen => {
+                self.get_next_token()?;
+                self.literal_expression(Literal::Nil)
+            },
+            TokenValue::Operator(op) => {
+                self.get_next_token()?;
+                self.expect(TokenValue::RightParen)?;
+                self.var_expression(crate::ast::Name::Plain(op))
+            },
+            _ => {
+                let exp = self.parse_inner_expression(0, true)?;
+                self.expect(TokenValue::RightParen)?;
+                exp
+            }
+        };
+        Ok(exp)
     }
 }

@@ -5,9 +5,11 @@ use crate::common::{Error, Location, Result};
 use crate::ast::{Metadata, Node};
 use crate::parser::lexer::{Token, TokenValue};
 
+mod declaration;
 mod expression;
 mod helpers;
 pub(crate) mod lexer;
+mod pattern;
 mod tests;
 
 

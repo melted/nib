@@ -30,9 +30,15 @@ pub enum Annotation {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum Binding {
+pub enum Declaration {
     Module(Module),
     Use(Use),
+    Binding(Binding)
+}
+
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum Binding {
     VarBinding(VarBinding),
     FunBinding(FunBinding),
     OpBinding(OpBinding)
@@ -91,12 +97,12 @@ pub struct OpClauses {
 #[derive(Debug, Clone, PartialEq)]
 pub enum Pattern {
     Wildcard,
-    Ellipsis,
+    Ellipsis(Name),
     Literal(Literal),
     Var(Name),
     Array(Vec<Pattern>),
-    Alias(Box<Pattern>, String),
-    Custom(String, Vec<Pattern>)
+    Alias(Box<Pattern>, Name),
+    Custom(Name, Vec<Pattern>)
 }
 
 
