@@ -40,50 +40,50 @@ pub enum Binding {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Module {
-    id: Node,
-    name: Name
+    pub id: Node,
+    pub name: Name
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Use {
-    id: Node,
-    name: Name
+    pub id: Node,
+    pub name: Name
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct VarBinding {
-    id: Node,
-    lhs: Pattern,
-    rhs: Expression
+    pub id: Node,
+    pub lhs: Pattern,
+    pub rhs: Expression
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct FunBinding {
-    id: Node,
-    name: Name,
-    clauses: Vec<FunClause>
+    pub id: Node,
+    pub name: Name,
+    pub clauses: Vec<FunClause>
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct FunClause {
-    id: Node,
-    args: Vec<Pattern>,
-    rhs: Expression
+    pub id: Node,
+    pub args: Vec<Pattern>,
+    pub rhs: Expression
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct OpBinding {
-    id: Node,
-    op: Operator,
-    clauses: Vec<FunClause>
+    pub id: Node,
+    pub op: Operator,
+    pub clauses: Vec<FunClause>
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct OpClauses {
-    id: Node,
-    lpat: Pattern,
-    rpat: Pattern,
-    rhs: Expression
+    pub id: Node,
+    pub lpat: Pattern,
+    pub rpat: Pattern,
+    pub rhs: Expression
 }
 
 
@@ -102,9 +102,10 @@ pub enum Pattern {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Expression {
-    id: Node,
-    expr: ExpressionKind
+    pub id: Node,
+    pub expr: ExpressionKind
 }
+
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ExpressionKind {
@@ -112,16 +113,24 @@ pub enum ExpressionKind {
     Var(Name),
     Array(Vec<Expression>),
     Lambda(Vec<FunClause>),
-    App(Vec<Expression>),
+    App(Box<Expression>, Box<Expression>),
     Binop(Binop),
-    Where(Box<Expression>, Vec<Binding>)
+    Where(Box<Expression>, Vec<Binding>),
+    Cond(Cond)
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Binop {
-    op: Operator,
-    lhs: Box<Expression>,
-    rhs: Box<Expression>
+    pub op: Operator,
+    pub lhs: Box<Expression>,
+    pub rhs: Box<Expression>
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Cond {
+    pub pred: Box<Expression>,
+    pub on_true: Box<Expression>,
+    pub on_false: Box<Expression>
 }
 
 #[derive(Debug, Clone, PartialEq)]

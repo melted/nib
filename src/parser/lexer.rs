@@ -22,9 +22,6 @@ impl<'a> super::ParserState<'a> {
         while let Some((p, c)) = self.chars.peek() {
             self.token_start = *p;
             let tok = match *c {
-                '\n' => {
-                    Some(self.handle_newline()?)
-                },
                 _ if c.is_whitespace() => {
                     self.next();
                     None
@@ -102,6 +99,31 @@ impl<'a> super::ParserState<'a> {
         Ok(self.token(TokenValue::Eof))
     }
 
+    pub(super) fn token_indent(&self, token:Token) -> i32 {
+        let start = match token.location {
+            Location::Offset { start, .. } => start,
+            _ => { return -1; }
+        };
+        for i in self.metadata.newlines.iter().rev() {
+            if *i <= start {
+                return (start - i) as i32
+            } 
+        }
+        start as i32
+    }
+
+    pub(super) fn next_indent(&mut self) -> i32 {
+        let tok = self.peek_next_token();
+        match tok {
+            Ok(tok) => self.token_indent(tok),
+            _ => 0
+        } 
+    }
+
+    pub(super) fn current_line(&mut self) -> usize {
+        self.metadata.newlines.len()
+    }
+
     fn read_identifier(&mut self) -> Result<Token> {
         let first = self.pos;
         if let Ok(last) = self.snarf(|c| identifier_char(*c)) {
@@ -126,6 +148,7 @@ impl<'a> super::ParserState<'a> {
         if let Ok(last) = self.snarf(|c| c.is_symbol() || c.is_ascii_punctuation()) {
             let id = &self.src[first..last];
             match id {
+                "?" => Ok(self.token(TokenValue::QuestionMark)),
                 "@" => Ok(self.token(TokenValue::As)),
                 "->" => Ok(self.token(TokenValue::RightArrow)),
                 "-" => {
@@ -261,31 +284,6 @@ impl<'a> super::ParserState<'a> {
         Ok(self.token(TokenValue::Integer(sign*int)))
     }
 
-    fn handle_newline(&mut self) -> Result<Token> {
-        self.chars.next();
-        let mut indent = 0;
-        while let Some((_, ch)) = self.chars.peek() {
-            match ch {
-                ' ' => {
-                    indent+=1;
-                    self.next();
-                },
-                '\t' => {
-                    indent += 8;
-                    self.next();
-                },
-                '\r' | '\n' => {
-                    indent = 0;
-                    self.next();
-                },
-                _ => {
-                    return Ok(self.token(TokenValue::Indent(indent)));
-                }
-            }
-        }
-        Ok(self.token(TokenValue::Eof))
-    }
-
     fn snarf(&mut self, pred: impl Fn(&char) -> bool) -> Result<usize> {
         let next = self.chars.peek();
         match next {
@@ -409,8 +407,8 @@ pub enum TokenValue {
     Equals,
     Backslash,
     RightArrow,
+    QuestionMark,
     // Layout
-    Indent(usize),
     Eof,
 }
 

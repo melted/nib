@@ -47,6 +47,7 @@ struct ParserState<'a> {
     token_start: usize,
     pos: usize,
     stashed_token: Option<Token>,
+    indent_stack: Vec<i32>,
     counter: Node
 }
 
@@ -58,6 +59,7 @@ impl<'a> ParserState<'a> {
             token_start: 0,
             pos: 0,
             stashed_token: None,
+            indent_stack: Vec::new(),
             counter: 0 }
     }
 
@@ -73,6 +75,11 @@ impl<'a> ParserState<'a> {
 
     pub(self) fn error<T>(&self, msg: &str) -> Result<T> {
         Err(self.new_error(msg))
+    }
+
+    pub(self) fn indent(&self) -> i32 {
+        let last_newline = self.metadata.newlines.last().unwrap_or(&0);
+        (self.pos - last_newline) as i32
     }
 }
 

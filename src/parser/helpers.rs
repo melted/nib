@@ -1,5 +1,5 @@
 
-use crate::{ast::{self, Literal}, common::{Error, Result}};
+use crate::{ast::{self, Binding, Binop, Cond, Expression, Literal, Operator}, common::{Error, Result}};
 
 use super::{ParserState, lexer::TokenValue};
 
@@ -179,10 +179,90 @@ impl<'a> ParserState<'a> {
         Ok(NameOrOperator::Name(ret))
     }
 
+    pub(super) fn parse_literal(&mut self) -> Result<Literal> {
+        todo!()
+    }
+
     pub(super) fn parse_unit_nil(&mut self) -> Result<Literal> {
         self.expect(TokenValue::LeftParen)?;
         self.expect(TokenValue::RightParen)?;
         Ok(Literal::Nil)
+    }
+
+    pub(super) fn literal_expression(&mut self, lit: ast::Literal) -> ast::Expression {
+        self.counter += 1;
+        ast::Expression {
+            id: self.counter,
+            expr: ast::ExpressionKind::Literal(lit)
+        }
+    }
+
+    pub(super) fn var_expression(&mut self, var: ast::Name) -> ast::Expression {
+        self.counter += 1;
+        ast::Expression {
+            id: self.counter,
+            expr: ast::ExpressionKind::Var(var)
+        }
+    }
+
+    pub(super) fn array_expression(&mut self, vals: Vec<ast::Expression>) -> ast::Expression {
+        self.counter += 1;
+        ast::Expression {
+            id: self.counter,
+            expr: ast::ExpressionKind::Array(vals)
+        }
+    }
+
+    pub(super) fn app_expression(&mut self, f: Expression, arg: Expression) -> ast::Expression {
+        self.counter += 1;
+        ast::Expression {
+            id: self.counter,
+            expr: ast::ExpressionKind::App(Box::new(f), Box::new(arg))
+        }
+    }
+
+    pub(super) fn lambda_expression(&mut self, clauses: Vec<ast::FunClause>) -> ast::Expression {
+        self.counter += 1;
+        ast::Expression {
+            id: self.counter,
+            expr: ast::ExpressionKind::Lambda(clauses)
+        }
+    }
+
+    pub(super) fn binop_expression(&mut self, op: Operator, lhs: Expression, rhs: Expression) -> ast::Expression {
+        self.counter += 1;
+        ast::Expression {
+            id: self.counter,
+            expr: ast::ExpressionKind::Binop(
+                Binop {
+                    op: op,
+                    lhs: Box::new(lhs),
+                    rhs: Box::new(rhs)
+                }
+            )
+        }
+    }
+
+    pub(super) fn where_expression(&mut self, expr: Expression, bindings: Vec<Binding>) -> ast::Expression {
+        self.counter += 1;
+        ast::Expression {
+            id: self.counter,
+            expr: ast::ExpressionKind::Where(Box::new(expr), bindings)
+        }
+    }
+
+    pub(super) fn cond_expression(&mut self, pred: Expression, on_true: Expression, on_false: Expression) -> ast::Expression {
+        self.counter += 1;
+        ast::Expression {
+            id: self.counter,
+            expr: ast::ExpressionKind::Cond(
+                Cond {
+                    pred: Box::new(pred),
+                    on_true: Box::new(on_true),
+                    on_false: Box::new(on_false)
+                }
+            )
+        }
     }
 }
 

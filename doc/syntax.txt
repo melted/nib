@@ -9,7 +9,7 @@ pattern := literal | identifier | `_` | `[` [pattern `,`]* pattern `]` |
           `(` pattern `)`
   
 expr := literal | name | expr (expr)+ | expr binop expr | `(` expr `)` | `[` (expr `,`)* expr `]` |
-        `{` (clause `;`)* clause `}`
+        `{` (clause `;`)* clause `}` | expr `where` (binding `;`) binding | expr `?` expr `;` expr
 
 clause := [pattern+ `->`] expr
 
