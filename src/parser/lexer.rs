@@ -133,6 +133,8 @@ impl<'a> super::ParserState<'a> {
                 "nil" => Ok(self.token(TokenValue::Nil)),
                 "use" => Ok(self.token(TokenValue::Use)),
                 "do" => Ok(self.token(TokenValue::Do)),
+                "true" => Ok(self.token(TokenValue::True)),
+                "false" => Ok(self.token(TokenValue::False)),
                 "_" => Ok(self.token(TokenValue::Underscore)),
                 _ => {
                     Ok(self.token(TokenValue::Identifier(id.to_string())))
@@ -400,6 +402,8 @@ pub enum TokenValue {
     Module,
     Nil,
     Where,
+    True,
+    False,
     // Symbols
     Underscore,
     Ellipsis,
@@ -432,7 +436,8 @@ impl TokenValue {
         match self {
             TokenValue::Char(_) | TokenValue::String(_) |
             TokenValue::Float(_) | TokenValue::Integer(_) |
-            TokenValue::Symbol(_) | TokenValue::HashLeftBracket => true,
+            TokenValue::Symbol(_) | TokenValue::HashLeftBracket|
+            TokenValue::False | TokenValue::True => true,
             _ => false
         }
     }

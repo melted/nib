@@ -183,6 +183,8 @@ impl<'a> ParserState<'a> {
     pub(super) fn parse_literal(&mut self) -> Result<Literal> {
         let token = self.get_next_token()?;
         match token.value {
+            TokenValue::False => Ok(Literal::Bool(false)),
+            TokenValue::True => Ok(Literal::Bool(true)),
             TokenValue::Integer(n) => Ok(Literal::Integer(n)),
             TokenValue::Float(x) => Ok(Literal::Real(x)),
             TokenValue::Char(ch) => Ok(Literal::Char(ch)),
@@ -205,7 +207,7 @@ impl<'a> ParserState<'a> {
             let v:u8 =b.try_into().map_err(|e|self.new_error(&format!("Invalid bytearray literal: {b:?}")))?;
             Ok(v)
         } else {
-            let tok = self.get_next_token()?
+            let tok = self.get_next_token()?;
             self.error(&format!("Illegal token {tok:?} in bytearray literal"))
         }
     }
