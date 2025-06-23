@@ -48,7 +48,7 @@ impl<'a> ParserState<'a> {
             } else {
                 let op = self.parse_operator()?;
                 let rpat = self.parse_pattern()?;
-                self.expect(TokenValue::Equals);
+                self.expect(TokenValue::Equals)?;
                 let rhs = self.parse_expression()?;
                 Ok(self.op_binding(op, pat, rpat, rhs)  )
             }

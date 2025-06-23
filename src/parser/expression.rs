@@ -119,7 +119,7 @@ impl<'a> ParserState<'a> {
     }
 
     pub(super) fn parse_paren_expression(&mut self) -> Result<Expression> {
-        self.get_next_token()?;
+        self.expect(TokenValue::LeftParen)?;
         let token = self.peek_next_token()?;
         let exp = match token.value {
             TokenValue::RightParen => {

@@ -172,7 +172,7 @@ impl<'a> ParserState<'a> {
                 let TokenValue::Operator(op) = self.get_next_token()?.value else {
                     return self.error("Can't happen");
                 };
-                self.expect(TokenValue::RightParen);
+                self.expect(TokenValue::RightParen)?;
                 return Ok(NameOrOperator::Name(Name::Plain(op)));
             },
             _ => {
