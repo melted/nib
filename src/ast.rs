@@ -81,11 +81,11 @@ pub struct FunClause {
 pub struct OpBinding {
     pub id: Node,
     pub op: Operator,
-    pub clauses: Vec<FunClause>
+    pub clauses: Vec<OpClause>
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct OpClauses {
+pub struct OpClause {
     pub id: Node,
     pub lpat: Pattern,
     pub rpat: Pattern,

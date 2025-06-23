@@ -1,5 +1,5 @@
 
-use crate::{ ast::{self, Binding, Binop, Cond, Declaration, Expression, Literal, Module, Name, Operator, Use}, 
+use crate::{ ast::{self, Binding, Binop, Cond, Declaration, Expression, FunBinding, FunClause, Literal, Module, Name, OpBinding, OpClause, Operator, Pattern, Use, VarBinding}, 
             common::{Error, Result}, parser::lexer::Token};
 
 use super::{ParserState, lexer::TokenValue};
@@ -167,7 +167,14 @@ impl<'a> ParserState<'a> {
             TokenValue::Identifier(id) => id,
             TokenValue::Operator(id) => {
                 return Ok(NameOrOperator::Operator(ast::Operator::Plain(id)))
-            }
+            },
+            TokenValue::LeftParen if self.is_next_operator()? => {
+                let TokenValue::Operator(op) = self.get_next_token()?.value else {
+                    return self.error("Can't happen");
+                };
+                self.expect(TokenValue::RightParen);
+                return Ok(NameOrOperator::Name(Name::Plain(op)));
+            },
             _ => {
                 return self.error(&format!("Expected identifier or operator, got {:?}", &first.value));
             }
@@ -180,7 +187,14 @@ impl<'a> ParserState<'a> {
                 TokenValue::Identifier(id) => id,
                 TokenValue::Operator(id) => {
                     return Ok(NameOrOperator::Operator(ast::Operator::Qualified(path, id)))
-                }
+                },
+                TokenValue::LeftParen if self.is_next_operator()? => {
+                    let TokenValue::Operator(op) = self.get_next_token()?.value else {
+                        return self.error("Can't happen");
+                    };
+                    self.expect(TokenValue::RightParen);
+                    return Ok(NameOrOperator::Name(Name::Qualified(path, op)));
+                },
                 _ => {
                     return self.error(&format!("Expected identifier or operator, got {:?}", &next.value));
                 }
@@ -323,6 +337,39 @@ impl<'a> ParserState<'a> {
             name: name
         })
     }
+
+    pub(super) fn var_binding(&mut self, pat:Pattern, rhs:Expression) -> Binding {
+        self.counter += 1;
+        Binding::VarBinding(VarBinding {
+            id: self.counter,
+            lhs: pat,
+            rhs: rhs
+        })
+    }
+
+    pub(super) fn fun_binding(&mut self, name:Name, args:Vec<Pattern>, rhs:Expression) -> Binding {
+        self.counter += 1;
+        let clauses = vec![FunClause { id: self.counter, args: args, rhs: rhs }];
+        self.counter += 1;
+        Binding::FunBinding(FunBinding {
+            id: self.counter,
+            name:name,
+            clauses:clauses
+        })
+    }
+
+    pub(super) fn op_binding(&mut self, op: Operator, lpat:Pattern, rpat:Pattern, rhs:Expression) -> Binding {
+        self.counter += 1;
+        let clauses = vec![OpClause { id: self.counter, lpat: lpat,rpat:rpat, rhs: rhs }];
+        self.counter += 1;
+        Binding::OpBinding(OpBinding {
+            id: self.counter,
+            op:op,
+            clauses:clauses
+        })
+    }
+
+    
 }
 
 pub enum NameOrOperator {

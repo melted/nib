@@ -27,6 +27,31 @@ impl<'a> ParserState<'a> {
     }
 
     pub(super) fn parse_binding(&mut self) -> Result<Binding> {
-        todo!()
+        if let Some(name) = self.try_parse(&mut Self::parse_name)? {
+            if self.is_next(TokenValue::Equals)? {
+                self.expect(TokenValue::Equals)?;
+                let rhs = self.parse_expression()?;
+                Ok(self.var_binding(pat, rhs))
+            } else {
+                let args = self.parse_some1(&mut Self::parse_pattern)?;
+                self.expect(TokenValue::Equals)?;
+                let rhs = self.parse_expression()?;
+                Ok(self.fun_binding(name, args, rhs)    )
+            }
+
+        } else {
+            let pat = self.parse_pattern()?;
+            if self.is_next(TokenValue::Equals)? {
+                self.expect(TokenValue::Equals)?;
+                let rhs = self.parse_expression()?;
+                Ok(self.var_binding(pat, rhs))
+            } else {
+                let op = self.parse_operator()?;
+                let rpat = self.parse_pattern()?;
+                self.expect(TokenValue::Equals);
+                let rhs = self.parse_expression()?;
+                Ok(self.op_binding(op, pat, rpat, rhs)  )
+            }
+        }
     }
 }
