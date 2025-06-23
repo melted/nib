@@ -31,7 +31,7 @@ impl<'a> ParserState<'a> {
             if self.is_next(TokenValue::Equals)? {
                 self.expect(TokenValue::Equals)?;
                 let rhs = self.parse_expression()?;
-                Ok(self.var_binding(pat, rhs))
+                Ok(self.var_binding(crate::ast::Pattern::Var(name), rhs))
             } else {
                 let args = self.parse_some1(&mut Self::parse_pattern)?;
                 self.expect(TokenValue::Equals)?;
