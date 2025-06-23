@@ -1,5 +1,5 @@
 
-use crate::{ ast::{self, Binding, Binop, Cond, Expression, Literal, Operator}, 
+use crate::{ ast::{self, Binding, Binop, Cond, Declaration, Expression, Literal, Module, Name, Operator, Use}, 
             common::{Error, Result}, parser::lexer::Token};
 
 use super::{ParserState, lexer::TokenValue};
@@ -147,7 +147,21 @@ impl<'a> ParserState<'a> {
         }
     }
 
-    pub(super) fn parse_name(&mut self) -> Result<NameOrOperator> {
+    pub(super) fn parse_name(&mut self) -> Result<Name> {
+        let NameOrOperator::Name(name) = self.parse_name_or_operator()? else {
+            return self.error("Expected a name, not an operator");
+        };
+        Ok(name)
+    }
+
+    pub(super) fn parse_operator(&mut self) -> Result<Operator> {
+        let NameOrOperator::Operator(op) = self.parse_name_or_operator()? else {
+            return self.error("Expected an operator, not a name");
+        };
+        Ok(op)
+    }
+
+    pub(super) fn parse_name_or_operator(&mut self) -> Result<NameOrOperator> {
         let first = self.get_next_token()?;
         let mut id = match first.value {
             TokenValue::Identifier(id) => id,
@@ -292,6 +306,22 @@ impl<'a> ParserState<'a> {
                 }
             )
         }
+    }
+
+    pub(super) fn module_declaration(&mut self, name:Name) -> Declaration {
+        self.counter += 1;
+        Declaration::Module(Module {
+            id: self.counter,
+            name: name
+        })
+    }
+
+    pub(super) fn use_declaration(&mut self, name:Name) -> Declaration {
+        self.counter += 1;
+        Declaration::Use(Use {
+            id: self.counter,
+            name: name
+        })
     }
 }
 

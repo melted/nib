@@ -59,11 +59,9 @@ impl<'a> ParserState<'a> {
         match self.peek_next_token()?.value {
             TokenValue::RightParen => Ok(Pattern::Literal(Literal::Nil)),
             TokenValue::Identifier(_) => {
-                let NameOrOperator::Name(n) = self.parse_name()? else {
-                    return self.error("Custom pattern must start with a name");
-                };
+                let name = self.parse_name()?;
                 let pats = self.parse_some(&mut Self::parse_pattern)?;
-                Ok(Pattern::Custom(n, pats))
+                Ok(Pattern::Custom(name , pats))
             }
             _ => {
                 self.error("Custom pattern must start with a name")

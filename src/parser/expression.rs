@@ -1,4 +1,4 @@
-use crate::ast::{Expression, Literal};
+use crate::ast::{Expression, Literal, Operator};
 use crate::common::Result;
 use crate::parser::helpers::NameOrOperator;
 use crate::parser::lexer::TokenValue;
@@ -21,6 +21,7 @@ impl<'a> ParserState<'a> {
             if self.next_indent() <= indent {
                 return Ok(lhs);
             }
+
             let result = match tok.value {
                 TokenValue::Where => { 
                     if min_pred < 2 {
@@ -29,9 +30,9 @@ impl<'a> ParserState<'a> {
                         break;
                     }
                 },
-                TokenValue::Operator(_) => {
+                TokenValue::Operator(op) => {
                     if min_pred < 6 {
-                        self.parse_binop_expression(lhs)?
+                        self.parse_binop_expression(lhs, Operator::Plain(op))?
                     } else {
                         break;
                     }
@@ -44,8 +45,20 @@ impl<'a> ParserState<'a> {
                     }
                 },
                 _ => {
-                    // This one is right leaning
-                    if min_pred < 9 {
+                    if self.is_next_identifier()? {
+                        match self.parse_name_or_operator()? {
+                            NameOrOperator::Name(name) if min_pred < 9 => {
+                                let var = self.var_expression(name);
+                                self.app_expression(lhs, var)
+                            },
+                            NameOrOperator::Operator(op) if min_pred < 6 => {
+                                self.parse_binop_expression(lhs, op)?
+                            }
+                            _ => {
+                                break;
+                            }
+                        }
+                    } else if min_pred < 9 {
                         let expr = self.try_parse(&mut |s|s.parse_inner_expression(9, false))?;
                         match expr {
                             Some(e) => self.app_expression(lhs, e),
@@ -76,9 +89,7 @@ impl<'a> ParserState<'a> {
             TokenValue::LeftBracket => self.parse_array_expression(),
             TokenValue::LeftParen => self.parse_paren_expression(),
             TokenValue::Identifier(_) => {
-                let NameOrOperator::Name(name) = self.parse_name()? else {
-                    return self.error("Expected a name and not an operator");
-                };
+                let name = self.parse_name()?;
                 Ok(self.var_expression(name))
             },
             _ => {
@@ -91,7 +102,7 @@ impl<'a> ParserState<'a> {
         todo!()
     }
 
-    pub(super) fn parse_binop_expression(&mut self, lhs:Expression) -> Result<Expression> {
+    pub(super) fn parse_binop_expression(&mut self, lhs:Expression, op:Operator) -> Result<Expression> {
         todo!()
     }
 

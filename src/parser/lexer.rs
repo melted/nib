@@ -150,7 +150,6 @@ impl<'a> super::ParserState<'a> {
         if let Ok(last) = self.snarf(|c| c.is_symbol() || c.is_ascii_punctuation()) {
             let id = &self.src[first..last];
             match id {
-                "?" => Ok(self.token(TokenValue::QuestionMark)),
                 "@" => Ok(self.token(TokenValue::As)),
                 "->" => Ok(self.token(TokenValue::RightArrow)),
                 "-" => {
@@ -410,7 +409,6 @@ pub enum TokenValue {
     Equals,
     Backslash,
     RightArrow,
-    QuestionMark,
     // Layout
     Eof,
 }

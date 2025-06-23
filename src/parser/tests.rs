@@ -30,7 +30,7 @@ fn parse_names() -> Result<()> {
     let ret = state.parse_name();
     assert!(ret.is_ok());
     match ret {
-        Ok(NameOrOperator::Name(Name::Qualified(p, n))) => {
+        Ok(Name::Qualified(p, n)) => {
             assert_eq!(n, "name");
             assert_eq!(p.len(), 1);
             assert_eq!(p[0], "a");
