@@ -1,5 +1,5 @@
 use crate::common::{ Error, Location };
-use std::collections::HashMap;
+use std::{collections::HashMap, path};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Metadata {
@@ -155,6 +155,34 @@ pub enum Literal {
 pub enum Name {
     Qualified(Vec<String>, String),
     Plain(String)
+}
+
+impl Name {
+    pub fn to_string(&self) -> String {
+        match self {
+            Name::Qualified(path, name) => {
+                let mut str = String::new();
+                for s in path {
+                    str.push_str(s);
+                    str.push_str(".");
+                }
+                str.push_str(name);
+                str
+            },
+            Name::Plain(name) => name.clone()
+        }
+    }
+
+    pub fn name(n : &str) -> Self {
+        let mut parts : Vec<&str> = n.split(".").collect();
+        if parts.len() == 1 {
+            Name::Plain(parts[0].to_string())
+        } else {
+            let base = parts.pop().unwrap();
+            let path = parts.iter().map(|s| s.to_string()).collect();
+            Name::Qualified(path, base.to_string())
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]

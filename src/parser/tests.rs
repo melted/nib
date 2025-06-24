@@ -1,7 +1,7 @@
 #![cfg(test)] 
 
 
-use crate::ast::{Declaration, Literal, Name};
+use crate::ast::{Binding, Declaration, Expression, ExpressionKind, Literal, Name, Pattern, VarBinding};
 use crate::common::Result;
 use crate::parser::helpers::NameOrOperator;
 use crate::parser::{lex, ParserState};
@@ -80,18 +80,50 @@ fn parse_literal_pattern() -> Result<()> {
 
 #[test]
 fn parse_module_declaration() -> Result<()> {
-    let mut state = ParserState::new("module cool.ddd");
+    let mut state = ParserState::new("module cool.mod");
     let decl = state.parse_declaration()?;
     if let Declaration::Module(module) = decl {
         assert_eq!(module.name,
-                   Name::Qualified(vec!["cool".to_string()], "ddd".to_string()));
+                   Name::Qualified(vec!["cool".to_string()], "mod".to_string()));
     } else {
         assert!(false);
     }
     Ok(())
 }
 
+
+#[test]
+fn parse_custom_pattern() -> Result<()> {
+    let mut state = ParserState::new("(pair a b)");
+    let pat = state.parse_pattern()?;
+    match pat {
+        Pattern::Custom(name,fields ) => {
+            assert_eq!(name.to_string(), "pair");
+            assert_eq!(fields[0], Pattern::Var(Name::name("a")));
+            assert_eq!(fields[1], Pattern::Var(Name::name("b")));
+        },
+        _ => assert!(false)
+    }
+    Ok(())
+}
+
+#[test]
+fn parse_simple_binding() -> Result<()> {
+    let mut state = ParserState::new("a = 1");
+    let decl = state.parse_declaration()?;
+    match decl {
+        Declaration::Binding(Binding::VarBinding(bind )) => {
+            assert_eq!(bind.lhs, Pattern::Var(Name::name("a")));
+            let exp = bind.rhs.expr;
+            assert_eq!(exp, ExpressionKind::Literal(Literal::Integer(1)));
+        }
+        _ => assert!(false)
+    }
+    Ok(())
+}
+
 #[test]
 fn empty_test_skeleton() -> Result<()> {
+    let mut state = ParserState::new("");
     Ok(())
 }
