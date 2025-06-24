@@ -2,7 +2,7 @@ use std::iter::Peekable;
 use std::str::CharIndices;
 
 use crate::common::{Error, Location, Result};
-use crate::ast::{Expression, Metadata, Node};
+use crate::ast::{Declaration, Expression, Metadata, Node};
 use crate::parser::lexer::{Token, TokenValue};
 
 mod declaration;
@@ -12,6 +12,13 @@ pub(crate) mod lexer;
 mod pattern;
 mod tests;
 
+
+pub fn parse_declarations(code: &str) -> Result<Vec<Declaration>> {
+    let mut state = ParserState::new(code);
+    let decls = state.parse_some(&mut ParserState::parse_declaration)?;
+    // TODO: create a better return value. One that allows for incremental parsing
+    Ok(decls)
+}
 
 
 pub fn parse_expression(code: &str) -> Result<Expression> {
@@ -50,6 +57,7 @@ struct ParserState<'a> {
     pos: usize,
     stashed_token: Option<Token>,
     indent_stack: Vec<i32>,
+    on_new_line: bool,
     counter: Node
 }
 
@@ -62,7 +70,9 @@ impl<'a> ParserState<'a> {
             pos: 0,
             stashed_token: None,
             indent_stack: Vec::new(),
-            counter: 0 }
+            on_new_line: true,
+            counter: 0
+        }
     }
 
     pub(self) fn new_error(&self, msg: &str) -> Error {

@@ -45,7 +45,7 @@ impl<'a> ParserState<'a> {
                     }
                 },
                 _ => {
-                    if self.is_next_identifier()? {
+                    if self.peek_identifier()? {
                         match self.parse_name_or_operator()? {
                             NameOrOperator::Name(name) if min_pred < 9 => {
                                 let var = self.var_expression(name);

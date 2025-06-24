@@ -29,7 +29,6 @@ impl<'a> ParserState<'a> {
     pub(super) fn parse_binding(&mut self) -> Result<Binding> {
         if let Some(name) = self.try_parse(&mut Self::parse_name)? {
             if self.is_next(TokenValue::Equals)? {
-                self.expect(TokenValue::Equals)?;
                 let rhs = self.parse_expression()?;
                 Ok(self.var_binding(crate::ast::Pattern::Var(name), rhs))
             } else {
@@ -42,7 +41,6 @@ impl<'a> ParserState<'a> {
         } else {
             let pat = self.parse_pattern()?;
             if self.is_next(TokenValue::Equals)? {
-                self.expect(TokenValue::Equals)?;
                 let rhs = self.parse_expression()?;
                 Ok(self.var_binding(pat, rhs))
             } else {

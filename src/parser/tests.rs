@@ -80,11 +80,11 @@ fn parse_literal_pattern() -> Result<()> {
 
 #[test]
 fn parse_module_declaration() -> Result<()> {
-    let mut state = ParserState::new("module cool.module");
+    let mut state = ParserState::new("module cool.ddd");
     let decl = state.parse_declaration()?;
     if let Declaration::Module(module) = decl {
         assert_eq!(module.name,
-                   Name::Qualified(vec!["cool".to_string()], "module".to_string()));
+                   Name::Qualified(vec!["cool".to_string()], "ddd".to_string()));
     } else {
         assert!(false);
     }

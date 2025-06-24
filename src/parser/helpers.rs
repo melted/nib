@@ -7,7 +7,7 @@ use super::{ParserState, lexer::TokenValue};
 
 /// General help functions for parsing
 impl<'a> ParserState<'a> {
-        pub(super) fn expect(&mut self, t: TokenValue) -> Result<()> {
+    pub(super) fn expect(&mut self, t: TokenValue) -> Result<()> {
         let next = self.get_next_token()?;
         if t != next.value {
             self.error(&format!("expected {:?}, got {:?}", t, next.value))
@@ -26,7 +26,7 @@ impl<'a> ParserState<'a> {
         }
     }
 
-    pub(super) fn is_next_identifier(&mut self) -> Result<bool> {
+    pub(super) fn peek_identifier(&mut self) -> Result<bool> {
         let next = self.peek_next_token()?;
         match next.value {
             TokenValue::Identifier(_) => Ok(true),
@@ -34,7 +34,7 @@ impl<'a> ParserState<'a> {
         }
     }
 
-    pub(super) fn is_next_operator(&mut self) -> Result<bool> {
+    pub(super) fn peek_operator(&mut self) -> Result<bool> {
         let next = self.peek_next_token()?;
         match next.value {
             TokenValue::Operator(_) => Ok(true),
@@ -42,45 +42,12 @@ impl<'a> ParserState<'a> {
         }
     }
 
-    pub(super) fn is_next_symbol(&mut self) -> Result<bool> {
+    pub(super) fn peek_literal(&mut self) -> Result<bool> {
         let next = self.peek_next_token()?;
-        match next.value {
-            TokenValue::Symbol(_) => Ok(true),
-            _ => Ok(false)
-        }
+        Ok(next.value.is_literal())
     }
 
-    pub(super) fn is_next_integer(&mut self) -> Result<bool> {
-        let next = self.peek_next_token()?;
-        match next.value {
-            TokenValue::Integer(_) => Ok(true),
-            _ => Ok(false)
-        }
-    }
 
-    pub(super) fn is_next_float(&mut self) -> Result<bool> {
-        let next = self.peek_next_token()?;
-        match next.value {
-            TokenValue::Float(_) => Ok(true),
-            _ => Ok(false)
-        }
-    }
-
-    pub(super) fn is_next_char(&mut self) -> Result<bool> {
-        let next = self.peek_next_token()?;
-        match next.value {
-            TokenValue::Char(_) => Ok(true),
-            _ => Ok(false)
-        }
-    }
-
-    pub(super) fn is_next_string(&mut self) -> Result<bool> {
-        let next = self.peek_next_token()?;
-        match next.value {
-            TokenValue::String(_) => Ok(true),
-            _ => Ok(false)
-        }
-    }
 
     pub(super) fn peek_next(&mut self, t: TokenValue) -> Result<bool> {
         let next = self.peek_next_token()?;
@@ -141,7 +108,7 @@ impl<'a> ParserState<'a> {
         match inner_parser(self) {
             Ok(res) => Ok(Some(res)),
             Err(_err) => {
-                self.token_start = start;
+                self.rewind_lexer(start);
                 Ok(None)
             }
         }
@@ -168,7 +135,7 @@ impl<'a> ParserState<'a> {
             TokenValue::Operator(id) => {
                 return Ok(NameOrOperator::Operator(ast::Operator::Plain(id)))
             },
-            TokenValue::LeftParen if self.is_next_operator()? => {
+            TokenValue::LeftParen if self.peek_operator()? => {
                 let TokenValue::Operator(op) = self.get_next_token()?.value else {
                     return self.error("Can't happen");
                 };
@@ -188,11 +155,11 @@ impl<'a> ParserState<'a> {
                 TokenValue::Operator(id) => {
                     return Ok(NameOrOperator::Operator(ast::Operator::Qualified(path, id)))
                 },
-                TokenValue::LeftParen if self.is_next_operator()? => {
+                TokenValue::LeftParen if self.peek_operator()? => {
                     let TokenValue::Operator(op) = self.get_next_token()?.value else {
                         return self.error("Can't happen");
                     };
-                    self.expect(TokenValue::RightParen);
+                    self.expect(TokenValue::RightParen)?;
                     return Ok(NameOrOperator::Name(Name::Qualified(path, op)));
                 },
                 _ => {
@@ -232,7 +199,7 @@ impl<'a> ParserState<'a> {
     pub(super) fn parse_byte(&mut self) -> Result<u8> {
         if let TokenValue::Integer(b) = self.peek_next_token()?.value {
             self.get_next_token()?;
-            let v:u8 =b.try_into().map_err(|e|self.new_error(&format!("Invalid bytearray literal: {b:?}")))?;
+            let v:u8 =b.try_into().map_err(|_e|self.new_error(&format!("Invalid bytearray literal: {b:?}")))?;
             Ok(v)
         } else {
             let tok = self.get_next_token()?;

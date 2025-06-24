@@ -32,7 +32,6 @@ impl<'a> ParserState<'a> {
         };
 
         if self.is_next(TokenValue::As)? {
-            self.get_next_token()?;
             let tok = self.get_next_token()?;
             match tok.value {
                 TokenValue::Identifier(name) => {

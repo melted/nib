@@ -22,6 +22,11 @@ impl<'a> super::ParserState<'a> {
         while let Some((p, c)) = self.chars.peek() {
             self.token_start = *p;
             let tok = match *c {
+                '\n' => {
+                    self.on_new_line = true;
+                    self.next();
+                    None
+                },
                 _ if c.is_whitespace() => {
                     self.next();
                     None
@@ -99,6 +104,14 @@ impl<'a> super::ParserState<'a> {
         Ok(self.token(TokenValue::Eof))
     }
 
+    pub(super) fn rewind_lexer(&mut self, pos:usize) {
+        self.pos = pos;
+        self.chars = self.src.char_indices().peekable();
+        if pos > 0 {
+            self.chars.nth(pos-1);
+        }
+    }
+
     pub(super) fn token_indent(&self, token:Token) -> i32 {
         let start = match token.location {
             Location::Offset { start, .. } => start,
@@ -120,9 +133,20 @@ impl<'a> super::ParserState<'a> {
         } 
     }
 
-    pub(super) fn current_line(&mut self) -> usize {
-        self.metadata.newlines.len()
+    pub(super) fn line(&mut self, t:Token) -> Option<usize> {
+        let total = self.metadata.newlines.len();
+        let Location::Offset { start, end } = t.location else {
+            return None;
+        };
+        for (i, nl) in self.metadata.newlines.iter().rev().enumerate() {
+            if *nl < end {
+                return Some(total - i);
+            }
+        }
+        return Some(0);
     }
+
+
 
     fn read_identifier(&mut self) -> Result<Token> {
         let first = self.pos;
@@ -348,9 +372,12 @@ impl<'a> super::ParserState<'a> {
     }
 
     fn token(&mut self, token: TokenValue) -> Token {
+        let nl = self.on_new_line;
+        self.on_new_line = false;
         Token {
             value: token,
             location: self.location_current_token(),
+            on_new_line: nl
         }
     }
 
@@ -417,6 +444,7 @@ pub enum TokenValue {
 pub struct Token {
     pub value: TokenValue,
     pub location: Location,
+    pub on_new_line: bool,
 }
 
 impl Token {
@@ -424,6 +452,7 @@ impl Token {
         Token {
             value,
             location: Location::Unlocated,
+            on_new_line: false
         }
     }
 
