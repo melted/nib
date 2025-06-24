@@ -1,7 +1,7 @@
 #![cfg(test)] 
 
 
-use crate::ast::{Literal, Name};
+use crate::ast::{Declaration, Literal, Name};
 use crate::common::Result;
 use crate::parser::helpers::NameOrOperator;
 use crate::parser::{lex, ParserState};
@@ -75,5 +75,23 @@ fn parse_literal_expression() -> Result<()> {
 fn parse_literal_pattern() -> Result<()> {
     let mut state = ParserState::new("1");
     let pat = state.parse_pattern()?;
+    Ok(())
+}
+
+#[test]
+fn parse_module_declaration() -> Result<()> {
+    let mut state = ParserState::new("module cool.module");
+    let decl = state.parse_declaration()?;
+    if let Declaration::Module(module) = decl {
+        assert_eq!(module.name,
+                   Name::Qualified(vec!["cool".to_string()], "module".to_string()));
+    } else {
+        assert!(false);
+    }
+    Ok(())
+}
+
+#[test]
+fn empty_test_skeleton() -> Result<()> {
     Ok(())
 }
