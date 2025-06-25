@@ -15,7 +15,7 @@ mod tests;
 
 pub fn parse_declarations(code: &str) -> Result<Vec<Declaration>> {
     let mut state = ParserState::new(code);
-    let decls = state.parse_some(&mut ParserState::parse_declaration)?;
+    let decls = state.parse_declarations()?;
     // TODO: create a better return value. One that allows for incremental parsing
     Ok(decls)
 }
@@ -31,7 +31,6 @@ pub fn lex(code: &str) -> Result<Vec<Token>> {
     let mut tokens = Vec::new();
     loop {
         let tok = state.get_next_token()?;
-        println!("{:?}", &tok);
         if tok == TokenValue::Eof {
             tokens.push(tok);
             break;
@@ -45,6 +44,14 @@ pub fn dump_lex(code: &str) -> Result<()> {
     let tokens = lex(code)?;
     for t in tokens {
         println!("{:?}", t);
+    }
+    Ok(())
+}
+
+pub fn dump_prog(code: &str) -> Result<()> {
+    let decls = parse_declarations(code)?;
+    for d in decls {
+        println!("{:?}", d);
     }
     Ok(())
 }

@@ -1,5 +1,5 @@
-use crate::common::{ Error, Location };
-use std::{collections::HashMap, path};
+use crate::common::Location;
+use std::{collections::HashMap};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Metadata {

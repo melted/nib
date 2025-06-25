@@ -2,6 +2,17 @@ use crate::{ast::{Binding, Declaration}, common::Result, parser::{lexer::TokenVa
 
 
 impl<'a> ParserState<'a> {
+    pub(super) fn parse_declarations(&mut self) -> Result<Vec<Declaration>> {
+        let mut decls = Vec::new();
+        loop {
+            if self.is_next(TokenValue::Eof)? {
+                break;
+            }
+            self.parse_add_declaration(&mut decls)?;
+        }
+        Ok(decls)
+    }
+
     pub(super) fn parse_declaration(&mut self) -> Result<Declaration> {
         let token = self.peek_next_token()?;
         match token.value {
@@ -13,6 +24,35 @@ impl<'a> ParserState<'a> {
             }
         }
     }
+
+    pub(super) fn merge_same_binding(a: &mut Declaration, b:&mut Declaration) -> bool {
+        match (a, b) {
+            (Declaration::Binding(Binding::FunBinding(abind)), Declaration::Binding(Binding::FunBinding(bbind))) if abind.name == bbind.name => {
+                abind.clauses.append(&mut bbind.clauses);
+                true
+            },            
+            (Declaration::Binding(Binding::OpBinding(abind)), Declaration::Binding(Binding::OpBinding(bbind))) if abind.op == bbind.op => {
+                abind.clauses.append(&mut bbind.clauses);
+                true
+            },
+            _ => false
+        }
+    }
+
+    pub(super) fn parse_add_declaration(&mut self, decls:&mut Vec<Declaration>) -> Result<()> {
+        let mut decl = self.parse_declaration()?;
+        let Some(mut last) = decls.last_mut() else {
+            decls.push(decl);
+            return Ok(());
+        };
+        if Self::merge_same_binding(&mut last, &mut decl) {
+            Ok(())
+        } else {
+            decls.push(decl);
+            Ok(())
+        }
+    }
+
 
     pub(super) fn parse_module_declaration(&mut self) -> Result<Declaration> {
         self.expect(TokenValue::Module)?;

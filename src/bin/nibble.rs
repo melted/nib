@@ -9,5 +9,6 @@ fn main() -> io::Result<()> {
     let mut stdin = io::stdin();
     stdin.read_to_string(&mut buffer)?;
     parser::dump_lex(&buffer)?;
+    parser::dump_prog(&buffer)?;
     Ok(())
 }

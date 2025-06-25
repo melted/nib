@@ -1,4 +1,4 @@
-use crate::{ast::{Literal, Name, Pattern}, parser::helpers::NameOrOperator};
+use crate::{ast::{Literal, Name, Pattern}};
 use super::{ ParserState, lexer::TokenValue };
 use crate::common::Result;
 

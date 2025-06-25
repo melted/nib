@@ -23,6 +23,7 @@ impl<'a> super::ParserState<'a> {
             self.token_start = *p;
             let tok = match *c {
                 '\n' => {
+                    self.metadata.newlines.push(*p);
                     self.on_new_line = true;
                     self.next();
                     None
@@ -105,7 +106,24 @@ impl<'a> super::ParserState<'a> {
     }
 
     pub(super) fn rewind_lexer(&mut self, pos:usize) {
+        if pos >= self.pos {
+            return;
+        }
+        let prev = self.pos;
+        println!("rewinding from {prev} to {pos}");
         self.pos = pos;
+        loop {
+            let Some(last) = self.metadata.newlines.last() else {
+                break;
+            };
+            let l = *last;
+            if l > pos {
+                self.metadata.newlines.pop();
+            } else {
+                break;
+            }
+        }
+        self.stashed_token = None;
         self.chars = self.src.char_indices().peekable();
         if pos > 0 {
             self.chars.nth(pos-1);
@@ -132,21 +150,6 @@ impl<'a> super::ParserState<'a> {
             _ => 0
         } 
     }
-
-    pub(super) fn line(&mut self, t:Token) -> Option<usize> {
-        let total = self.metadata.newlines.len();
-        let Location::Offset { start, end } = t.location else {
-            return None;
-        };
-        for (i, nl) in self.metadata.newlines.iter().rev().enumerate() {
-            if *nl < end {
-                return Some(total - i);
-            }
-        }
-        return Some(0);
-    }
-
-
 
     fn read_identifier(&mut self) -> Result<Token> {
         let first = self.pos;
@@ -177,6 +180,7 @@ impl<'a> super::ParserState<'a> {
                 "=" => Ok(self.token(TokenValue::Equals)),
                 "@" => Ok(self.token(TokenValue::As)),
                 "->" => Ok(self.token(TokenValue::RightArrow)),
+                "=>" => Ok(self.token(TokenValue::FatRightArrow)),
                 "-" => {
                     match self.chars.peek() {
                         Some((_, ch)) if ch.is_numeric() => self.read_number(true),
@@ -437,6 +441,8 @@ pub enum TokenValue {
     Equals,
     Backslash,
     RightArrow,
+    FatRightArrow,
+    Bar,
     // Layout
     Eof,
 }

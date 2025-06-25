@@ -8,20 +8,19 @@ use super::ParserState;
 
 impl<'a> ParserState<'a> {
     pub(super) fn parse_expression(&mut self) -> Result<Expression> {
-        self.parse_inner_expression(0, false)
+        self.parse_inner_expression(0)
     }
 
-    pub(super) fn parse_inner_expression(&mut self, min_pred:i32, in_paren:bool) -> Result<Expression> {
-        let indent = if in_paren { -1 } else { self.indent() }; // TODO: maybe it's reasonable that
-                                                                     // paren expressions have to indent too?
+    pub(super) fn parse_inner_expression(&mut self, min_pred:i32) -> Result<Expression> {
+        let indent = self.indent();
         self.indent_stack.push(indent);
         let mut lhs = self.parse_left_expression()?;
         loop {
             let tok = self.peek_next_token()?;
             if self.next_indent() <= indent {
+                dbg!(indent);
                 return Ok(lhs);
             }
-
             let result = match tok.value {
                 TokenValue::Where => { 
                     if min_pred < 2 {
@@ -32,12 +31,13 @@ impl<'a> ParserState<'a> {
                 },
                 TokenValue::Operator(op) => {
                     if min_pred < 6 {
+                        self.get_next_token()?;
                         self.parse_binop_expression(lhs, Operator::Plain(op))?
                     } else {
                         break;
                     }
                 },
-                TokenValue::RightArrow => {
+                TokenValue::FatRightArrow => {
                     if min_pred < 4 {
                         self.parse_cond_expression(lhs)?
                     } else {
@@ -59,7 +59,7 @@ impl<'a> ParserState<'a> {
                             }
                         }
                     } else if min_pred < 9 {
-                        let expr = self.try_parse(&mut |s|s.parse_inner_expression(9, false))?;
+                        let expr = self.try_parse(&mut |s|s.parse_inner_expression(9))?;
                         match expr {
                             Some(e) => self.app_expression(lhs, e),
                             None => {
@@ -98,24 +98,67 @@ impl<'a> ParserState<'a> {
         }
     }
 
+    fn semicolon_or_newline(&mut self) -> Result<bool> {
+        let next = self.peek_next_token()?;
+        if next.on_new_line {
+            Ok(true)
+        } else if next.value == TokenValue::Semicolon {
+            self.expect(TokenValue::Semicolon)?;
+            Ok(true)
+        } else {
+            Ok(false)
+        }
+    }
+
     pub(super) fn parse_where_expression(&mut self, lhs:Expression) -> Result<Expression> {
-        todo!()
+        self.expect(TokenValue::Where)?;
+        let mut bindings = Vec::new();
+        loop {
+            let binding = self.parse_binding()?;
+            bindings.push(binding);
+            if !self.semicolon_or_newline()? {
+                break;
+            }
+        }
+        Ok(self.where_expression(lhs, bindings))
     }
 
     pub(super) fn parse_binop_expression(&mut self, lhs:Expression, op:Operator) -> Result<Expression> {
-        todo!()
+        let rhs = self.parse_inner_expression(5)?;
+        Ok(self.binop_expression(op, lhs, rhs))
     }
 
     pub(super) fn parse_cond_expression(&mut self, lhs:Expression) -> Result<Expression> {
-        todo!()
+        let on_true = self.parse_inner_expression(3)?;
+        if self.semicolon_or_newline()? {
+            let on_false = self.parse_inner_expression(3)?;
+            Ok(self.cond_expression(lhs, on_true, on_false))
+        } else {
+            self.error("Missing else expression in => expression")
+        }
     }
 
     pub(super) fn parse_lambda_expression(&mut self) -> Result<Expression> {
-        todo!()
+        self.expect(TokenValue::LeftBrace)?;
+        let mut clauses = Vec::new();
+        loop {
+            let args = self.parse_some1(&mut Self::parse_pattern)?;
+            self.expect(TokenValue::RightArrow)?;
+            let expr = self.parse_expression()?;
+            clauses.push(self.fun_clause(args, expr));
+            if !self.semicolon_or_newline()? {
+                break;
+            }
+        }
+        self.expect(TokenValue::RightBrace)?;
+        Ok(self.lambda_expression(clauses))
     }
 
     pub(super) fn parse_array_expression(&mut self) -> Result<Expression> {
-        todo!()
+        self.expect(TokenValue::LeftBracket)?;
+        let exprs = self.parse_separated_by(&mut Self::parse_expression, TokenValue::Comma)?;
+        self.expect(TokenValue::RightBracket)?;
+        Ok(self.array_expression(exprs))
     }
 
     pub(super) fn parse_paren_expression(&mut self) -> Result<Expression> {
@@ -132,7 +175,7 @@ impl<'a> ParserState<'a> {
                 self.var_expression(crate::ast::Name::Plain(op))
             },
             _ => {
-                let exp = self.parse_inner_expression(0, true)?;
+                let exp = self.parse_inner_expression(0)?;
                 self.expect(TokenValue::RightParen)?;
                 exp
             }

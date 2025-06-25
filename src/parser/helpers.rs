@@ -1,6 +1,6 @@
 
 use crate::{ ast::{self, Binding, Binop, Cond, Declaration, Expression, FunBinding, FunClause, Literal, Module, Name, OpBinding, OpClause, Operator, Pattern, Use, VarBinding}, 
-            common::{Error, Result}, parser::lexer::Token};
+            common::Result};
 
 use super::{ParserState, lexer::TokenValue};
 
@@ -46,8 +46,6 @@ impl<'a> ParserState<'a> {
         let next = self.peek_next_token()?;
         Ok(next.value.is_literal())
     }
-
-
 
     pub(super) fn peek_next(&mut self, t: TokenValue) -> Result<bool> {
         let next = self.peek_next_token()?;
@@ -315,8 +313,7 @@ impl<'a> ParserState<'a> {
     }
 
     pub(super) fn fun_binding(&mut self, name:Name, args:Vec<Pattern>, rhs:Expression) -> Binding {
-        self.counter += 1;
-        let clauses = vec![FunClause { id: self.counter, args: args, rhs: rhs }];
+        let clauses = vec![self.fun_clause(args, rhs)];
         self.counter += 1;
         Binding::FunBinding(FunBinding {
             id: self.counter,
@@ -325,6 +322,11 @@ impl<'a> ParserState<'a> {
         })
     }
 
+    pub(super) fn fun_clause(&mut self, args:Vec<Pattern>, rhs:Expression) -> FunClause {
+        self.counter += 1;
+        FunClause { id: self.counter, args: args, rhs: rhs }
+    }
+ 
     pub(super) fn op_binding(&mut self, op: Operator, lpat:Pattern, rpat:Pattern, rhs:Expression) -> Binding {
         self.counter += 1;
         let clauses = vec![OpClause { id: self.counter, lpat: lpat,rpat:rpat, rhs: rhs }];

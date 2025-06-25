@@ -1,0 +1,10 @@
+module testy
+
+a = 3
+
+fac 0 = 1
+fac n = n * fac (n - 1)
+
+// c = 3
+
+// (something 1 2) = make_something ()
