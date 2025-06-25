@@ -66,10 +66,20 @@ fn parse_invalid_bytearray_literal() -> Result<()> {
 
 #[test]
 fn parse_literal_expression() -> Result<()> {
-    let mut state = ParserState::new("1");
+    let mut state = ParserState::new("a");
     let exp = state.parse_expression()?;
     Ok(())
 }
+
+
+#[test]
+fn parse_binop_expression() -> Result<()> {
+    let mut state = ParserState::new("1 + 2");
+    let exp = state.parse_expression()?;
+    dbg!(exp);
+    Ok(())
+}
+
 
 #[test]
 fn parse_literal_pattern() -> Result<()> {

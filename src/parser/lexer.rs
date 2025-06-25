@@ -7,23 +7,24 @@ use crate::common::Result;
 impl<'a> super::ParserState<'a> {
     pub(super) fn peek_next_token(&mut self) -> Result<Token> {
         let tok = self.get_next_token()?;
-        self.stashed_token = Some(tok.clone());
+        self.next_token -= 1;
         Ok(tok)
     }
 
     pub(super) fn get_next_token(&mut self) -> Result<Token> {
-        let stashed = self.stashed_token.take();
-        match stashed {
-            Some(t) => {
-                return Ok(t);
-            },
-            _ => {}
-        };
+        if self.next_token < self.tokens.len() {
+            let tok = self.tokens[self.next_token].clone();
+            self.next_token += 1;
+            return Ok(tok)
+        }
         while let Some((p, c)) = self.chars.peek() {
             self.token_start = *p;
             let tok = match *c {
                 '\n' => {
-                    self.metadata.newlines.push(*p);
+                    let last = *self.metadata.newlines.last().unwrap_or(&0);
+                    if *p > last {
+                        self.metadata.newlines.push(*p);
+                    }
                     self.on_new_line = true;
                     self.next();
                     None
@@ -99,34 +100,22 @@ impl<'a> super::ParserState<'a> {
             };
 
             if let Some(t) = tok {
+                self.tokens.push(t.clone());
+                self.next_token += 1;
                 return Ok(t);
             }
         }
         Ok(self.token(TokenValue::Eof))
     }
 
-    pub(super) fn rewind_lexer(&mut self, pos:usize) {
-        if pos >= self.pos {
-            return;
-        }
-        let prev = self.pos;
-        println!("rewinding from {prev} to {pos}");
-        self.pos = pos;
-        loop {
-            let Some(last) = self.metadata.newlines.last() else {
-                break;
-            };
-            let l = *last;
-            if l > pos {
-                self.metadata.newlines.pop();
-            } else {
-                break;
+    pub(super) fn rewind_lexer(&mut self, checkpoint:usize) {
+        println!("rewinding from {} to {}, tokens = {}", self.next_token, checkpoint, self.tokens.len());
+        if checkpoint < self.tokens.len() {
+            let loc = self.tokens[checkpoint].location;
+            if let Location::Offset { start, end } = loc {
+                self.pos = start;
             }
-        }
-        self.stashed_token = None;
-        self.chars = self.src.char_indices().peekable();
-        if pos > 0 {
-            self.chars.nth(pos-1);
+            self.next_token = checkpoint;
         }
     }
 
@@ -162,6 +151,7 @@ impl<'a> super::ParserState<'a> {
                 "do" => Ok(self.token(TokenValue::Do)),
                 "true" => Ok(self.token(TokenValue::True)),
                 "false" => Ok(self.token(TokenValue::False)),
+                "where" => Ok(self.token(TokenValue::Where)),
                 "_" => Ok(self.token(TokenValue::Underscore)),
                 _ => {
                     Ok(self.token(TokenValue::Identifier(id.to_string())))
@@ -181,12 +171,7 @@ impl<'a> super::ParserState<'a> {
                 "@" => Ok(self.token(TokenValue::As)),
                 "->" => Ok(self.token(TokenValue::RightArrow)),
                 "=>" => Ok(self.token(TokenValue::FatRightArrow)),
-                "-" => {
-                    match self.chars.peek() {
-                        Some((_, ch)) if ch.is_numeric() => self.read_number(true),
-                        _ => Ok(self.token(TokenValue::Operator(id.to_string())))
-                    }
-                },
+                "-" =>  Ok(self.token(TokenValue::Operator(id.to_string()))),
                 _ => {
                     Ok(self.token(TokenValue::Operator(id.to_string())))
                 }

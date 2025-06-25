@@ -44,21 +44,23 @@ impl<'a> ParserState<'a> {
                         break;
                     }
                 },
-                _ => {
-                    if self.peek_identifier()? {
-                        match self.parse_name_or_operator()? {
-                            NameOrOperator::Name(name) if min_pred < 9 => {
-                                let var = self.var_expression(name);
-                                self.app_expression(lhs, var)
-                            },
-                            NameOrOperator::Operator(op) if min_pred < 6 => {
-                                self.parse_binop_expression(lhs, op)?
-                            }
-                            _ => {
-                                break;
-                            }
+                TokenValue::Identifier(_) => {
+                    match self.parse_name_or_operator()? {
+                        NameOrOperator::Name(name) if min_pred < 9 => {
+                            let var = self.var_expression(name);
+                            self.app_expression(lhs, var)
+                        },
+                        NameOrOperator::Operator(op) if min_pred < 6 => {
+                            self.parse_binop_expression(lhs, op)?
                         }
-                    } else if min_pred < 9 {
+                        _ => {
+                            break;
+                        }
+                    }
+                },
+                TokenValue::Eof => break,
+                _ => {
+                    if min_pred < 9 {
                         let expr = self.try_parse(&mut |s|s.parse_inner_expression(9))?;
                         match expr {
                             Some(e) => self.app_expression(lhs, e),
@@ -100,13 +102,15 @@ impl<'a> ParserState<'a> {
 
     fn semicolon_or_newline(&mut self) -> Result<bool> {
         let next = self.peek_next_token()?;
-        if next.on_new_line {
-            Ok(true)
-        } else if next.value == TokenValue::Semicolon {
-            self.expect(TokenValue::Semicolon)?;
-            Ok(true)
-        } else {
-            Ok(false)
+
+        match next.value {
+            TokenValue::Semicolon => {
+                self.expect(TokenValue::Semicolon)?;
+                Ok(true)
+            }, 
+            TokenValue::Eof => Ok(false),
+            _ if next.on_new_line => Ok(true),
+            _ => Ok(false)
         }
     }
 
@@ -124,14 +128,14 @@ impl<'a> ParserState<'a> {
     }
 
     pub(super) fn parse_binop_expression(&mut self, lhs:Expression, op:Operator) -> Result<Expression> {
-        let rhs = self.parse_inner_expression(5)?;
+        let rhs = self.parse_inner_expression(6)?;
         Ok(self.binop_expression(op, lhs, rhs))
     }
 
     pub(super) fn parse_cond_expression(&mut self, lhs:Expression) -> Result<Expression> {
-        let on_true = self.parse_inner_expression(3)?;
+        let on_true = self.parse_inner_expression(5)?;
         if self.semicolon_or_newline()? {
-            let on_false = self.parse_inner_expression(3)?;
+            let on_false = self.parse_inner_expression(5)?;
             Ok(self.cond_expression(lhs, on_true, on_false))
         } else {
             self.error("Missing else expression in => expression")

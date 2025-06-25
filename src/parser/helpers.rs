@@ -72,7 +72,7 @@ impl<'a> ParserState<'a> {
         Ok(output)
     }
 
-    pub(super) fn parse_some1<T>(
+    pub(super) fn parse_some1<T> (
         &mut self,
         inner_parser: &mut impl FnMut(&mut Self) -> Result<T>,
     ) -> Result<Vec<T>> {
@@ -102,21 +102,24 @@ impl<'a> ParserState<'a> {
         &mut self,
         inner_parser: &mut impl FnMut(&mut Self) -> Result<T>,
     ) -> Result<Option<T>> {
-        let start = self.token_start;
+        let checkpoint = self.next_token;
         match inner_parser(self) {
             Ok(res) => Ok(Some(res)),
             Err(_err) => {
-                self.rewind_lexer(start);
+                if checkpoint != self.next_token {
+                    self.rewind_lexer(checkpoint);
+                }
                 Ok(None)
             }
         }
     }
 
     pub(super) fn parse_name(&mut self) -> Result<Name> {
-        let NameOrOperator::Name(name) = self.parse_name_or_operator()? else {
-            return self.error("Expected a name, not an operator");
-        };
-        Ok(name)
+        match self.parse_name_or_operator()? {
+            NameOrOperator::Name(name) => Ok(name),
+            NameOrOperator::Operator(Operator::Plain(op)) if op == "-" => Ok(Name::Plain("negate".to_string())), 
+            _ => self.error("Expected a name, not an operator")
+        }
     }
 
     pub(super) fn parse_operator(&mut self) -> Result<Operator> {

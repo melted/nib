@@ -4,11 +4,10 @@ use crate::{ast::{Binding, Declaration}, common::Result, parser::{lexer::TokenVa
 impl<'a> ParserState<'a> {
     pub(super) fn parse_declarations(&mut self) -> Result<Vec<Declaration>> {
         let mut decls = Vec::new();
-        loop {
+        while self.parse_add_declaration(&mut decls)? {
             if self.is_next(TokenValue::Eof)? {
                 break;
             }
-            self.parse_add_declaration(&mut decls)?;
         }
         Ok(decls)
     }
@@ -39,20 +38,21 @@ impl<'a> ParserState<'a> {
         }
     }
 
-    pub(super) fn parse_add_declaration(&mut self, decls:&mut Vec<Declaration>) -> Result<()> {
-        let mut decl = self.parse_declaration()?;
+    pub(super) fn parse_add_declaration(&mut self, decls:&mut Vec<Declaration>) -> Result<bool> {
+        let Some(mut decl) = self.try_parse(&mut Self::parse_declaration)? else {
+            return Ok(false);
+        };
         let Some(mut last) = decls.last_mut() else {
             decls.push(decl);
-            return Ok(());
+            return Ok(true);
         };
         if Self::merge_same_binding(&mut last, &mut decl) {
-            Ok(())
+            Ok(true)
         } else {
             decls.push(decl);
-            Ok(())
+            Ok(true)
         }
     }
-
 
     pub(super) fn parse_module_declaration(&mut self) -> Result<Declaration> {
         self.expect(TokenValue::Module)?;
@@ -68,6 +68,8 @@ impl<'a> ParserState<'a> {
 
     pub(super) fn parse_binding(&mut self) -> Result<Binding> {
         if let Some(name) = self.try_parse(&mut Self::parse_name)? {
+            dbg!(&name);
+            dbg!(&self.peek_next_token());
             if self.is_next(TokenValue::Equals)? {
                 let rhs = self.parse_expression()?;
                 Ok(self.var_binding(crate::ast::Pattern::Var(name), rhs))
@@ -75,7 +77,7 @@ impl<'a> ParserState<'a> {
                 let args = self.parse_some1(&mut Self::parse_pattern)?;
                 self.expect(TokenValue::Equals)?;
                 let rhs = self.parse_expression()?;
-                Ok(self.fun_binding(name, args, rhs)    )
+                Ok(self.fun_binding(name, args, rhs))
             }
 
         } else {

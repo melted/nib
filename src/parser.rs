@@ -62,8 +62,9 @@ struct ParserState<'a> {
     chars: Peekable<CharIndices<'a>>,
     token_start: usize,
     pos: usize,
-    stashed_token: Option<Token>,
+    next_token: usize,
     indent_stack: Vec<i32>,
+    tokens: Vec<Token>,
     on_new_line: bool,
     counter: Node
 }
@@ -75,8 +76,9 @@ impl<'a> ParserState<'a> {
             chars: code.char_indices().peekable(),
             token_start: 0,
             pos: 0,
-            stashed_token: None,
+            next_token: 0,
             indent_stack: Vec::new(),
+            tokens: Vec::new(),
             on_new_line: true,
             counter: 0
         }

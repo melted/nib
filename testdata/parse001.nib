@@ -4,7 +4,14 @@ a = 3
 
 fac 0 = 1
 fac n = n * fac (n - 1)
+//c = a + b where 
+//        a = 4; b = 8
 
-// c = 3
 
-// (something 1 2) = make_something ()
+fib n = go 1 0 n where
+            go a _ 0 = a
+            go a b n = go (a+b) a (n-1)
+
+c = 3
+
+(something 1 2) = make_something ()
