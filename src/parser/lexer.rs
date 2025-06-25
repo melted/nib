@@ -75,7 +75,7 @@ impl<'a> super::ParserState<'a> {
                             Some(self.token(TokenValue::HashLeftBracket))
                         }, 
                         _ => {
-                            Some(self.token(TokenValue::Operator("#".to_string())))
+                            Some(self.read_operator()?)
                         }
                     }
                 },
@@ -84,7 +84,7 @@ impl<'a> super::ParserState<'a> {
                         self.snarf(|c| *c != '\n')?;
                         None
                     } else {
-                        Some(self.token(TokenValue::Operator("/".to_string())))
+                        Some(self.read_operator()?)
                     }
                 },
                 '"' => Some(self.read_string()?),
