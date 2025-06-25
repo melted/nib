@@ -2,7 +2,6 @@ use crate::{ast::{Literal, Name, Pattern}};
 use super::{ ParserState, lexer::TokenValue };
 use crate::common::Result;
 
-
 impl<'a> ParserState<'a> {
     pub(super) fn parse_pattern(&mut self) -> Result<Pattern> {
         let tok = self.peek_next_token()?;

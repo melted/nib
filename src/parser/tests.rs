@@ -1,6 +1,4 @@
 #![cfg(test)] 
-
-
 use crate::ast::{Binding, Declaration, Expression, ExpressionKind, Literal, Name, Pattern, VarBinding};
 use crate::common::Result;
 use crate::parser::helpers::NameOrOperator;
@@ -71,15 +69,12 @@ fn parse_literal_expression() -> Result<()> {
     Ok(())
 }
 
-
 #[test]
 fn parse_binop_expression() -> Result<()> {
     let mut state = ParserState::new("1 + 2");
     let exp = state.parse_expression()?;
-    dbg!(exp);
     Ok(())
 }
-
 
 #[test]
 fn parse_literal_pattern() -> Result<()> {
@@ -100,7 +95,6 @@ fn parse_module_declaration() -> Result<()> {
     }
     Ok(())
 }
-
 
 #[test]
 fn parse_custom_pattern() -> Result<()> {

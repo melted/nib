@@ -18,7 +18,6 @@ impl<'a> ParserState<'a> {
         loop {
             let tok = self.peek_next_token()?;
             if self.next_indent() <= indent {
-                dbg!(indent);
                 return Ok(lhs);
             }
             let result = match tok.value {
