@@ -117,7 +117,6 @@ impl<'a> ParserState<'a> {
     pub(super) fn parse_name(&mut self) -> Result<Name> {
         match self.parse_name_or_operator()? {
             NameOrOperator::Name(name) => Ok(name),
-            NameOrOperator::Operator(Operator::Plain(op)) if op == "-" => Ok(Name::Plain("negate".to_string())), 
             _ => self.error("Expected a name, not an operator")
         }
     }

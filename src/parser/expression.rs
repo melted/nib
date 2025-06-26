@@ -1,4 +1,4 @@
-use crate::ast::{Expression, Literal, Operator};
+use crate::ast::{Expression, Literal, Name, Operator};
 use crate::common::Result;
 use crate::parser::helpers::NameOrOperator;
 use crate::parser::lexer::TokenValue;
@@ -60,7 +60,7 @@ impl<'a> ParserState<'a> {
                 TokenValue::Eof => break,
                 _ => {
                     if min_pred < 9 {
-                        let expr = self.try_parse(&mut |s|s.parse_inner_expression(9))?;
+                        let expr = self.try_parse(&mut |s|s.parse_inner_expression(8))?;
                         match expr {
                             Some(e) => self.app_expression(lhs, e),
                             None => {
@@ -93,6 +93,10 @@ impl<'a> ParserState<'a> {
                 let name = self.parse_name()?;
                 Ok(self.var_expression(name))
             },
+            TokenValue::Operator(op) if op == "-" => {
+                // Special rule for prefix -, it's sugar for negate.
+                Ok(self.var_expression(Name::name("negate")))
+            }
             _ => {
                 self.error(&format!("Illegal token in left expression {tok:?}"))
             }
