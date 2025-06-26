@@ -37,6 +37,8 @@ impl<'a> super::ParserState<'a> {
                 ')' => Some(self.simple_token(TokenValue::RightParen)),
                 '[' => Some(self.simple_token(TokenValue::LeftBracket)),
                 ']' => Some(self.simple_token(TokenValue::RightBracket)),
+                '{' => Some(self.simple_token(TokenValue::LeftBrace)),
+                '}' => Some(self.simple_token(TokenValue::RightBrace)),
                 '`' => {
                     self.next();
                     let TokenValue::Identifier(id) = self.read_identifier()?.value else {

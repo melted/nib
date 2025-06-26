@@ -1,5 +1,5 @@
 #![cfg(test)] 
-use crate::ast::{Binding, Declaration, Expression, ExpressionKind, Literal, Name, Pattern, VarBinding};
+use crate::ast::{Binding, Declaration, Expression, ExpressionKind, FunClause, Literal, Name, Pattern, VarBinding};
 use crate::common::Result;
 use crate::parser::helpers::NameOrOperator;
 use crate::parser::{lex, ParserState};
@@ -120,6 +120,28 @@ fn parse_simple_binding() -> Result<()> {
             assert_eq!(bind.lhs, Pattern::Var(Name::name("a")));
             let exp = bind.rhs.expr;
             assert_eq!(exp, ExpressionKind::Literal(Literal::Integer(1)));
+        }
+        _ => assert!(false)
+    }
+    Ok(())
+}
+
+#[test]
+fn parse_lambda_expression() -> Result<()> {
+    let mut state = ParserState::new("{ a -> a + 1 }");
+    let expr = state.parse_expression()?;
+    match expr.expr {
+        ExpressionKind::Lambda(fc) => {
+            assert_eq!(fc.len(), 1);
+            let Pattern::Var(ref x) = fc[0].args[0] else {
+                assert!(false);
+                return state.error("meh");
+            };
+            assert_eq!(x, &Name::name("a"));
+            let ExpressionKind::Binop(ref op) = fc[0].rhs.expr else {
+                assert!(false);
+                return state.error("meh");
+            };
         }
         _ => assert!(false)
     }
