@@ -7,7 +7,9 @@ use crate::common::Result;
 impl<'a> super::ParserState<'a> {
     pub(super) fn peek_next_token(&mut self) -> Result<Token> {
         let tok = self.get_next_token()?;
-        self.next_token -= 1;
+        if tok.value != TokenValue::Eof {
+            self.next_token -= 1;
+        }
         Ok(tok)
     }
 

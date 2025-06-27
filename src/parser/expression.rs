@@ -57,7 +57,6 @@ impl<'a> ParserState<'a> {
                         }
                     }
                 },
-                TokenValue::Eof => break,
                 _ => {
                     if min_pred < 9 {
                         let expr = self.try_parse(&mut |s|s.parse_inner_expression(8))?;
@@ -131,14 +130,14 @@ impl<'a> ParserState<'a> {
     }
 
     pub(super) fn parse_binop_expression(&mut self, lhs:Expression, op:Operator) -> Result<Expression> {
-        let rhs = self.parse_inner_expression(6)?;
+        let rhs = self.parse_inner_expression(5)?;
         Ok(self.binop_expression(op, lhs, rhs))
     }
 
     pub(super) fn parse_cond_expression(&mut self, lhs:Expression) -> Result<Expression> {
-        let on_true = self.parse_inner_expression(5)?;
+        let on_true = self.parse_inner_expression(3)?;
         if self.semicolon_or_newline()? {
-            let on_false = self.parse_inner_expression(5)?;
+            let on_false = self.parse_inner_expression(3)?;
             Ok(self.cond_expression(lhs, on_true, on_false))
         } else {
             self.error("Missing else expression in => expression")

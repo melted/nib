@@ -149,6 +149,37 @@ fn parse_lambda_expression() -> Result<()> {
 }
 
 #[test]
+fn parse_double_binop() -> Result<()> {
+    let mut state = ParserState::new("1+2+3");
+    let expr = state.parse_expression()?;
+    match expr.expr {
+        ExpressionKind::Binop(op) => {
+            assert_eq!(op.lhs.expr, ExpressionKind::Literal(Literal::Integer(1)));
+            match op.rhs.expr {
+                ExpressionKind::Binop(op2) => {
+                    assert_eq!(op2.lhs.expr, ExpressionKind::Literal(Literal::Integer(2)));
+                }
+                _ => assert!(false)
+            }
+        }
+        _ => assert!(false)
+    }
+    Ok(())
+}
+
+#[test]
+fn lex_double_peek_at_end() -> Result<()> {
+    let mut state = ParserState::new("a = 1 + 2");
+    for i in 0..5 {
+        state.get_next_token()?;
+    };
+    let y = state.peek_next_token()?;
+    let z = state.peek_next_token()?;
+    assert_eq!(y, z);
+    Ok(())
+}
+
+#[test]
 fn empty_test_skeleton() -> Result<()> {
     let mut state = ParserState::new("");
     Ok(())
