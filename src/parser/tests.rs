@@ -1,6 +1,7 @@
 #![cfg(test)] 
-use crate::ast::{Binding, Declaration, Expression, ExpressionKind, FunClause, Literal, Name, Pattern, VarBinding};
+use crate::ast::{Binding, Declaration, Expression, ExpressionKind, FunClause, Literal, Name, Pattern, PatternKind, VarBinding};
 use crate::common::Result;
+use crate::parser::expression::UsedImplicits;
 use crate::parser::helpers::NameOrOperator;
 use crate::parser::{lex, ParserState};
 use crate::parser::lexer::{ Token, TokenValue };
@@ -100,11 +101,11 @@ fn parse_module_declaration() -> Result<()> {
 fn parse_custom_pattern() -> Result<()> {
     let mut state = ParserState::new("(pair a b)");
     let pat = state.parse_pattern()?;
-    match pat {
-        Pattern::Custom(name,fields ) => {
+    match &pat.pattern{
+        PatternKind::Custom(name,fields ) => {
             assert_eq!(name.to_string(), "pair");
-            assert_eq!(fields[0], Pattern::Var(Name::name("a")));
-            assert_eq!(fields[1], Pattern::Var(Name::name("b")));
+            assert_eq!(fields[0].pattern, PatternKind::Var(Name::name("a")));
+            assert_eq!(fields[1].pattern, PatternKind::Var(Name::name("b")));
         },
         _ => assert!(false)
     }
@@ -117,7 +118,7 @@ fn parse_simple_binding() -> Result<()> {
     let decl = state.parse_declaration()?;
     match decl {
         Declaration::Binding(Binding::VarBinding(bind )) => {
-            assert_eq!(bind.lhs, Pattern::Var(Name::name("a")));
+            assert_eq!(bind.lhs.pattern, PatternKind::Var(Name::name("a")));
             let exp = bind.rhs.expr;
             assert_eq!(exp, ExpressionKind::Literal(Literal::Integer(1)));
         }
@@ -133,7 +134,7 @@ fn parse_lambda_expression() -> Result<()> {
     match expr.expr {
         ExpressionKind::Lambda(fc) => {
             assert_eq!(fc.len(), 1);
-            let Pattern::Var(ref x) = fc[0].args[0] else {
+            let PatternKind::Var(ref x) = fc[0].args[0].pattern else {
                 assert!(false);
                 return state.error("meh");
             };
@@ -183,6 +184,18 @@ fn lex_double_peek_at_end() -> Result<()> {
 fn parse_guarded_decl() -> Result<()> {
     let mut state = ParserState::new("f n | n > 5 = 10");
     let decl = state.parse_declaration()?;
+    Ok(())
+}
+
+#[test]
+fn test_implicit_visitor() -> Result<()> {
+    let mut state = ParserState::new("a * b + e");
+    let expr = state.parse_expression()?;
+    let mut visitor = UsedImplicits::new();
+    expr.visit(&mut visitor);
+    assert!(visitor.vars.contains(&Name::name("a")));
+    assert!(visitor.vars.contains(&Name::name("b")));
+    assert!(!visitor.vars.contains(&Name::name("e")));
     Ok(())
 }
 

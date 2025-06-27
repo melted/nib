@@ -129,9 +129,15 @@ pub struct OpClause {
 }
 
 // Patterns
+#[derive(Debug, Clone, PartialEq)]
+pub struct Pattern {
+    pub id:Node,
+    pub pattern:PatternKind
+}
+
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum Pattern {
+pub enum PatternKind {
     Wildcard,
     Ellipsis(Name),
     Literal(Literal),
@@ -146,16 +152,16 @@ impl Pattern {
         if !visitor.on_pattern(self) {
             return;
         }
-        match &self {
-            Pattern::Alias(pat, _) => {
+        match &self.pattern {
+            PatternKind::Alias(pat, _) => {
                 pat.visit(visitor);
             },
-            Pattern::Array(pats) => {
+            PatternKind::Array(pats) => {
                 for p in pats {
                     p.visit(visitor);
                 }
             },
-            Pattern::Custom(_, pats) => {
+            PatternKind::Custom(_, pats) => {
                 for p in pats {
                     p.visit(visitor);
                 }
@@ -188,7 +194,7 @@ pub enum ExpressionKind {
 
 
 impl Expression {
-    fn visit(&self, visitor: &mut dyn AstVisitor) {
+    pub fn visit(&self, visitor: &mut dyn AstVisitor) {
         if !visitor.on_expression(self) {
             return;
         }

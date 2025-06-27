@@ -1,4 +1,4 @@
-use crate::{ast::{Binding, Declaration}, common::Result, parser::{lexer::TokenValue, parse_expression, ParserState}};
+use crate::{ast::{Binding, Declaration, Expression, FunBinding, Module, Name, OpBinding, OpClause, Operator, Pattern, Use, VarBinding}, common::Result, parser::{lexer::TokenValue, parse_expression, ParserState}};
 
 
 impl<'a> ParserState<'a> {
@@ -70,7 +70,8 @@ impl<'a> ParserState<'a> {
         if let Some(name) = self.try_parse(&mut Self::parse_name)? {
             if self.is_next(TokenValue::Equals)? {
                 let rhs = self.parse_expression()?;
-                Ok(self.var_binding(crate::ast::Pattern::Var(name), rhs))
+                let pat = self.var_pattern(name);
+                Ok(self.var_binding(pat, rhs))
             } else {
                 let (args, guard) = self.parse_fun_args()?;
                 self.expect(TokenValue::Equals)?;
@@ -96,5 +97,52 @@ impl<'a> ParserState<'a> {
                 Ok(self.op_binding(op, pat, rpat, guard, rhs))
             }
         }
+    }
+
+    
+    pub(super) fn module_declaration(&mut self, name:Name) -> Declaration {
+        self.counter += 1;
+        Declaration::Module(Module {
+            id: self.counter,
+            name: name
+        })
+    }
+
+    pub(super) fn use_declaration(&mut self, name:Name) -> Declaration {
+        self.counter += 1;
+        Declaration::Use(Use {
+            id: self.counter,
+            name: name
+        })
+    }
+
+    pub(super) fn var_binding(&mut self, pat:Pattern, rhs:Expression) -> Binding {
+        self.counter += 1;
+        Binding::VarBinding(VarBinding {
+            id: self.counter,
+            lhs: pat,
+            rhs: rhs
+        })
+    }
+
+    pub(super) fn fun_binding(&mut self, name:Name, args:Vec<Pattern>, guard: Option<Expression>, rhs:Expression) -> Binding {
+        let clauses = vec![self.fun_clause(args, guard, rhs)];
+        self.counter += 1;
+        Binding::FunBinding(FunBinding {
+            id: self.counter,
+            name:name,
+            clauses:clauses
+        })
+    }
+
+    pub(super) fn op_binding(&mut self, op: Operator, lpat:Pattern, rpat:Pattern, guard: Option<Expression>, rhs:Expression) -> Binding {
+        self.counter += 1;
+        let clauses = vec![OpClause { id: self.counter, lpat,rpat, guard, body: rhs }];
+        self.counter += 1;
+        Binding::OpBinding(OpBinding {
+            id: self.counter,
+            op:op,
+            clauses:clauses
+        })
     }
 }
