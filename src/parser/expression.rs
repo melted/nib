@@ -1,10 +1,9 @@
-use crate::ast::{Expression, Literal, Name, Operator};
+use crate::ast::{Expression, Literal, Name, Operator, Pattern};
 use crate::common::Result;
 use crate::parser::helpers::NameOrOperator;
 use crate::parser::lexer::TokenValue;
+use crate::parser::parse_expression;
 use super::ParserState;
-
-
 
 impl<'a> ParserState<'a> {
     pub(super) fn parse_expression(&mut self) -> Result<Expression> {
@@ -13,7 +12,7 @@ impl<'a> ParserState<'a> {
 
     pub(super) fn parse_inner_expression(&mut self, min_pred:i32) -> Result<Expression> {
         let indent = self.indent();
-        self.indent_stack.push(indent);
+        self.indent_stack.push(indent); // TODO: Is the stack needed? It's not used now.
         let mut lhs = self.parse_left_expression()?;
         loop {
             let tok = self.peek_next_token()?;
@@ -144,14 +143,24 @@ impl<'a> ParserState<'a> {
         }
     }
 
+    pub(super) fn parse_fun_args(&mut self) -> Result<(Vec<Pattern>, Option<Expression>)> {
+        let args = self.parse_some1(&mut Self::parse_pattern)?;
+        let guard = if self.is_next(TokenValue::Bar)? {
+            Some(self.parse_expression()?)
+        } else {
+            None
+        };
+        Ok((args, guard))
+    }
+
     pub(super) fn parse_lambda_expression(&mut self) -> Result<Expression> {
         self.expect(TokenValue::LeftBrace)?;
         let mut clauses = Vec::new();
         loop {
-            let args = self.parse_some1(&mut Self::parse_pattern)?;
+            let (args, guard) = self.parse_fun_args()?;
             self.expect(TokenValue::RightArrow)?;
             let expr = self.parse_expression()?;
-            clauses.push(self.fun_clause(args, expr));
+            clauses.push(self.fun_clause(args, guard, expr));
             if !self.semicolon_or_newline()? {
                 break;
             }

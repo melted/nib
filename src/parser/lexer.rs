@@ -63,6 +63,7 @@ impl<'a> super::ParserState<'a> {
                         Some(self.simple_token(TokenValue::Period))
                     }
                 },
+                '|' => Some(self.simple_token(TokenValue::Bar)),
                 '#' => {
                     self.next();
                     match self.chars.peek() {

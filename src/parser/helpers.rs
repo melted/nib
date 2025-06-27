@@ -314,8 +314,8 @@ impl<'a> ParserState<'a> {
         })
     }
 
-    pub(super) fn fun_binding(&mut self, name:Name, args:Vec<Pattern>, rhs:Expression) -> Binding {
-        let clauses = vec![self.fun_clause(args, rhs)];
+    pub(super) fn fun_binding(&mut self, name:Name, args:Vec<Pattern>, guard: Option<Expression>, rhs:Expression) -> Binding {
+        let clauses = vec![self.fun_clause(args, guard, rhs)];
         self.counter += 1;
         Binding::FunBinding(FunBinding {
             id: self.counter,
@@ -324,14 +324,14 @@ impl<'a> ParserState<'a> {
         })
     }
 
-    pub(super) fn fun_clause(&mut self, args:Vec<Pattern>, rhs:Expression) -> FunClause {
+    pub(super) fn fun_clause(&mut self, args:Vec<Pattern>, guard: Option<Expression>, body:Expression) -> FunClause {
         self.counter += 1;
-        FunClause { id: self.counter, args: args, rhs: rhs }
+        FunClause { id: self.counter, args, guard, body }
     }
  
-    pub(super) fn op_binding(&mut self, op: Operator, lpat:Pattern, rpat:Pattern, rhs:Expression) -> Binding {
+    pub(super) fn op_binding(&mut self, op: Operator, lpat:Pattern, rpat:Pattern, guard: Option<Expression>, rhs:Expression) -> Binding {
         self.counter += 1;
-        let clauses = vec![OpClause { id: self.counter, lpat: lpat,rpat:rpat, rhs: rhs }];
+        let clauses = vec![OpClause { id: self.counter, lpat,rpat, guard, body: rhs }];
         self.counter += 1;
         Binding::OpBinding(OpBinding {
             id: self.counter,

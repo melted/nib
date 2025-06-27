@@ -138,7 +138,7 @@ fn parse_lambda_expression() -> Result<()> {
                 return state.error("meh");
             };
             assert_eq!(x, &Name::name("a"));
-            let ExpressionKind::Binop(ref op) = fc[0].rhs.expr else {
+            let ExpressionKind::Binop(ref op) = fc[0].body.expr else {
                 assert!(false);
                 return state.error("meh");
             };
@@ -176,6 +176,13 @@ fn lex_double_peek_at_end() -> Result<()> {
     let y = state.peek_next_token()?;
     let z = state.peek_next_token()?;
     assert_eq!(y, z);
+    Ok(())
+}
+
+#[test]
+fn parse_guarded_decl() -> Result<()> {
+    let mut state = ParserState::new("f n | n > 5 = 10");
+    let decl = state.parse_declaration()?;
     Ok(())
 }
 

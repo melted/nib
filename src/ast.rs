@@ -74,7 +74,8 @@ pub struct FunBinding {
 pub struct FunClause {
     pub id: Node,
     pub args: Vec<Pattern>,
-    pub rhs: Expression
+    pub guard: Option<Expression>,
+    pub body: Expression
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -89,7 +90,8 @@ pub struct OpClause {
     pub id: Node,
     pub lpat: Pattern,
     pub rpat: Pattern,
-    pub rhs: Expression
+    pub guard: Option<Expression>,
+    pub body: Expression
 }
 
 

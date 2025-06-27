@@ -1,4 +1,4 @@
-use crate::{ast::{Binding, Declaration}, common::Result, parser::{lexer::TokenValue, ParserState}};
+use crate::{ast::{Binding, Declaration}, common::Result, parser::{lexer::TokenValue, parse_expression, ParserState}};
 
 
 impl<'a> ParserState<'a> {
@@ -72,10 +72,10 @@ impl<'a> ParserState<'a> {
                 let rhs = self.parse_expression()?;
                 Ok(self.var_binding(crate::ast::Pattern::Var(name), rhs))
             } else {
-                let args = self.parse_some1(&mut Self::parse_pattern)?;
+                let (args, guard) = self.parse_fun_args()?;
                 self.expect(TokenValue::Equals)?;
                 let rhs = self.parse_expression()?;
-                Ok(self.fun_binding(name, args, rhs))
+                Ok(self.fun_binding(name, args, guard, rhs))
             }
 
         } else {
@@ -86,9 +86,14 @@ impl<'a> ParserState<'a> {
             } else {
                 let op = self.parse_operator()?;
                 let rpat = self.parse_pattern()?;
+                let guard = if self.is_next(TokenValue::Bar)? {
+                    Some(self.parse_expression()?)
+                } else {
+                    None
+                };
                 self.expect(TokenValue::Equals)?;
                 let rhs = self.parse_expression()?;
-                Ok(self.op_binding(op, pat, rpat, rhs)  )
+                Ok(self.op_binding(op, pat, rpat, guard, rhs))
             }
         }
     }
