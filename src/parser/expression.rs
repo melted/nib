@@ -183,9 +183,14 @@ impl<'a> ParserState<'a> {
     pub(super) fn parse_implicit_lambda_expression(&mut self) -> Result<Expression> {
         self.expect(TokenValue::LeftBrace)?;
         let expr = self.parse_expression()?;
-
         self.expect(TokenValue::RightBrace)?;
-        Ok(expr)
+        let mut visitor = UsedImplicits::new();
+        expr.visit(&mut visitor);
+        let mut vars : Vec<Name> = visitor.vars.into_iter().collect();
+        vars.sort();
+        let pats = vars.into_iter().map(|n| self.var_pattern(n)).collect();
+        let clause = self.fun_clause(pats, None, expr);
+        Ok(self.lambda_expression(vec![clause]))
     }
 
     pub(super) fn parse_array_expression(&mut self) -> Result<Expression> {

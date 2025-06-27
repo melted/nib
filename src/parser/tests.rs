@@ -1,10 +1,9 @@
 #![cfg(test)] 
-use crate::ast::{Binding, Declaration, Expression, ExpressionKind, FunClause, Literal, Name, Pattern, PatternKind, VarBinding};
+use crate::ast::{Binding, Declaration, ExpressionKind, Literal, Name, PatternKind};
 use crate::common::Result;
 use crate::parser::expression::UsedImplicits;
-use crate::parser::helpers::NameOrOperator;
 use crate::parser::{lex, ParserState};
-use crate::parser::lexer::{ Token, TokenValue };
+use crate::parser::lexer::TokenValue;
 
 #[test]
 fn lex_numbers() -> Result<()> {
@@ -196,6 +195,14 @@ fn test_implicit_visitor() -> Result<()> {
     assert!(visitor.vars.contains(&Name::name("a")));
     assert!(visitor.vars.contains(&Name::name("b")));
     assert!(!visitor.vars.contains(&Name::name("e")));
+    Ok(())
+}
+
+#[test]
+fn parse_implicit_lambda() -> Result<()> {
+    let mut state = ParserState::new("{ a*b*c }");
+    let expr = state.parse_expression()?;
+    dbg!(expr);
     Ok(())
 }
 
