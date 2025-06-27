@@ -146,7 +146,7 @@ impl<'a> super::ParserState<'a> {
     }
 
     fn read_identifier(&mut self) -> Result<Token> {
-        let first = self.pos;
+        let first = self.token_start;
         if let Ok(last) = self.snarf(|c| identifier_char(*c)) {
             let id = &self.src[first..last];
             match id {
@@ -168,7 +168,7 @@ impl<'a> super::ParserState<'a> {
     }
 
     fn read_operator(&mut self) -> Result<Token> {
-        let first = self.pos;
+        let first = self.token_start;
         if let Ok(last) = self.snarf(|c| c.is_symbol() || c.is_ascii_punctuation()) {
             let id = &self.src[first..last];
             match id {
