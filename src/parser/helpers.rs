@@ -207,12 +207,6 @@ impl<'a> ParserState<'a> {
         }
     }
 
-    pub(super) fn parse_unit_nil(&mut self) -> Result<Literal> {
-        self.expect(TokenValue::LeftParen)?;
-        self.expect(TokenValue::RightParen)?;
-        Ok(Literal::Nil)
-    }
-
     pub(super) fn literal_expression(&mut self, lit: ast::Literal) -> ast::Expression {
         self.counter += 1;
         ast::Expression {
@@ -339,8 +333,6 @@ impl<'a> ParserState<'a> {
             clauses:clauses
         })
     }
-
-    
 }
 
 pub enum NameOrOperator {

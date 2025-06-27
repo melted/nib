@@ -1,5 +1,5 @@
 use crate::common::Location;
-use std::{collections::HashMap};
+use std::collections::{HashMap, HashSet};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Metadata {
@@ -29,6 +29,8 @@ pub enum Annotation {
     Comment(String),
 }
 
+
+// Declarations
 #[derive(Debug, Clone, PartialEq)]
 pub enum Declaration {
     Module(Module),
@@ -36,6 +38,38 @@ pub enum Declaration {
     Binding(Binding)
 }
 
+impl Declaration {
+    pub fn visit(&self, visitor:&mut dyn AstVisitor) {
+        if !visitor.on_declaration(self) {
+            return;
+        }
+        match &self {
+            Declaration::Binding(b) => match  b {
+                Binding::FunBinding(fb) => {
+                    for c in &fb.clauses {
+                        c.args.iter().map(|p| p.visit(visitor));
+                        c.guard.as_ref().map(|g| g.visit(visitor));
+                        c.body.visit(visitor);
+                    }
+                },
+                Binding::OpBinding(ob) => {
+                    for c in &ob.clauses {
+                        c.lpat.visit(visitor);
+                        c.rpat.visit(visitor);
+                        c.guard.as_ref().map(|e| e.visit(visitor));
+                        c.body.visit(visitor);
+                    }
+                },
+                Binding::VarBinding(vb) => {
+                    vb.lhs.visit(visitor);
+                    vb.rhs.visit(visitor);
+                }
+            }
+            _ => {}
+        }
+        visitor.on_post_declaration(self);
+    }
+}
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Binding {
@@ -94,8 +128,8 @@ pub struct OpClause {
     pub body: Expression
 }
 
+// Patterns
 
-// TODO: should guards go into patterns or function argument lists? Should there be and and/or or patterns?
 #[derive(Debug, Clone, PartialEq)]
 pub enum Pattern {
     Wildcard,
@@ -105,6 +139,31 @@ pub enum Pattern {
     Array(Vec<Pattern>),
     Alias(Box<Pattern>, Name),
     Custom(Name, Vec<Pattern>)
+}
+
+impl Pattern {
+    pub fn visit(&self, visitor: &mut dyn AstVisitor) {
+        if !visitor.on_pattern(self) {
+            return;
+        }
+        match &self {
+            Pattern::Alias(pat, _) => {
+                pat.visit(visitor);
+            },
+            Pattern::Array(pats) => {
+                for p in pats {
+                    p.visit(visitor);
+                }
+            },
+            Pattern::Custom(_, pats) => {
+                for p in pats {
+                    p.visit(visitor);
+                }
+            },
+            _ => {}
+        }
+        visitor.on_post_pattern(self);
+    }
 }
 
 
@@ -125,6 +184,55 @@ pub enum ExpressionKind {
     Binop(Binop),
     Where(Box<Expression>, Vec<Binding>),
     Cond(Cond)
+}
+
+
+impl Expression {
+    fn visit(&self, visitor: &mut dyn AstVisitor) {
+        if !visitor.on_expression(self) {
+            return;
+        }
+        match &self.expr {
+            ExpressionKind::App(f,arg ) => {
+                f.visit(visitor);
+                arg.visit(visitor);
+            },
+            ExpressionKind::Array(elems) => {
+                for e in elems {
+                    e.visit(visitor);
+                }
+            },
+            ExpressionKind::Binop(Binop { op, lhs, rhs }) => {
+                lhs.visit(visitor);
+                rhs.visit(visitor);
+            },
+            ExpressionKind::Cond(Cond {pred, on_true, on_false }) => {
+                pred.visit(visitor);
+                on_true.visit(visitor);
+                on_false.visit(visitor);
+            },
+            ExpressionKind::Lambda(clauses) => {
+                for clause in clauses {
+                    if let Some(guard) = &clause.guard {
+                        guard.visit(visitor);
+                    }
+                    clause.body.visit(visitor);
+                }
+            },
+            ExpressionKind::Where(exp, bindings) => {
+
+            },
+            _ => {}
+        }
+        visitor.on_post_expression(self);
+    }
+
+
+    pub fn free_variables(&self) -> HashSet<Name> {
+        let mut vars = HashSet::new();
+  //      let mut bound = HashSet::new();
+        vars
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -193,3 +301,28 @@ pub enum Operator {
     Plain(String)
 }
 
+pub trait AstVisitor {
+    fn on_expression(&mut self, expression: &Expression) -> bool {
+        true
+    }
+
+    fn on_post_expression(&mut self, expression: &Expression) {
+
+    }
+
+    fn on_declaration(&mut self, decl: &Declaration) -> bool {
+        true
+    }
+
+    fn on_post_declaration(&mut self, decl: &Declaration) {
+
+    }
+
+    fn on_pattern(&mut self, pat: &Pattern) -> bool {
+        true
+    }
+
+    fn on_post_pattern(&mut self, pat: &Pattern) {
+         
+    }
+}
