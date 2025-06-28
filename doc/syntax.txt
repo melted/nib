@@ -2,27 +2,30 @@ Let's make a BNF grammar
 
 Program := decl*
 decl := `module` name | `use` name | binding
-binding := binding_lhs `=` expr
+binding := binding_lhs [`|` expr] `=` expr
 binding_lhs := pattern | name pattern+ | pattern binop pattern | `do`
 pattern := literal | identifier | `_` | `[` [pattern `,`]* pattern `]` |
-          pattern `@` identifier | `(` name pattern+ `)` | identifier `...` |
-          `(` pattern `)`
+          pattern `@` identifier | `(` name pattern+ `)` | identifier `...`
   
 expr := literal | name | expr (expr)+ | expr binop expr | `(` expr `)` | `[` (expr `,`)* expr `]` |
-        `{` (clause `;`)* clause `}` | expr `where` (binding `;`) binding | expr `?` expr `;` expr
+        `{` ((clause semi)* clause | expr ) `}` | expr `where` (binding semi) binding | expr `=>` expr semi expr
 
-clause := [pattern+ `->`] expr
+semi := `;` | <newline>
+
+clause := pattern+ [`|` expr] `->` expr
 
 literal = nil | `true` | `false` | string | char |
           number | symbol | `#[` (u8 `,`) u8 `]`
 
 
 nil = `nil` | `()`
-identifier = (alpha | `_`) (alphanum | `_`)*
+
+identifier = (alpha | `_`) (alphanum | `_`)* and not `_`
+
 binop = symbolchar+ not in reserved | `\`` name `\`` 
 
 name = (identifier `.`)* identifier
 qbinop = (identifier `.`)* binop
 
 symbolchar = unicode symbol except '{} [] ().,;'
-reserved = `=` `@` `->` 
+reserved = `=` `@` `->` `_` `=>` 

@@ -1,5 +1,5 @@
 use crate::common::Location;
-use std::collections::{HashMap, HashSet};
+use std::{collections::{HashMap, HashSet}, fmt::Display};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Metadata {
@@ -71,11 +71,23 @@ impl Declaration {
     }
 }
 
+impl Display for Declaration {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        todo!()
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum Binding {
     VarBinding(VarBinding),
     FunBinding(FunBinding),
     OpBinding(OpBinding)
+}
+
+impl Display for Binding {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        todo!()
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -84,10 +96,22 @@ pub struct Module {
     pub name: Name
 }
 
+impl Display for Module {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        todo!()
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct Use {
     pub id: Node,
     pub name: Name
+}
+
+impl Display for Use {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        todo!()
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -97,11 +121,23 @@ pub struct VarBinding {
     pub rhs: Expression
 }
 
+impl Display for VarBinding {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        todo!()
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct FunBinding {
     pub id: Node,
     pub name: Name,
     pub clauses: Vec<FunClause>
+}
+
+impl Display for FunBinding {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        todo!()
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -112,11 +148,23 @@ pub struct FunClause {
     pub body: Expression
 }
 
+impl Display for FunClause {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        todo!()
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct OpBinding {
     pub id: Node,
     pub op: Operator,
     pub clauses: Vec<OpClause>
+}
+
+impl Display for OpBinding {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        todo!()
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -126,6 +174,12 @@ pub struct OpClause {
     pub rpat: Pattern,
     pub guard: Option<Expression>,
     pub body: Expression
+}
+
+impl Display for OpClause {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        todo!()
+    }
 }
 
 // Patterns
@@ -172,6 +226,17 @@ impl Pattern {
     }
 }
 
+impl Display for Pattern {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        todo!()
+    }
+}
+
+impl Display for PatternKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        todo!()
+    }
+}
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Expression {
@@ -191,7 +256,6 @@ pub enum ExpressionKind {
     Where(Box<Expression>, Vec<Binding>),
     Cond(Cond)
 }
-
 
 impl Expression {
     pub fn visit(&self, visitor: &mut dyn AstVisitor) {
@@ -241,6 +305,59 @@ impl Expression {
     }
 }
 
+impl Display for Expression {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.expr);
+        Ok(())
+    }
+}
+
+impl Display for ExpressionKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ExpressionKind::Literal(lit) => write!(f, "{}", lit)?,
+            ExpressionKind::Var(v) => write!(f, "{}", v)?,
+            ExpressionKind::App(fun, arg) => write!(f, "({} {})", fun, arg)?,
+            ExpressionKind::Array(arr) => {
+                write!(f, "[")?;
+                for (i, exp) in arr.iter().enumerate() {
+                    write!(f, "{}", exp)?;
+                    if i < arr.len() - 1 {
+                        write!(f, ", ")?;
+                    }
+                }
+                write!(f, "]")?;
+            },
+            ExpressionKind::Binop(Binop { op, lhs, rhs }) => {
+                write!(f, "({} {} {})", lhs, op, rhs)?
+            },
+            ExpressionKind::Cond(Cond { pred, on_true, on_false }) => {
+                write!(f, "({} => {} ; {})", pred, on_true, on_false)?
+            },
+            ExpressionKind::Lambda(clauses) => {
+                write!(f, "{{ ")?;
+                for c in clauses {
+                    for p in &c.args {
+                        write!(f, "{p} ")?;
+                    }
+                    if let Some(guard) = &c.guard {
+                        write!(f, "| {} ", guard)?;
+                    }
+                    write!(f, "-> {}; ", c.body);
+                }
+                write!(f, " }}")?;
+            },
+            ExpressionKind::Where(lhs, bindings ) => {
+                write!(f, "{} where ", lhs)?;
+                for b in bindings {
+                    // TODO: implement display for bindings
+                }
+            }
+        };
+        Ok(())
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct Binop {
     pub op: Operator,
@@ -265,6 +382,31 @@ pub enum Literal {
     String(String),
     Symbol(String),
     Bytearray(Vec<u8>)
+}
+
+impl Display for Literal {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Literal::Nil => write!(f, "()")?,
+            Literal::Bool(b) => write!(f, "{}", b)?,
+            Literal::Integer(i) => write!(f, "{}", i)?,
+            Literal::Real(r) => write!(f, "{}", r)?,
+            Literal::String(s) => write!(f, "\"{}\"", s)?,
+            Literal::Char(c) => write!(f, "'{}'", c)?,
+            Literal::Symbol(s) => write!(f, "#{}", s)?,
+            Literal::Bytearray(ba) => {
+                write!(f, "#[")?;
+                for (i, b) in ba.iter().enumerate() {
+                    write!(f, "{}", b)?;
+                    if i < ba.len() - 1 {
+                        write!(f, ", ")?;
+                    }
+                }
+                write!(f, "]")?;
+            }
+        }
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -301,10 +443,32 @@ impl Name {
     }
 }
 
+impl Display for Name {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.to_string())?;
+        Ok(())
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Operator {
     Qualified(Vec<String>, String),
     Plain(String)
+}
+
+impl Display for Operator {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+           Operator::Qualified(path, op) => {
+                for p in path {
+                    write!(f, "{p}.")?;
+                }
+                write!(f, "{op}")?;
+           }
+           Operator::Plain(op) => write!(f, "{op}")?
+        }
+        Ok(())
+    }
 }
 
 pub trait AstVisitor {
