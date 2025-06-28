@@ -1,6 +1,6 @@
 // Simple pattern matching by using multi-clause lambdas
 
-on what lam = lam what
+on what fun = fun what
 
 // This works
 // length xs = on xs { () -> 0

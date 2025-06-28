@@ -1,5 +1,5 @@
 use crate::common::Location;
-use std::{collections::{HashMap, HashSet}, fmt::Display};
+use std::{collections::{HashMap, HashSet}, fmt::{write, Display}};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Metadata {
@@ -73,7 +73,11 @@ impl Declaration {
 
 impl Display for Declaration {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        todo!()
+        match self {
+            Declaration::Module(m) => write!(f, "{}", m),
+            Declaration::Use(u) => write!(f, "{}", u),
+            Declaration::Binding(b) => write!(f, "{}", b)
+        }
     }
 }
 
@@ -86,7 +90,11 @@ pub enum Binding {
 
 impl Display for Binding {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        todo!()
+        match self {
+            Binding::VarBinding(vb) => write!(f, "{}", vb),
+            Binding::FunBinding(fb) => write!(f, "{}", fb),
+            Binding::OpBinding(ob) => write!(f, "{}", ob)
+        }
     }
 }
 
@@ -98,7 +106,7 @@ pub struct Module {
 
 impl Display for Module {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        todo!()
+        write!(f, "module {}", self.name)
     }
 }
 
@@ -110,7 +118,7 @@ pub struct Use {
 
 impl Display for Use {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        todo!()
+        write!(f, "use {}", self.name)
     }
 }
 
@@ -123,7 +131,7 @@ pub struct VarBinding {
 
 impl Display for VarBinding {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        todo!()
+        write!(f, "{} = {}", self.lhs, self.rhs)
     }
 }
 
@@ -136,7 +144,10 @@ pub struct FunBinding {
 
 impl Display for FunBinding {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        todo!()
+        for c in &self.clauses {
+            write!(f, "{} {}; ", self.name, c)?;
+        }
+        Ok(())
     }
 }
 
@@ -150,7 +161,13 @@ pub struct FunClause {
 
 impl Display for FunClause {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        todo!()
+        for a in &self.args {
+            write!(f, "{} ", a)?;
+        }
+        if let Some(guard) = &self.guard {
+            write!(f, "| {} ", guard)?;
+        }
+        write!(f, "= {}", self.body)
     }
 }
 
@@ -163,7 +180,10 @@ pub struct OpBinding {
 
 impl Display for OpBinding {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        todo!()
+        for c in &self.clauses {
+            write!(f, "({}) {}", self.op, c)?;
+        }
+        Ok(())
     }
 }
 
@@ -178,7 +198,11 @@ pub struct OpClause {
 
 impl Display for OpClause {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        todo!()
+        write!(f, "{} {}", self.lpat, self.rpat)?;
+        if let Some(guard) = &self.guard {
+            write!(f, "| {} ", guard)?;
+        }
+        write!(f, "= {}", self.body)
     }
 }
 
@@ -228,13 +252,36 @@ impl Pattern {
 
 impl Display for Pattern {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        todo!()
+        write!(f, "{}", self.pattern)
     }
 }
 
 impl Display for PatternKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        todo!()
+        match self {
+            PatternKind::Wildcard => write!(f, "_"),
+            PatternKind::Alias(pat, alias ) => write!(f, "{}@{} ", pat, alias),
+            PatternKind::Array(pats) => {
+                write!(f, "[")?;
+                for (i, p) in pats.iter().enumerate() {
+                    write!(f, "{}", p)?;
+                    if i < pats.len() -1 {
+                        write!(f, ", ")?;
+                    }
+                }
+                write!(f, "]")
+            },
+            PatternKind::Custom(name, pats) => {
+                write!(f, "({}", name)?;
+                for p in pats {
+                    write!(f, " {}", p)?;
+                }
+                write!(f, ")")
+            },
+            PatternKind::Ellipsis(name) => write!(f, "{}...", name),
+            PatternKind::Literal(lit) => write!(f, "{}", lit),
+            PatternKind::Var(var) => write!(f, "{}", var)
+         }
     }
 }
 
@@ -350,7 +397,7 @@ impl Display for ExpressionKind {
             ExpressionKind::Where(lhs, bindings ) => {
                 write!(f, "{} where ", lhs)?;
                 for b in bindings {
-                    // TODO: implement display for bindings
+                    write!(f, "{}; ", b)?;
                 }
             }
         };

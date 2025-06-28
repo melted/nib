@@ -51,7 +51,7 @@ pub fn dump_lex(code: &str) -> Result<()> {
 pub fn dump_prog(code: &str) -> Result<()> {
     let decls = parse_declarations(code)?;
     for d in decls {
-        println!("{:?}", d);
+        println!("{}", d);
     }
     Ok(())
 }

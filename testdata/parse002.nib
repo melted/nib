@@ -1,1 +1,3 @@
 a = {a+b+c}
+
+go a b n = go (a+b) a (n-1)

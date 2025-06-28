@@ -238,6 +238,15 @@ fn test_rewind_lexer() -> Result<()> {
     Ok(())
 }
 
+
+#[test]
+fn parse_composite_call() -> Result<()> {
+    let mut state = ParserState::new("go (b) a");
+    let expr = state.parse_expression();
+    dbg!(&expr);
+    Ok(())
+}
+
 #[test]
 fn empty_test_skeleton() -> Result<()> {
     let mut state = ParserState::new("");

@@ -60,7 +60,7 @@ impl<'a> ParserState<'a> {
                 },
                 _ => {
                     if min_pred < 9 {
-                        let expr = self.try_parse(&mut |s|s.parse_inner_expression(8))?;
+                        let expr = self.try_parse(&mut |s|s.parse_inner_expression(9))?;
                         match expr {
                             Some(e) => self.app_expression(lhs, e),
                             None => {
@@ -223,7 +223,9 @@ impl<'a> ParserState<'a> {
             },
             _ => {
                 let exp = self.parse_inner_expression(0)?;
+                dbg!(&exp);
                 self.expect(TokenValue::RightParen)?;
+                dbg!(self.peek_next_token()?);
                 exp
             }
         };
