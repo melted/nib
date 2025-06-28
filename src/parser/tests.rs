@@ -23,6 +23,13 @@ fn lex_identifier() -> Result<()> {
 }
 
 #[test]
+fn lex_squashed_tokens() -> Result<()> {
+    let tokens = lex("{a->a*a+1.0*b*c}")?;
+    assert_eq!(tokens.len(), 14);
+    Ok(())
+}
+
+#[test]
 fn parse_names() -> Result<()> {
     let mut state = ParserState::new("a.name");
     let ret = state.parse_name();
