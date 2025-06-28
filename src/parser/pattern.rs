@@ -56,7 +56,10 @@ impl<'a> ParserState<'a> {
     pub(super) fn parse_custom_pattern(&mut self) -> Result<Pattern> {
         self.expect(TokenValue::LeftParen)?;
         match self.peek_next_token()?.value {
-            TokenValue::RightParen => Ok(self.literal_pattern(Literal::Nil)),
+            TokenValue::RightParen => {
+                self.expect(TokenValue::RightParen)?;
+                Ok(self.literal_pattern(Literal::Nil))
+            },
             TokenValue::Identifier(_) => {
                 let name = self.parse_name()?;
                 let pats = self.parse_some(&mut Self::parse_pattern)?;
