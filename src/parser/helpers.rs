@@ -62,9 +62,11 @@ impl<'a> ParserState<'a> {
     pub(super) fn parse_some<T>(
         &mut self,
         inner_parser: &mut impl FnMut(&mut Self) -> Result<T>,
+        until_pred: impl Fn(TokenValue) ->bool 
     ) -> Result<Vec<T>> {
         let mut output = Vec::new();
-        while let Some(res) = self.try_parse(inner_parser)? {
+        while until_pred(self.peek_next_token()?.value) {
+            let res = inner_parser(self)?;
             output.push(res);
         }
         Ok(output)
@@ -73,11 +75,13 @@ impl<'a> ParserState<'a> {
     pub(super) fn parse_some1<T> (
         &mut self,
         inner_parser: &mut impl FnMut(&mut Self) -> Result<T>,
+        until_pred: impl Fn(TokenValue) ->bool 
     ) -> Result<Vec<T>> {
         let mut output = Vec::new();
         let first = inner_parser(self)?;
         output.push(first);
-        while let Some(res) = self.try_parse(inner_parser)? {
+        while until_pred(self.peek_next_token()?.value) {
+            let res = inner_parser(self)?;
             output.push(res);
         }
         Ok(output)

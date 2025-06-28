@@ -4,10 +4,11 @@ use crate::{ast::{Binding, Declaration, Expression, FunBinding, Module, Name, Op
 impl<'a> ParserState<'a> {
     pub(super) fn parse_declarations(&mut self) -> Result<Vec<Declaration>> {
         let mut decls = Vec::new();
-        while self.parse_add_declaration(&mut decls)? {
+        loop {
             if self.is_next(TokenValue::Eof)? {
                 break;
             }
+            self.parse_add_declaration(&mut decls)?
         }
         Ok(decls)
     }
@@ -38,19 +39,17 @@ impl<'a> ParserState<'a> {
         }
     }
 
-    pub(super) fn parse_add_declaration(&mut self, decls:&mut Vec<Declaration>) -> Result<bool> {
-        let Some(mut decl) = self.try_parse(&mut Self::parse_declaration)? else {
-            return Ok(false);
-        };
+    pub(super) fn parse_add_declaration(&mut self, decls:&mut Vec<Declaration>) -> Result<()> {
+        let mut decl = self.parse_declaration()?;
         let Some(mut last) = decls.last_mut() else {
             decls.push(decl);
-            return Ok(true);
+            return Ok(());
         };
         if Self::merge_same_binding(&mut last, &mut decl) {
-            Ok(true)
+            Ok(())
         } else {
             decls.push(decl);
-            Ok(true)
+            Ok(())
         }
     }
 

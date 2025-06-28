@@ -150,7 +150,7 @@ impl<'a> ParserState<'a> {
     }
 
     pub(super) fn parse_fun_args(&mut self) -> Result<(Vec<Pattern>, Option<Expression>)> {
-        let args = self.parse_some1(&mut Self::parse_pattern)?;
+        let args = self.parse_some1(&mut Self::parse_pattern, |t| t != TokenValue::Bar && t != TokenValue::RightArrow && t != TokenValue::Equals)?;
         let guard = if self.is_next(TokenValue::Bar)? {
             Some(self.parse_expression()?)
         } else {

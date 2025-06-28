@@ -62,7 +62,7 @@ impl<'a> ParserState<'a> {
             },
             TokenValue::Identifier(_) => {
                 let name = self.parse_name()?;
-                let pats = self.parse_some(&mut Self::parse_pattern)?;
+                let pats = self.parse_some(&mut Self::parse_pattern, |t| t != TokenValue::RightParen)?;
                 self.expect(TokenValue::RightParen)?;
                 Ok(self.custom_pattern(name , pats))
             }
