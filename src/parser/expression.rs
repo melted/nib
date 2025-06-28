@@ -192,7 +192,10 @@ impl<'a> ParserState<'a> {
         expr.visit(&mut visitor);
         let mut vars : Vec<Name> = visitor.vars.into_iter().collect();
         vars.sort();
-        let pats = vars.into_iter().map(|n| self.var_pattern(n)).collect();
+        let mut pats: Vec<Pattern> = vars.into_iter().map(|n| self.var_pattern(n)).collect();
+        if pats.is_empty() {
+            pats.push(self.wildcard_pattern());
+        }
         let clause = self.fun_clause(pats, None, expr);
         Ok(self.lambda_expression(vec![clause]))
     }

@@ -209,7 +209,20 @@ fn test_implicit_visitor() -> Result<()> {
 fn parse_implicit_lambda() -> Result<()> {
     let mut state = ParserState::new("{ a*b*c }");
     let expr = state.parse_expression()?;
-    dbg!(expr);
+    Ok(())
+}
+
+#[test]
+fn parse_implicit_lambda_no_args() -> Result<()> {
+    let mut state = ParserState::new("{ print \"hello\" }");
+    let expr = state.parse_expression()?;
+    match expr.expr {
+        ExpressionKind::Lambda(clauses) => {
+            assert_eq!(clauses.len(), 1);
+            assert_eq!(clauses[0].args.len(), 1);
+        },
+        _ => assert!(false)
+    }
     Ok(())
 }
 
