@@ -15,10 +15,12 @@ impl<'a> ParserState<'a> {
     pub(super) fn parse_inner_expression(&mut self, min_pred:i32) -> Result<Expression> {
         let indent = self.indent();
         self.indent_stack.push(indent); // TODO: Is the stack needed? It's not used now.
+        // Also, it may become corrupted on error returns.
         let mut lhs = self.parse_left_expression()?;
         loop {
             let tok = self.peek_next_token()?;
             if self.next_indent() <= indent {
+                self.indent_stack.pop();
                 return Ok(lhs);
             }
             let result = match tok.value {
@@ -58,18 +60,17 @@ impl<'a> ParserState<'a> {
                         }
                     }
                 },
+                TokenValue::Eof => break,
+                TokenValue::LeftBrace | TokenValue::LeftParen | TokenValue::LeftBracket => {
+                    let expr = self.parse_left_expression()?;
+                    self.app_expression(lhs, expr)
+                },
+                _ if tok.value.is_literal() => {
+                    let expr = self.parse_left_expression()?;
+                    self.app_expression(lhs, expr)
+                }, 
                 _ => {
-                    if min_pred < 9 {
-                        let expr = self.try_parse(&mut |s|s.parse_inner_expression(9))?;
-                        match expr {
-                            Some(e) => self.app_expression(lhs, e),
-                            None => {
-                                break;
-                            }
-                        }
-                    } else {
-                        break;
-                    }
+                    break;
                 }
             };
             lhs = result;
@@ -77,7 +78,6 @@ impl<'a> ParserState<'a> {
         self.indent_stack.pop();
         Ok(lhs)
     }
-
 
     pub(super) fn parse_left_expression(&mut self) -> Result<Expression> {
         let tok = self.peek_next_token()?;
@@ -223,16 +223,14 @@ impl<'a> ParserState<'a> {
             },
             _ => {
                 let exp = self.parse_inner_expression(0)?;
-                dbg!(&exp);
                 self.expect(TokenValue::RightParen)?;
-                dbg!(self.peek_next_token()?);
                 exp
             }
         };
         Ok(exp)
     }
 
-        pub(super) fn literal_expression(&mut self, lit: Literal) -> Expression {
+    pub(super) fn literal_expression(&mut self, lit: Literal) -> Expression {
         self.counter += 1;
         Expression {
             id: self.counter,
