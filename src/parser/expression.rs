@@ -1,10 +1,10 @@
 use std::collections::HashSet;
+use std::ops::Index;
 
 use crate::ast::{AstVisitor, Binding, Binop, Cond, Expression, ExpressionKind, FunClause, Literal, Name, Operator, Pattern};
 use crate::common::Result;
 use crate::parser::helpers::NameOrOperator;
 use crate::parser::lexer::TokenValue;
-use crate::parser::parse_expression;
 use super::ParserState;
 
 impl<'a> ParserState<'a> {
@@ -120,7 +120,11 @@ impl<'a> ParserState<'a> {
     pub(super) fn parse_where_expression(&mut self, lhs:Expression) -> Result<Expression> {
         self.expect(TokenValue::Where)?;
         let mut bindings = Vec::new();
+        let indent = *self.indent_stack.last().unwrap_or(&0);
         loop {
+            if self.next_indent() <= indent {
+                break;
+            }
             let binding = self.parse_binding()?;
             bindings.push(binding);
             if !self.semicolon_or_newline()? {

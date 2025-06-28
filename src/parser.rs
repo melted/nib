@@ -62,9 +62,9 @@ struct ParserState<'a> {
     chars: Peekable<CharIndices<'a>>,
     token_start: usize,
     pos: usize,
-    next_token: usize,
+    offset: usize,
     indent_stack: Vec<i32>,
-    tokens: Vec<Token>,
+    stashed_token: Option<Token>,
     on_new_line: bool,
     counter: Node
 }
@@ -76,9 +76,9 @@ impl<'a> ParserState<'a> {
             chars: code.char_indices().peekable(),
             token_start: 0,
             pos: 0,
-            next_token: 0,
+            offset: 0,
             indent_stack: Vec::new(),
-            tokens: Vec::new(),
+            stashed_token: None,
             on_new_line: true,
             counter: 0
         }
@@ -87,10 +87,7 @@ impl<'a> ParserState<'a> {
     pub(self) fn new_error(&self, msg: &str) -> Error {
         Error::Syntax {
             msg: msg.to_string(),
-            loc: Location::Offset {
-                start: self.token_start,
-                end: self.pos,
-            },
+            loc: Location::at(self.token_start, self.position()) // TODO: extent of AST element
         }
     }
 
@@ -100,7 +97,16 @@ impl<'a> ParserState<'a> {
 
     pub(self) fn indent(&self) -> i32 {
         let last_newline = self.metadata.newlines.last().unwrap_or(&0);
-        (self.pos - last_newline) as i32
+        (self.position() - last_newline) as i32
+    }
+
+    pub(self) fn position(&self) -> usize {
+        self.pos + self.offset
+    }
+
+    pub(self) fn adjust_offset(&mut self, offset:usize) {
+        self.offset += offset;
+        self.pos = 0;
     }
 }
 

@@ -3,23 +3,21 @@ use std::{fmt::Display, io};
 use thiserror::Error;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub enum Location {
-    Offset { start: usize, end: usize },
-    Unlocated,
+pub struct Location {
+    pub start:usize,
+    pub end:usize
+}
+
+impl Location {
+    pub fn at(start:usize, end:usize) -> Self {
+        Location { start, end }
+    }
 }
 
 impl Display for Location {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Location::Offset { start, end } => {
-                write!(f, "offset {}-{}", start, end)?;
-                Ok(())
-            }
-            Location::Unlocated => {
-                write!(f, "unknown location")?;
-                Ok(())
-            }
-        }
+        write!(f, "offset {}-{}", self.start, self.end)?;
+        Ok(())
     }
 }
 

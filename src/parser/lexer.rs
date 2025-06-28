@@ -8,31 +8,32 @@ impl<'a> super::ParserState<'a> {
     pub(super) fn peek_next_token(&mut self) -> Result<Token> {
         let tok = self.get_next_token()?;
         if tok.value != TokenValue::Eof {
-            self.next_token -= 1;
+            self.stashed_token = Some(tok.clone());
         }
+        self.pos = tok.location.start - self.offset;
+        self.token_start = self.position();
         Ok(tok)
     }
 
     pub(super) fn get_next_token(&mut self) -> Result<Token> {
-        if self.next_token < self.tokens.len() {
-            let tok = self.tokens[self.next_token].clone();
-            self.next_token += 1;
+        if let Some(tok) = self.stashed_token.take() {
             return Ok(tok)
         }
         while let Some((p, c)) = self.chars.peek() {
-            self.token_start = *p;
-            self.pos = self.token_start;
-            let tok = match *c {
+            let ch = *c;
+            self.pos = *p;
+            self.token_start = self.position();
+            let tok = match ch {
                 '\n' => {
                     let last = *self.metadata.newlines.last().unwrap_or(&0);
-                    if *p > last {
-                        self.metadata.newlines.push(*p);
+                    if self.position() > last {
+                        self.metadata.newlines.push(self.position());
                     }
                     self.on_new_line = true;
                     self.next();
                     None
                 },
-                _ if c.is_whitespace() => {
+                _ if ch.is_whitespace() => {
                     self.next();
                     None
                 },
@@ -95,19 +96,16 @@ impl<'a> super::ParserState<'a> {
                 },
                 '"' => Some(self.read_string()?),
                 '\'' => Some(self.read_char()?),
-                _ if c.is_numeric() => Some(self.read_number(false)?),
-                _ if identifier_initial_char(*c) => Some(self.read_identifier()?),
-                _ if c.is_symbol() || c.is_ascii_punctuation() =>  Some(self.read_operator()?),
+                _ if ch.is_numeric() => Some(self.read_number(false)?),
+                _ if identifier_initial_char(ch) => Some(self.read_identifier()?),
+                _ if ch.is_symbol() || ch.is_ascii_punctuation() =>  Some(self.read_operator()?),
                 _ => {
-                    let ch = *c;
                     self.lex_error(format!("Lexing failed at illegal char: {}", ch).as_str())?;
                     None
                 }
             };
 
             if let Some(t) = tok {
-                self.tokens.push(t.clone());
-                self.next_token += 1;
                 return Ok(t);
             }
         }
@@ -115,21 +113,25 @@ impl<'a> super::ParserState<'a> {
     }
 
     pub(super) fn rewind_lexer(&mut self, checkpoint:usize) {
-        println!("rewinding from {} to {}, tokens = {}", self.next_token, checkpoint, self.tokens.len());
-        if checkpoint < self.tokens.len() {
-            let loc = self.tokens[checkpoint].location;
-            if let Location::Offset { start, end } = loc {
-                self.pos = start;
+        println!("rewinding from {} to {}", self.position(), checkpoint);
+        if checkpoint < self.position() {
+            self.chars = self.src[checkpoint..].char_indices().peekable();
+            self.adjust_offset(checkpoint);
+            self.stashed_token = None;
+            loop {
+                let last_nl = self.metadata.newlines.last().unwrap_or(&0);
+                if self.position() < *last_nl {
+                    self.metadata.newlines.pop();
+                } else {
+                    self.on_new_line = self.src[*last_nl..self.position()].chars().all(char::is_whitespace);
+                    break;
+                }
             }
-            self.next_token = checkpoint;
         }
     }
 
     pub(super) fn token_indent(&self, token:Token) -> i32 {
-        let start = match token.location {
-            Location::Offset { start, .. } => start,
-            _ => { return -1; }
-        };
+        let start = token.location.start;
         for i in self.metadata.newlines.iter().rev() {
             if *i <= start {
                 return (start - i) as i32
@@ -147,7 +149,7 @@ impl<'a> super::ParserState<'a> {
     }
 
     fn read_identifier(&mut self) -> Result<Token> {
-        let first = self.pos;
+        let first = self.position();
         if let Ok(last) = self.snarf(|c| identifier_char(*c)) {
             let id = &self.src[first..last];
             match id {
@@ -169,7 +171,7 @@ impl<'a> super::ParserState<'a> {
     }
 
     fn read_operator(&mut self) -> Result<Token> {
-        let first = self.pos;
+        let first = self.position();
         if let Ok(last) = self.snarf(|c| c.is_symbol() || c.is_ascii_punctuation()) {
             let id = &self.src[first..last];
             match id {
@@ -249,7 +251,7 @@ impl<'a> super::ParserState<'a> {
 
 
     fn get_codepoint(&mut self, pred: impl Fn(&char) -> bool, radix: u32) -> Result<char> {
-        let start = self.pos;
+        let start = self.position();
         let stop = self.snarf(pred)?;
         let code = match u32::from_str_radix(&self.src[start..stop], radix) {
             Ok(c) => c,
@@ -266,7 +268,7 @@ impl<'a> super::ParserState<'a> {
         let sign = if neg { -1 } else { 1 };
         if self.check_prefix("0x") || self.check_prefix("0X") {
             self.advance(2);
-            let start = self.pos;
+            let start = self.position();
             let stop = self.snarf(char::is_ascii_hexdigit)?;
             let bigint = match i64::from_str_radix(&self.src[start..stop], 16) {
                 Ok(c) => c,
@@ -319,7 +321,7 @@ impl<'a> super::ParserState<'a> {
                 break;
             }
         }
-        Ok(self.pos)
+        Ok(self.position())
     }
 
     fn advance(&mut self, n: usize) {
@@ -329,7 +331,7 @@ impl<'a> super::ParserState<'a> {
     }
 
     fn check_prefix(&self, what: &str) -> bool {
-        self.src[self.pos..].starts_with(what)
+        self.src[self.position()..].starts_with(what)
     }
 
     fn peek(&mut self) -> Result<char> {
@@ -379,10 +381,7 @@ impl<'a> super::ParserState<'a> {
 
     fn location_current_token(&self) -> Location {
         // TODO: give InContext if applicable
-        Location::Offset {
-            start: self.token_start,
-            end: self.pos,
-        }
+        Location::at(self.token_start, self.position())
     }
 }
 
@@ -449,7 +448,7 @@ impl Token {
     pub(super) fn new(value: TokenValue) -> Token {
         Token {
             value,
-            location: Location::Unlocated,
+            location: Location::at(0, 0),
             on_new_line: false
         }
     }

@@ -214,6 +214,18 @@ fn parse_implicit_lambda() -> Result<()> {
 }
 
 #[test]
+fn test_rewind_lexer() -> Result<()> {
+    let mut state = ParserState::new("{ a*b*c }");
+    let t = state.get_next_token()?;
+    let t2 = state.get_next_token()?;
+    let t3 = state.get_next_token()?;
+    state.rewind_lexer(0);
+    let s = state.get_next_token()?;
+    assert_eq!(t, s);
+    Ok(())
+}
+
+#[test]
 fn empty_test_skeleton() -> Result<()> {
     let mut state = ParserState::new("");
     Ok(())

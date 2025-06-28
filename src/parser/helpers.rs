@@ -1,6 +1,5 @@
 
-use crate::{ ast::{self, Binding, Binop, Cond, Declaration, Expression, FunBinding, FunClause, Literal, Module, Name, OpBinding, OpClause, Operator, Pattern, Use, VarBinding}, 
-            common::Result};
+use crate::{ ast::{self, Expression, FunClause, Literal, Name,Operator, Pattern}, common::Result};
 
 use super::{ParserState, lexer::TokenValue};
 
@@ -102,12 +101,15 @@ impl<'a> ParserState<'a> {
         &mut self,
         inner_parser: &mut impl FnMut(&mut Self) -> Result<T>,
     ) -> Result<Option<T>> {
-        let checkpoint = self.next_token;
+        let checkpoint = self.position();
         match inner_parser(self) {
             Ok(res) => Ok(Some(res)),
             Err(_err) => {
-                if checkpoint != self.next_token {
+                if checkpoint <= self.position() {
                     self.rewind_lexer(checkpoint);
+                } else {
+                    let p = self.position();
+                    panic!("rewinding forwards! {checkpoint} {p}");
                 }
                 Ok(None)
             }
@@ -206,7 +208,6 @@ impl<'a> ParserState<'a> {
             self.error(&format!("Illegal token {tok:?} in bytearray literal"))
         }
     }
-
 
     pub(super) fn fun_clause(&mut self, args:Vec<Pattern>, guard: Option<Expression>, body:Expression) -> FunClause {
         self.counter += 1;
