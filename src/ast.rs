@@ -47,7 +47,7 @@ impl Declaration {
             Declaration::Binding(b) => match  b {
                 Binding::FunBinding(fb) => {
                     for c in &fb.clauses {
-                        c.args.iter().map(|p| p.visit(visitor));
+                        c.args.iter().for_each(|p| p.visit(visitor));
                         c.guard.as_ref().map(|g| g.visit(visitor));
                         c.body.visit(visitor);
                     }
