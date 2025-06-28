@@ -118,11 +118,13 @@ impl<'a> super::ParserState<'a> {
             self.chars = self.src[checkpoint..].char_indices().peekable();
             self.adjust_offset(checkpoint);
             self.stashed_token = None;
+            let new_pos = self.position();
             loop {
                 let last_nl = self.metadata.newlines.last().unwrap_or(&0);
                 if self.position() < *last_nl {
                     self.metadata.newlines.pop();
                 } else {
+                    println!("checking {}-{} for whitespace {} {}",*last_nl, self.position(), self.pos, self.offset);
                     self.on_new_line = self.src[*last_nl..self.position()].chars().all(char::is_whitespace);
                     break;
                 }

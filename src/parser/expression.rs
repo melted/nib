@@ -172,10 +172,11 @@ impl<'a> ParserState<'a> {
         let mut clauses = Vec::new();
         loop {
             let (args, guard) = self.parse_fun_args()?;
+
             self.expect(TokenValue::RightArrow)?;
             let expr = self.parse_expression()?;
             clauses.push(self.fun_clause(args, guard, expr));
-            if !self.semicolon_or_newline()? {
+            if !self.semicolon_or_newline()? || self.peek_next(TokenValue::RightBrace)? {
                 break;
             }
         }

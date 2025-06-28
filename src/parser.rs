@@ -105,7 +105,7 @@ impl<'a> ParserState<'a> {
     }
 
     pub(self) fn adjust_offset(&mut self, offset:usize) {
-        self.offset += offset;
+        self.offset = offset;
         self.pos = 0;
     }
 }

@@ -1,0 +1,17 @@
+// Simple pattern matching by using multi-clause lambdas
+
+on what lam = lam what
+
+// This works
+// length xs = on xs { () -> 0
+//                    (cons hd tl) -> 1 + length tl }
+
+// This doesn't
+length xs = on xs { 
+                () -> 0
+                (cons hd tl) -> 1 + length tl 
+            }
+
+// Now both work, hooray
+
+

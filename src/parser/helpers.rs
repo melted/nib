@@ -1,4 +1,3 @@
-
 use crate::{ ast::{self, Expression, FunClause, Literal, Name,Operator, Pattern}, common::Result};
 
 use super::{ParserState, lexer::TokenValue};
@@ -180,6 +179,7 @@ impl<'a> ParserState<'a> {
     pub(super) fn parse_literal(&mut self) -> Result<Literal> {
         let token = self.get_next_token()?;
         match token.value {
+            TokenValue::Nil => Ok(Literal::Nil),
             TokenValue::False => Ok(Literal::Bool(false)),
             TokenValue::True => Ok(Literal::Bool(true)),
             TokenValue::Integer(n) => Ok(Literal::Integer(n)),
