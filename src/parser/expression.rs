@@ -45,6 +45,7 @@ impl<'a> ParserState<'a> {
                         break;
                     }
                 },
+                TokenValue::Period => self.parse_projection_expression(lhs)?,
                 TokenValue::Identifier(_) => {
                     match self.parse_name_or_operator()? {
                         NameOrOperator::Name(name) if min_pred < 9 => {
@@ -60,11 +61,11 @@ impl<'a> ParserState<'a> {
                     }
                 },
                 TokenValue::Eof => break,
-                TokenValue::LeftBrace | TokenValue::LeftParen | TokenValue::LeftBracket => {
+                TokenValue::LeftBrace | TokenValue::LeftParen | TokenValue::LeftBracket if min_pred < 9 => {
                     let expr = self.parse_left_expression()?;
                     self.app_expression(lhs, expr)
                 },
-                _ if tok.value.is_literal() => {
+                _ if tok.value.is_literal() && min_pred < 9 => {
                     let expr = self.parse_left_expression()?;
                     self.app_expression(lhs, expr)
                 }, 
@@ -88,8 +89,9 @@ impl<'a> ParserState<'a> {
             TokenValue::LeftBrace => self.parse_lambda_expression(),
             TokenValue::LeftBracket => self.parse_array_expression(),
             TokenValue::LeftParen => self.parse_paren_expression(),
-            TokenValue::Identifier(_) => {
-                let name = self.parse_name()?;
+            TokenValue::Identifier(name) => {
+                self.get_next_token()?;
+                let name = Name::name(&name);
                 Ok(self.var_expression(name))
             },
             TokenValue::Operator(op) if op == "-" => {
@@ -207,6 +209,14 @@ impl<'a> ParserState<'a> {
         Ok(self.array_expression(exprs))
     }
 
+    pub(super) fn parse_projection_expression(&mut self, lhs: Expression) -> Result<Expression> {
+        self.expect(TokenValue::Period)?;
+        let mut projs = vec![lhs];
+        let mut exprs = self.parse_separated_by(&mut |this| this.parse_inner_expression(10), TokenValue::Period)?;
+        projs.append(&mut exprs);
+        Ok(self.projection_expression(projs))
+    }
+
     pub(super) fn parse_paren_expression(&mut self) -> Result<Expression> {
         self.expect(TokenValue::LeftParen)?;
         let exp = self.parse_inner_expression(0)?;
@@ -273,6 +283,14 @@ impl<'a> ParserState<'a> {
         Expression {
             id: self.counter,
             expr: ExpressionKind::Where(Box::new(expr), bindings)
+        }
+    }
+
+    pub(super) fn projection_expression(&mut self, exprs: Vec<Expression>) -> Expression {
+        self.counter += 1;
+        Expression {
+            id: self.counter,
+            expr: ExpressionKind::Projection(exprs)
         }
     }
 

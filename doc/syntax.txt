@@ -4,11 +4,12 @@ Program := decl*
 decl := `module` name | `use` name | binding
 binding := binding_lhs [`|` expr] `=` expr
 binding_lhs := pattern | name pattern+ | pattern binop pattern | `do`
-pattern := literal | identifier | `_` | `[` [pattern `,`]* pattern `]` |
-          pattern `@` identifier | `(` name pattern+ `)` | identifier `...`
+pattern := literal | name | `_` | `[` [pattern `,`]* pattern `]` |
+          pattern `@` identifier | `(` name pattern+ `)` | name `...`
   
-expr := literal | name | expr (expr)+ | expr binop expr | `(` expr `)` | `[` (expr `,`)* expr `]` |
-        `{` ((clause semi)* clause | expr ) `}` | expr `where` (binding semi) binding | expr `=>` expr semi expr
+expr := literal | identifier | expr (expr)+ | expr binop expr | `(` expr `)` | `[` (expr `,`)* expr `]` |
+        `{` ((clause semi)* clause | expr ) `}` | expr `where` (binding semi) binding | expr `=>` expr semi expr |
+        expr `.` expr 
 
 semi := `;` | <newline>
 
@@ -20,12 +21,14 @@ literal = nil | `true` | `false` | string | char |
 
 nil = `nil` | `()`
 
-identifier = (alpha | `_`) (alphanum | `_`)* and not `_`
+identifier = (alpha | `_`) (alphanum | `_`)* and not in reserved_words
+| `(` binop `)`
 
-binop = symbolchar+ not in reserved | `\`` name `\`` 
+binop = opchar+ not in reserved | `\`` name `\`` 
 
 name = (identifier `.`)* identifier
 qbinop = (identifier `.`)* binop
 
-symbolchar = unicode symbol except '{} [] ().,;'
-reserved = `=` `@` `->` `_` `=>` 
+symbolchar = unicode symbol except '{} [] ().,;#'
+reserved_symbols = `=` `@` `->` `_` `=>` '|' 
+reserved_words = `module` | `use` | `where` | `_`

@@ -44,27 +44,7 @@ impl Declaration {
             return;
         }
         match &self {
-            Declaration::Binding(b) => match  b {
-                Binding::FunBinding(fb) => {
-                    for c in &fb.clauses {
-                        c.args.iter().for_each(|p| p.visit(visitor));
-                        c.guard.as_ref().map(|g| g.visit(visitor));
-                        c.body.visit(visitor);
-                    }
-                },
-                Binding::OpBinding(ob) => {
-                    for c in &ob.clauses {
-                        c.lpat.visit(visitor);
-                        c.rpat.visit(visitor);
-                        c.guard.as_ref().map(|e| e.visit(visitor));
-                        c.body.visit(visitor);
-                    }
-                },
-                Binding::VarBinding(vb) => {
-                    vb.lhs.visit(visitor);
-                    vb.rhs.visit(visitor);
-                }
-            }
+            Declaration::Binding(b) => b.visit(visitor),
             _ => {}
         }
         visitor.on_post_declaration(self);
@@ -86,6 +66,36 @@ pub enum Binding {
     VarBinding(VarBinding),
     FunBinding(FunBinding),
     OpBinding(OpBinding)
+}
+
+impl Binding {
+    pub fn visit(&self, visitor:&mut dyn AstVisitor) {
+        if !visitor.on_binding(self) {
+            return;
+        }
+        match self {
+            Binding::FunBinding(fb) => {
+                for c in &fb.clauses {
+                    c.args.iter().for_each(|p| p.visit(visitor));
+                    c.guard.as_ref().map(|g| g.visit(visitor));
+                    c.body.visit(visitor);
+                }
+            },
+            Binding::OpBinding(ob) => {
+                for c in &ob.clauses {
+                    c.lpat.visit(visitor);
+                    c.rpat.visit(visitor);
+                    c.guard.as_ref().map(|e| e.visit(visitor));
+                    c.body.visit(visitor);
+                }
+            },
+            Binding::VarBinding(vb) => {
+                vb.lhs.visit(visitor);
+                vb.rhs.visit(visitor);
+            }
+        }
+        visitor.on_post_binding(self);
+    }
 }
 
 impl Display for Binding {
@@ -301,7 +311,8 @@ pub enum ExpressionKind {
     App(Box<Expression>, Box<Expression>),
     Binop(Binop),
     Where(Box<Expression>, Vec<Binding>),
-    Cond(Cond)
+    Cond(Cond),
+    Projection(Vec<Expression>)
 }
 
 impl Expression {
@@ -336,8 +347,16 @@ impl Expression {
                     clause.body.visit(visitor);
                 }
             },
+            ExpressionKind::Projection(exps) => {
+                for e in exps {
+                    e.visit(visitor);
+                }
+            },
             ExpressionKind::Where(exp, bindings) => {
-
+                exp.visit(visitor);
+                for b in bindings {
+                    b.visit(visitor);
+                }
             },
             _ => {}
         }
@@ -394,6 +413,14 @@ impl Display for ExpressionKind {
                 }
                 write!(f, " }}")?;
             },
+            ExpressionKind::Projection(exprs) => {
+                for (i, exp) in exprs.iter().enumerate() {
+                    write!(f, "{}", exp)?;
+                    if i < exprs.len() - 1 {
+                        write!(f, ".")?;
+                    }
+                }
+            }
             ExpressionKind::Where(lhs, bindings ) => {
                 write!(f, "{} where ", lhs)?;
                 for b in bindings {
@@ -542,4 +569,13 @@ pub trait AstVisitor {
     fn on_post_pattern(&mut self, pat: &Pattern) {
          
     }
+
+    fn on_binding(&mut self, binding: &Binding) -> bool {
+        true
+    }
+
+    fn on_post_binding(&mut self, binding: &Binding) {
+
+    }
+
 }
