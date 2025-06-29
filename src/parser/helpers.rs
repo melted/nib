@@ -1,4 +1,4 @@
-use crate::{ ast::{self, Expression, FunClause, Literal, Name,Operator, Pattern}, common::Result};
+use crate::{ ast::{self, ExpressionNode, FunClause, Literal, Name,Operator, PatternNode}, common::Result};
 
 use super::{ParserState, lexer::TokenValue};
 
@@ -199,7 +199,7 @@ impl<'a> ParserState<'a> {
         }
     }
 
-    pub(super) fn fun_clause(&mut self, args:Vec<Pattern>, guard: Option<Expression>, body:Expression) -> FunClause {
+    pub(super) fn fun_clause(&mut self, args:Vec<PatternNode>, guard: Option<ExpressionNode>, body:ExpressionNode) -> FunClause {
         self.counter += 1;
         FunClause { id: self.counter, args, guard, body }
     }

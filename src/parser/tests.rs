@@ -1,5 +1,5 @@
 #![cfg(test)] 
-use crate::ast::{Binding, Cond, Declaration, ExpressionKind, Literal, Name, PatternKind};
+use crate::ast::{Binding, Cond, Declaration, Expression, Literal, Name, Pattern};
 use crate::common::Result;
 use crate::parser::expression::UsedImplicits;
 use crate::parser::{lex, ParserState};
@@ -108,10 +108,10 @@ fn parse_custom_pattern() -> Result<()> {
     let mut state = ParserState::new("(pair a b)");
     let pat = state.parse_pattern()?;
     match &pat.pattern{
-        PatternKind::Custom(name,fields ) => {
+        Pattern::Custom(name,fields ) => {
             assert_eq!(name.to_string(), "pair");
-            assert_eq!(fields[0].pattern, PatternKind::Var(Name::name("a")));
-            assert_eq!(fields[1].pattern, PatternKind::Var(Name::name("b")));
+            assert_eq!(fields[0].pattern, Pattern::Var(Name::name("a")));
+            assert_eq!(fields[1].pattern, Pattern::Var(Name::name("b")));
         },
         _ => assert!(false)
     }
@@ -124,9 +124,9 @@ fn parse_simple_binding() -> Result<()> {
     let decl = state.parse_declaration()?;
     match decl {
         Declaration::Binding(Binding::VarBinding(bind )) => {
-            assert_eq!(bind.lhs.pattern, PatternKind::Var(Name::name("a")));
+            assert_eq!(bind.lhs.pattern, Pattern::Var(Name::name("a")));
             let exp = bind.rhs.expr;
-            assert_eq!(exp, ExpressionKind::Literal(Literal::Integer(1)));
+            assert_eq!(exp, Expression::Literal(Literal::Integer(1)));
         }
         _ => assert!(false)
     }
@@ -138,14 +138,14 @@ fn parse_lambda_expression() -> Result<()> {
     let mut state = ParserState::new("{ a -> a + 1 }");
     let expr = state.parse_expression()?;
     match expr.expr {
-        ExpressionKind::Lambda(fc) => {
+        Expression::Lambda(fc) => {
             assert_eq!(fc.len(), 1);
-            let PatternKind::Var(ref x) = fc[0].args[0].pattern else {
+            let Pattern::Var(ref x) = fc[0].args[0].pattern else {
                 assert!(false);
                 return state.error("meh");
             };
             assert_eq!(x, &Name::name("a"));
-            let ExpressionKind::Binop(ref op) = fc[0].body.expr else {
+            let Expression::Binop(ref op) = fc[0].body.expr else {
                 assert!(false);
                 return state.error("meh");
             };
@@ -160,11 +160,11 @@ fn parse_double_binop() -> Result<()> {
     let mut state = ParserState::new("1+2+3");
     let expr = state.parse_expression()?;
     match expr.expr {
-        ExpressionKind::Binop(op) => {
-            assert_eq!(op.lhs.expr, ExpressionKind::Literal(Literal::Integer(1)));
+        Expression::Binop(op) => {
+            assert_eq!(op.lhs.expr, Expression::Literal(Literal::Integer(1)));
             match op.rhs.expr {
-                ExpressionKind::Binop(op2) => {
-                    assert_eq!(op2.lhs.expr, ExpressionKind::Literal(Literal::Integer(2)));
+                Expression::Binop(op2) => {
+                    assert_eq!(op2.lhs.expr, Expression::Literal(Literal::Integer(2)));
                 }
                 _ => assert!(false)
             }
@@ -217,7 +217,7 @@ fn parse_implicit_lambda_no_args() -> Result<()> {
     let mut state = ParserState::new("{ print \"hello\" }");
     let expr = state.parse_expression()?;
     match expr.expr {
-        ExpressionKind::Lambda(clauses) => {
+        Expression::Lambda(clauses) => {
             assert_eq!(clauses.len(), 1);
             assert_eq!(clauses[0].args.len(), 1);
         },
@@ -257,8 +257,8 @@ fn parse_conditional_expression() -> Result<()> {
     let mut state = ParserState::new("x < y => x; y");
     let exp = state.parse_expression()?;
     match exp.expr {
-        ExpressionKind::Cond(Cond {pred, on_true, on_false}) => {
-            assert_eq!(on_true.expr, ExpressionKind::Var(Name::name("x")));
+        Expression::Cond(Cond {pred, on_true, on_false}) => {
+            assert_eq!(on_true.expr, Expression::Var(Name::name("x")));
         },
         _ => assert!(false)
     }

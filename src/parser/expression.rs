@@ -1,17 +1,17 @@
 use std::collections::HashSet;
 
-use crate::ast::{AstVisitor, Binding, Binop, Cond, Expression, ExpressionKind, FunClause, Literal, Name, Operator, Pattern};
+use crate::ast::{AstVisitor, Binding, Binop, Cond, ExpressionNode, Expression, FunClause, Literal, Name, Operator, PatternNode};
 use crate::common::Result;
 use crate::parser::helpers::NameOrOperator;
 use crate::parser::lexer::TokenValue;
 use super::ParserState;
 
 impl<'a> ParserState<'a> {
-    pub(super) fn parse_expression(&mut self) -> Result<Expression> {
+    pub(super) fn parse_expression(&mut self) -> Result<ExpressionNode> {
         self.parse_inner_expression(0)
     }
 
-    pub(super) fn parse_inner_expression(&mut self, min_pred:i32) -> Result<Expression> {
+    pub(super) fn parse_inner_expression(&mut self, min_pred:i32) -> Result<ExpressionNode> {
         let indent = self.indent();
         self.indent_stack.push(indent); // TODO: Is the stack needed? It's not used now.
         // Also, it may become corrupted on error returns.
@@ -79,7 +79,7 @@ impl<'a> ParserState<'a> {
         Ok(lhs)
     }
 
-    pub(super) fn parse_left_expression(&mut self) -> Result<Expression> {
+    pub(super) fn parse_left_expression(&mut self) -> Result<ExpressionNode> {
         let tok = self.peek_next_token()?;
         match tok.value {
             x if x.is_literal() => {
@@ -118,7 +118,7 @@ impl<'a> ParserState<'a> {
         }
     }
 
-    pub(super) fn parse_where_expression(&mut self, lhs:Expression) -> Result<Expression> {
+    pub(super) fn parse_where_expression(&mut self, lhs:ExpressionNode) -> Result<ExpressionNode> {
         self.expect(TokenValue::Where)?;
         let mut bindings = Vec::new();
         let indent = *self.indent_stack.last().unwrap_or(&0);
@@ -135,12 +135,12 @@ impl<'a> ParserState<'a> {
         Ok(self.where_expression(lhs, bindings))
     }
 
-    pub(super) fn parse_binop_expression(&mut self, lhs:Expression, op:Operator) -> Result<Expression> {
+    pub(super) fn parse_binop_expression(&mut self, lhs:ExpressionNode, op:Operator) -> Result<ExpressionNode> {
         let rhs = self.parse_inner_expression(5)?;
         Ok(self.binop_expression(op, lhs, rhs))
     }
 
-    pub(super) fn parse_cond_expression(&mut self, lhs:Expression) -> Result<Expression> {
+    pub(super) fn parse_cond_expression(&mut self, lhs:ExpressionNode) -> Result<ExpressionNode> {
         self.expect(TokenValue::FatRightArrow)?;
         let on_true = self.parse_inner_expression(3)?;
         if self.semicolon_or_newline()? {
@@ -151,7 +151,7 @@ impl<'a> ParserState<'a> {
         }
     }
 
-    pub(super) fn parse_fun_args(&mut self) -> Result<(Vec<Pattern>, Option<Expression>)> {
+    pub(super) fn parse_fun_args(&mut self) -> Result<(Vec<PatternNode>, Option<ExpressionNode>)> {
         let args = self.parse_some1(&mut Self::parse_pattern, |t| t != TokenValue::Bar && t != TokenValue::RightArrow && t != TokenValue::Equals)?;
         let guard = if self.is_next(TokenValue::Bar)? {
             Some(self.parse_expression()?)
@@ -161,7 +161,7 @@ impl<'a> ParserState<'a> {
         Ok((args, guard))
     }
 
-    pub(super) fn parse_lambda_expression(&mut self) -> Result<Expression> {
+    pub(super) fn parse_lambda_expression(&mut self) -> Result<ExpressionNode> {
         if let Some(exp) = self.try_parse(&mut Self::parse_full_lambda_expression)? {
             Ok(exp)
         } else {
@@ -169,7 +169,7 @@ impl<'a> ParserState<'a> {
         }
     }
 
-    pub(super) fn parse_full_lambda_expression(&mut self) -> Result<Expression> {
+    pub(super) fn parse_full_lambda_expression(&mut self) -> Result<ExpressionNode> {
         self.expect(TokenValue::LeftBrace)?;
         let mut clauses = Vec::new();
         loop {
@@ -187,7 +187,7 @@ impl<'a> ParserState<'a> {
     }
 
 
-    pub(super) fn parse_implicit_lambda_expression(&mut self) -> Result<Expression> {
+    pub(super) fn parse_implicit_lambda_expression(&mut self) -> Result<ExpressionNode> {
         self.expect(TokenValue::LeftBrace)?;
         let expr = self.parse_expression()?;
         self.expect(TokenValue::RightBrace)?;
@@ -195,7 +195,7 @@ impl<'a> ParserState<'a> {
         expr.visit(&mut visitor);
         let mut vars : Vec<Name> = visitor.vars.into_iter().collect();
         vars.sort();
-        let mut pats: Vec<Pattern> = vars.into_iter().map(|n| self.var_pattern(n)).collect();
+        let mut pats: Vec<PatternNode> = vars.into_iter().map(|n| self.var_pattern(n)).collect();
         if pats.is_empty() {
             pats.push(self.wildcard_pattern());
         }
@@ -203,14 +203,14 @@ impl<'a> ParserState<'a> {
         Ok(self.lambda_expression(vec![clause]))
     }
 
-    pub(super) fn parse_array_expression(&mut self) -> Result<Expression> {
+    pub(super) fn parse_array_expression(&mut self) -> Result<ExpressionNode> {
         self.expect(TokenValue::LeftBracket)?;
         let exprs = self.parse_separated_by(&mut Self::parse_expression, TokenValue::Comma)?;
         self.expect(TokenValue::RightBracket)?;
         Ok(self.array_expression(exprs))
     }
 
-    pub(super) fn parse_projection_expression(&mut self, lhs: Expression) -> Result<Expression> {
+    pub(super) fn parse_projection_expression(&mut self, lhs: ExpressionNode) -> Result<ExpressionNode> {
         self.expect(TokenValue::Period)?;
         let mut projs = vec![lhs];
         let mut exprs = self.parse_separated_by(&mut |this| this.parse_inner_expression(10), TokenValue::Period)?;
@@ -218,58 +218,58 @@ impl<'a> ParserState<'a> {
         Ok(self.projection_expression(projs))
     }
 
-    pub(super) fn parse_paren_expression(&mut self) -> Result<Expression> {
+    pub(super) fn parse_paren_expression(&mut self) -> Result<ExpressionNode> {
         self.expect(TokenValue::LeftParen)?;
         let exp = self.parse_inner_expression(0)?;
         self.expect(TokenValue::RightParen)?;
         Ok(exp)
     }
 
-    pub(super) fn literal_expression(&mut self, lit: Literal) -> Expression {
+    pub(super) fn literal_expression(&mut self, lit: Literal) -> ExpressionNode {
         self.counter += 1;
-        Expression {
+        ExpressionNode {
             id: self.counter,
-            expr: ExpressionKind::Literal(lit)
+            expr: Expression::Literal(lit)
         }
     }
 
-    pub(super) fn var_expression(&mut self, var: Name) -> Expression {
+    pub(super) fn var_expression(&mut self, var: Name) -> ExpressionNode {
         self.counter += 1;
-        Expression {
+        ExpressionNode {
             id: self.counter,
-            expr: ExpressionKind::Var(var)
+            expr: Expression::Var(var)
         }
     }
 
-    pub(super) fn array_expression(&mut self, vals: Vec<Expression>) -> Expression {
+    pub(super) fn array_expression(&mut self, vals: Vec<ExpressionNode>) -> ExpressionNode {
         self.counter += 1;
-        Expression {
+        ExpressionNode {
             id: self.counter,
-            expr: ExpressionKind::Array(vals)
+            expr: Expression::Array(vals)
         }
     }
 
-    pub(super) fn app_expression(&mut self, f: Expression, arg: Expression) -> Expression {
+    pub(super) fn app_expression(&mut self, f: ExpressionNode, arg: ExpressionNode) -> ExpressionNode {
         self.counter += 1;
-        Expression {
+        ExpressionNode {
             id: self.counter,
-            expr: ExpressionKind::App(Box::new(f), Box::new(arg))
+            expr: Expression::App(Box::new(f), Box::new(arg))
         }
     }
 
-    pub(super) fn lambda_expression(&mut self, clauses: Vec<FunClause>) -> Expression {
+    pub(super) fn lambda_expression(&mut self, clauses: Vec<FunClause>) -> ExpressionNode {
         self.counter += 1;
-        Expression {
+        ExpressionNode {
             id: self.counter,
-            expr: ExpressionKind::Lambda(clauses)
+            expr: Expression::Lambda(clauses)
         }
     }
 
-    pub(super) fn binop_expression(&mut self, op: Operator, lhs: Expression, rhs: Expression) -> Expression {
+    pub(super) fn binop_expression(&mut self, op: Operator, lhs: ExpressionNode, rhs: ExpressionNode) -> ExpressionNode {
         self.counter += 1;
-        Expression {
+        ExpressionNode {
             id: self.counter,
-            expr: ExpressionKind::Binop(
+            expr: Expression::Binop(
                 Binop {
                     op: op,
                     lhs: Box::new(lhs),
@@ -279,27 +279,27 @@ impl<'a> ParserState<'a> {
         }
     }
 
-    pub(super) fn where_expression(&mut self, expr: Expression, bindings: Vec<Binding>) -> Expression {
+    pub(super) fn where_expression(&mut self, expr: ExpressionNode, bindings: Vec<Binding>) -> ExpressionNode {
         self.counter += 1;
-        Expression {
+        ExpressionNode {
             id: self.counter,
-            expr: ExpressionKind::Where(Box::new(expr), bindings)
+            expr: Expression::Where(Box::new(expr), bindings)
         }
     }
 
-    pub(super) fn projection_expression(&mut self, exprs: Vec<Expression>) -> Expression {
+    pub(super) fn projection_expression(&mut self, exprs: Vec<ExpressionNode>) -> ExpressionNode {
         self.counter += 1;
-        Expression {
+        ExpressionNode {
             id: self.counter,
-            expr: ExpressionKind::Projection(exprs)
+            expr: Expression::Projection(exprs)
         }
     }
 
-    pub(super) fn cond_expression(&mut self, pred: Expression, on_true: Expression, on_false: Expression) -> Expression {
+    pub(super) fn cond_expression(&mut self, pred: ExpressionNode, on_true: ExpressionNode, on_false: ExpressionNode) -> ExpressionNode {
         self.counter += 1;
-        Expression {
+        ExpressionNode {
             id: self.counter,
-            expr: ExpressionKind::Cond(
+            expr: Expression::Cond(
                 Cond {
                     pred: Box::new(pred),
                     on_true: Box::new(on_true),
@@ -322,9 +322,9 @@ impl UsedImplicits {
 }
 
 impl AstVisitor for UsedImplicits {
-    fn on_expression(&mut self, expr: &Expression) -> bool {
+    fn on_expression(&mut self, expr: &ExpressionNode) -> bool {
         match &expr.expr {
-            ExpressionKind::Var(name) => {
+            Expression::Var(name) => {
                 let v = name.to_string();
                 if v == "a" || v == "b" || v == "c" || v == "d" {
                     self.vars.insert(name.clone());

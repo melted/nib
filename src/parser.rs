@@ -2,7 +2,7 @@ use std::iter::Peekable;
 use std::str::CharIndices;
 
 use crate::common::{Error, Location, Result};
-use crate::ast::{Declaration, Expression, Metadata, Node};
+use crate::ast::{Declaration, ExpressionNode, Metadata, Node};
 use crate::parser::lexer::{Token, TokenValue};
 
 mod declaration;
@@ -21,7 +21,7 @@ pub fn parse_declarations(code: &str) -> Result<Vec<Declaration>> {
 }
 
 
-pub fn parse_expression(code: &str) -> Result<Expression> {
+pub fn parse_expression(code: &str) -> Result<ExpressionNode> {
     let mut state = ParserState::new(code);
     state.parse_expression()
 }

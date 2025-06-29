@@ -1,4 +1,4 @@
-use crate::{ast::{Binding, Declaration, Expression, FunBinding, Module, Name, OpBinding, OpClause, Operator, Pattern, PatternKind, Use, VarBinding}, common::Result, parser::{lexer::TokenValue, ParserState}};
+use crate::{ast::{Binding, Declaration, ExpressionNode, FunBinding, Module, Name, OpBinding, OpClause, Operator, PatternNode, Pattern, Use, VarBinding}, common::Result, parser::{lexer::TokenValue, ParserState}};
 
 
 impl<'a> ParserState<'a> {
@@ -83,7 +83,7 @@ impl<'a> ParserState<'a> {
                 let rhs = self.parse_expression()?;
                 Ok(self.op_binding(op, initial, rpat, guard, rhs))
             } else {
-                if let PatternKind::Var(name) = initial.pattern {
+                if let Pattern::Var(name) = initial.pattern {
                     let (args, guard) = self.parse_fun_args()?;
                     self.expect(TokenValue::Equals)?;
                     let rhs = self.parse_expression()?;
@@ -111,7 +111,7 @@ impl<'a> ParserState<'a> {
         })
     }
 
-    pub(super) fn var_binding(&mut self, pat:Pattern, rhs:Expression) -> Binding {
+    pub(super) fn var_binding(&mut self, pat:PatternNode, rhs:ExpressionNode) -> Binding {
         self.counter += 1;
         Binding::VarBinding(VarBinding {
             id: self.counter,
@@ -120,7 +120,7 @@ impl<'a> ParserState<'a> {
         })
     }
 
-    pub(super) fn fun_binding(&mut self, name:Name, args:Vec<Pattern>, guard: Option<Expression>, rhs:Expression) -> Binding {
+    pub(super) fn fun_binding(&mut self, name:Name, args:Vec<PatternNode>, guard: Option<ExpressionNode>, rhs:ExpressionNode) -> Binding {
         let clauses = vec![self.fun_clause(args, guard, rhs)];
         self.counter += 1;
         Binding::FunBinding(FunBinding {
@@ -130,7 +130,7 @@ impl<'a> ParserState<'a> {
         })
     }
 
-    pub(super) fn op_binding(&mut self, op: Operator, lpat:Pattern, rpat:Pattern, guard: Option<Expression>, rhs:Expression) -> Binding {
+    pub(super) fn op_binding(&mut self, op: Operator, lpat:PatternNode, rpat:PatternNode, guard: Option<ExpressionNode>, rhs:ExpressionNode) -> Binding {
         self.counter += 1;
         let clauses = vec![OpClause { id: self.counter, lpat,rpat, guard, body: rhs }];
         self.counter += 1;

@@ -1,9 +1,9 @@
-use crate::ast::{Literal, Name, Pattern, PatternKind};
+use crate::ast::{Literal, Name, PatternNode, Pattern};
 use super::{ ParserState, lexer::TokenValue };
 use crate::common::Result;
 
 impl<'a> ParserState<'a> {
-    pub(super) fn parse_pattern(&mut self) -> Result<Pattern> {
+    pub(super) fn parse_pattern(&mut self) -> Result<PatternNode> {
         let tok = self.peek_next_token()?;
         let lhs = match tok.value {
             TokenValue::Underscore => {
@@ -45,14 +45,14 @@ impl<'a> ParserState<'a> {
         }
     }
 
-    pub(super) fn parse_array_pattern(&mut self) -> Result<Pattern> {
+    pub(super) fn parse_array_pattern(&mut self) -> Result<PatternNode> {
         self.get_next_token()?;
         let pats = self.parse_separated_by(&mut Self::parse_pattern, TokenValue::Comma)?;
         self.expect(TokenValue::RightBracket)?;
         Ok(self.array_pattern(pats))
     }
 
-    pub(super) fn parse_custom_pattern(&mut self) -> Result<Pattern> {
+    pub(super) fn parse_custom_pattern(&mut self) -> Result<PatternNode> {
         self.expect(TokenValue::LeftParen)?;
         match self.peek_next_token()?.value {
             TokenValue::Identifier(_) => {
@@ -67,38 +67,38 @@ impl<'a> ParserState<'a> {
         }
     }
 
-    pub(super) fn alias_pattern(&mut self, pattern:Pattern, alias:Name) -> Pattern {
+    pub(super) fn alias_pattern(&mut self, pattern:PatternNode, alias:Name) -> PatternNode {
         self.counter += 1;
-        Pattern { id: self.counter, pattern: PatternKind::Alias(Box::new(pattern), alias) }
+        PatternNode { id: self.counter, pattern: Pattern::Alias(Box::new(pattern), alias) }
     }
 
-    pub(super) fn array_pattern(&mut self, patterns:Vec<Pattern>) -> Pattern {
+    pub(super) fn array_pattern(&mut self, patterns:Vec<PatternNode>) -> PatternNode {
         self.counter += 1;
-        Pattern { id: self.counter, pattern: PatternKind::Array(patterns) }
+        PatternNode { id: self.counter, pattern: Pattern::Array(patterns) }
     }
 
-    pub(super) fn custom_pattern(&mut self, name:Name, patterns:Vec<Pattern>) -> Pattern {
+    pub(super) fn custom_pattern(&mut self, name:Name, patterns:Vec<PatternNode>) -> PatternNode {
         self.counter += 1;
-        Pattern { id: self.counter, pattern: PatternKind::Custom(name, patterns) }
+        PatternNode { id: self.counter, pattern: Pattern::Custom(name, patterns) }
     }
 
-    pub(super) fn var_pattern(&mut self, name:Name) -> Pattern {
+    pub(super) fn var_pattern(&mut self, name:Name) -> PatternNode {
         self.counter += 1;
-        Pattern { id: self.counter, pattern: PatternKind::Var(name) }
+        PatternNode { id: self.counter, pattern: Pattern::Var(name) }
     }
 
-    pub(super) fn literal_pattern(&mut self, lit:Literal) -> Pattern {
+    pub(super) fn literal_pattern(&mut self, lit:Literal) -> PatternNode {
         self.counter += 1;
-        Pattern { id: self.counter, pattern: PatternKind::Literal(lit) }
+        PatternNode { id: self.counter, pattern: Pattern::Literal(lit) }
     }
 
-    pub(super) fn ellipsis_pattern(&mut self, name:Name) -> Pattern {
+    pub(super) fn ellipsis_pattern(&mut self, name:Name) -> PatternNode {
         self.counter += 1;
-        Pattern { id: self.counter, pattern: PatternKind::Ellipsis(name) }
+        PatternNode { id: self.counter, pattern: Pattern::Ellipsis(name) }
     }
 
-    pub(super) fn wildcard_pattern(&mut self) -> Pattern {
+    pub(super) fn wildcard_pattern(&mut self) -> PatternNode {
         self.counter += 1;
-        Pattern { id: self.counter, pattern: PatternKind::Wildcard }
+        PatternNode { id: self.counter, pattern: Pattern::Wildcard }
     }
 }
