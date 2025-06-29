@@ -1,5 +1,5 @@
 #![cfg(test)] 
-use crate::ast::{Binding, Declaration, ExpressionKind, Literal, Name, PatternKind};
+use crate::ast::{Binding, Cond, Declaration, ExpressionKind, Literal, Name, PatternKind};
 use crate::common::Result;
 use crate::parser::expression::UsedImplicits;
 use crate::parser::{lex, ParserState};
@@ -249,6 +249,19 @@ fn parse_simple_call() -> Result<()> {
 fn parse_composite_call() -> Result<()> {
     let mut state = ParserState::new("go (b) a");
     let expr = state.parse_expression();
+    Ok(())
+}
+
+#[test]
+fn parse_conditional_expression() -> Result<()> {
+    let mut state = ParserState::new("x < y => x; y");
+    let exp = state.parse_expression()?;
+    match exp.expr {
+        ExpressionKind::Cond(Cond {pred, on_true, on_false}) => {
+            assert_eq!(on_true.expr, ExpressionKind::Var(Name::name("x")));
+        },
+        _ => assert!(false)
+    }
     Ok(())
 }
 

@@ -141,6 +141,7 @@ impl<'a> ParserState<'a> {
     }
 
     pub(super) fn parse_cond_expression(&mut self, lhs:Expression) -> Result<Expression> {
+        self.expect(TokenValue::FatRightArrow)?;
         let on_true = self.parse_inner_expression(3)?;
         if self.semicolon_or_newline()? {
             let on_false = self.parse_inner_expression(3)?;
