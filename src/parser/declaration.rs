@@ -1,4 +1,4 @@
-use crate::{ast::{Binding, Declaration, Expression, FunBinding, Module, Name, OpBinding, OpClause, Operator, Pattern, Use, VarBinding}, common::Result, parser::{lexer::TokenValue, parse_expression, ParserState}};
+use crate::{ast::{Binding, Declaration, Expression, FunBinding, Module, Name, OpBinding, OpClause, Operator, Pattern, PatternKind, Use, VarBinding}, common::Result, parser::{lexer::TokenValue, ParserState}};
 
 
 impl<'a> ParserState<'a> {
@@ -66,24 +66,12 @@ impl<'a> ParserState<'a> {
     }
 
     pub(super) fn parse_binding(&mut self) -> Result<Binding> {
-        if let Some(name) = self.try_parse(&mut Self::parse_name)? {
-            if self.is_next(TokenValue::Equals)? {
-                let rhs = self.parse_expression()?;
-                let pat = self.var_pattern(name);
-                Ok(self.var_binding(pat, rhs))
-            } else {
-                let (args, guard) = self.parse_fun_args()?;
-                self.expect(TokenValue::Equals)?;
-                let rhs = self.parse_expression()?;
-                Ok(self.fun_binding(name, args, guard, rhs))
-            }
-
+        let initial = self.parse_pattern()?;
+        if self.is_next(TokenValue::Equals)? {
+            let rhs = self.parse_expression()?;
+            Ok(self.var_binding(initial, rhs))
         } else {
-            let pat = self.parse_pattern()?;
-            if self.is_next(TokenValue::Equals)? {
-                let rhs = self.parse_expression()?;
-                Ok(self.var_binding(pat, rhs))
-            } else {
+            if self.peek_operator()? {
                 let op = self.parse_operator()?;
                 let rpat = self.parse_pattern()?;
                 let guard = if self.is_next(TokenValue::Bar)? {
@@ -93,12 +81,20 @@ impl<'a> ParserState<'a> {
                 };
                 self.expect(TokenValue::Equals)?;
                 let rhs = self.parse_expression()?;
-                Ok(self.op_binding(op, pat, rpat, guard, rhs))
+                Ok(self.op_binding(op, initial, rpat, guard, rhs))
+            } else {
+                if let PatternKind::Var(name) = initial.pattern {
+                    let (args, guard) = self.parse_fun_args()?;
+                    self.expect(TokenValue::Equals)?;
+                    let rhs = self.parse_expression()?;
+                    Ok(self.fun_binding(name, args, guard, rhs))
+                } else {
+                    self.error("Binding pattern matches neither a var, fun or operator binding")
+                }
             }
         }
     }
 
-    
     pub(super) fn module_declaration(&mut self, name:Name) -> Declaration {
         self.counter += 1;
         Declaration::Module(Module {

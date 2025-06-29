@@ -140,13 +140,6 @@ impl<'a> ParserState<'a> {
             TokenValue::Operator(id) => {
                 return Ok(NameOrOperator::Operator(ast::Operator::Plain(id)))
             },
-            TokenValue::LeftParen if self.peek_operator()? => {
-                let TokenValue::Operator(op) = self.get_next_token()?.value else {
-                    return self.error("Can't happen");
-                };
-                self.expect(TokenValue::RightParen)?;
-                return Ok(NameOrOperator::Name(Name::Plain(op)));
-            },
             _ => {
                 return self.error(&format!("Expected identifier or operator, got {:?}", &first.value));
             }
@@ -159,13 +152,6 @@ impl<'a> ParserState<'a> {
                 TokenValue::Identifier(id) => id,
                 TokenValue::Operator(id) => {
                     return Ok(NameOrOperator::Operator(ast::Operator::Qualified(path, id)))
-                },
-                TokenValue::LeftParen if self.peek_operator()? => {
-                    let TokenValue::Operator(op) = self.get_next_token()?.value else {
-                        return self.error("Can't happen");
-                    };
-                    self.expect(TokenValue::RightParen)?;
-                    return Ok(NameOrOperator::Name(Name::Qualified(path, op)));
                 },
                 _ => {
                     return self.error(&format!("Expected identifier or operator, got {:?}", &next.value));

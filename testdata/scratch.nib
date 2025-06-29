@@ -14,4 +14,6 @@ length xs = on xs {
 
 // Now both work, hooray
 
+(||) x y = x => x; y x
+
 

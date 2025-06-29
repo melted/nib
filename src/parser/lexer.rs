@@ -37,7 +37,30 @@ impl<'a> super::ParserState<'a> {
                     self.next();
                     None
                 },
-                '(' => Some(self.simple_token(TokenValue::LeftParen)),
+                '(' => {
+                    self.next();
+                    if let Some((_, c)) = self.chars.peek() {
+                        let c = *c;
+                        if !self.check_prefix("//") && operator_char(c) {
+                            let op = self.read_operator()?;
+                            let nt = match op.value {
+                                TokenValue::Operator(name) => self.token(TokenValue::Identifier(format!("({name})"))),
+                                _ => return self.lex_error(&format!("Expected operator token, got {:?}", op))
+                            };
+                            if  let Some((_, ')')) = self.chars.peek() {
+                                self.next();
+                                Some(nt)
+                            } else {
+                                return self.lex_error("Unterminated parens operator");
+                            }
+                        } else {
+                            Some(self.token(TokenValue::LeftParen))
+                        }
+                    } else {
+                        Some(self.token(TokenValue::LeftParen))
+                    }
+                    
+                },
                 ')' => Some(self.simple_token(TokenValue::RightParen)),
                 '[' => Some(self.simple_token(TokenValue::LeftBracket)),
                 ']' => Some(self.simple_token(TokenValue::RightBracket)),
@@ -65,7 +88,6 @@ impl<'a> super::ParserState<'a> {
                         Some(self.simple_token(TokenValue::Period))
                     }
                 },
-                '|' => Some(self.simple_token(TokenValue::Bar)),
                 '#' => {
                     self.next();
                     match self.chars.peek() {
@@ -82,7 +104,7 @@ impl<'a> super::ParserState<'a> {
                             Some(self.token(TokenValue::HashLeftBracket))
                         }, 
                         _ => {
-                            Some(self.read_operator()?)
+                            return self.lex_error("# is an illegal operator char");
                         }
                     }
                 },
@@ -98,7 +120,7 @@ impl<'a> super::ParserState<'a> {
                 '\'' => Some(self.read_char()?),
                 _ if ch.is_numeric() => Some(self.read_number(false)?),
                 _ if identifier_initial_char(ch) => Some(self.read_identifier()?),
-                _ if ch.is_symbol() || ch.is_ascii_punctuation() =>  Some(self.read_operator()?),
+                _ if operator_char(ch) =>  Some(self.read_operator()?),
                 _ => {
                     self.lex_error(format!("Lexing failed at illegal char: {}", ch).as_str())?;
                     None
@@ -174,9 +196,10 @@ impl<'a> super::ParserState<'a> {
 
     fn read_operator(&mut self) -> Result<Token> {
         let first = self.position();
-        if let Ok(last) = self.snarf(|c| c.is_symbol() || c.is_ascii_punctuation()) {
+        if let Ok(last) = self.snarf(|c| operator_char(*c)) {
             let id = &self.src[first..last];
             match id {
+                "|" => Ok(self.token(TokenValue::Bar)),
                 "=" => Ok(self.token(TokenValue::Equals)),
                 "@" => Ok(self.token(TokenValue::As)),
                 "->" => Ok(self.token(TokenValue::RightArrow)),
@@ -393,6 +416,19 @@ fn identifier_initial_char(ch:char) -> bool {
 
 fn identifier_char(ch:char) -> bool {
     ch.is_alphanumeric() || ch == '_'
+}
+
+fn forbidden_operator_char(ch:char) -> bool {
+    ch == '(' || ch == ')' ||
+    ch == '[' || ch == ']' ||
+    ch == '{' || ch == '}' ||
+    ch == '.' || ch == ',' ||
+    ch == ';' || ch == '#' ||
+    ch == '`'
+}
+
+fn operator_char(ch:char) -> bool {
+    (ch.is_symbol() || ch.is_ascii_punctuation()) && !forbidden_operator_char(ch)
 }
 
 #[derive(Debug, Clone, PartialEq)]
