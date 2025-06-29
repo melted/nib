@@ -53,13 +53,15 @@ impl<'a> super::ParserState<'a> {
                             } else {
                                 return self.lex_error("Unterminated parens operator");
                             }
+                        } else if c == ')' {
+                            self.next();
+                            Some(self.token(TokenValue::Nil))
                         } else {
                             Some(self.token(TokenValue::LeftParen))
                         }
                     } else {
                         Some(self.token(TokenValue::LeftParen))
                     }
-                    
                 },
                 ')' => Some(self.simple_token(TokenValue::RightParen)),
                 '[' => Some(self.simple_token(TokenValue::LeftBracket)),
@@ -499,7 +501,7 @@ impl TokenValue {
             TokenValue::Char(_) | TokenValue::String(_) |
             TokenValue::Float(_) | TokenValue::Integer(_) |
             TokenValue::Symbol(_) | TokenValue::HashLeftBracket|
-            TokenValue::False | TokenValue::True => true,
+            TokenValue::False | TokenValue::True | TokenValue::Nil => true,
             _ => false
         }
     }

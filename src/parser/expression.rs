@@ -1,5 +1,4 @@
 use std::collections::HashSet;
-use std::ops::Index;
 
 use crate::ast::{AstVisitor, Binding, Binop, Cond, Expression, ExpressionKind, FunClause, Literal, Name, Operator, Pattern};
 use crate::common::Result;
@@ -210,23 +209,8 @@ impl<'a> ParserState<'a> {
 
     pub(super) fn parse_paren_expression(&mut self) -> Result<Expression> {
         self.expect(TokenValue::LeftParen)?;
-        let token = self.peek_next_token()?;
-        let exp = match token.value {
-            TokenValue::RightParen => {
-                self.get_next_token()?;
-                self.literal_expression(Literal::Nil)
-            },
-            TokenValue::Operator(op) => {
-                self.get_next_token()?;
-                self.expect(TokenValue::RightParen)?;
-                self.var_expression(crate::ast::Name::Plain(op))
-            },
-            _ => {
-                let exp = self.parse_inner_expression(0)?;
-                self.expect(TokenValue::RightParen)?;
-                exp
-            }
-        };
+        let exp = self.parse_inner_expression(0)?;
+        self.expect(TokenValue::RightParen)?;
         Ok(exp)
     }
 
