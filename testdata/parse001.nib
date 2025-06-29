@@ -17,3 +17,7 @@ c = 3
 (something 1 2) = make_something ()
 
 a * b = primitive.mul a b
+
+global.pi = 3.1415 // should be enough digits
+
+global.flip x f = f x

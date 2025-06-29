@@ -14,10 +14,9 @@ impl<'a> ParserState<'a> {
                 let lit = self.parse_literal()?;
                 self.literal_pattern(lit)
             },
-            TokenValue::Identifier(name) => {
-                self.get_next_token()?;
+            TokenValue::Identifier(_) => {
+                let name = self.parse_name()?;
                 let ellipsis = self.is_next(TokenValue::Ellipsis)?;
-                let name = Name::name(&name);
                 if ellipsis {
                     self.ellipsis_pattern(name)
                 } else {
