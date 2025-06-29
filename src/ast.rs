@@ -208,7 +208,7 @@ pub struct OpClause {
 
 impl Display for OpClause {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} {}", self.lpat, self.rpat)?;
+        write!(f, "{} {} ", self.lpat, self.rpat)?;
         if let Some(guard) = &self.guard {
             write!(f, "| {} ", guard)?;
         }
