@@ -1,0 +1,16 @@
+// The default library for Nib
+
+module global
+
+// some arithmetic
+max x y = x > y => x; y
+min x y = x < y => x; y
+
+// logic
+x || y = x => x; y ()
+x && y = x => y x; false
+
+// convenience
+on x f = f x
+id x = x
+

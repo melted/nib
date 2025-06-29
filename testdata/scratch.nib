@@ -16,4 +16,5 @@ length xs = on xs {
 
 (||) x y = x => x; y x
 
+my_weird_symbol = #(**)
 

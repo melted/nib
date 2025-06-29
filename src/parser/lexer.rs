@@ -104,7 +104,25 @@ impl<'a> super::ParserState<'a> {
                         Some((_, ch)) if *ch == '[' => {
                             self.next();
                             Some(self.token(TokenValue::HashLeftBracket))
-                        }, 
+                        },
+                        Some((_, ch)) if *ch == '(' => {
+                            self.next();
+                            if !self.check_prefix("//") {
+                                let op = self.read_operator()?;
+                                let nt = match op.value {
+                                    TokenValue::Operator(name) => self.token(TokenValue::Symbol(format!("({name})"))),
+                                    _ => return self.lex_error(&format!("Expected operator token, got {:?}", op))
+                                };
+                                if  let Some((_, ')')) = self.chars.peek() {
+                                    self.next();
+                                    Some(nt)
+                                } else {
+                                    return self.lex_error("Unterminated parens symbol operator");
+                                }
+                            } else {
+                                return self.lex_error("# is an illegal operator char");
+                            }
+                        },
                         _ => {
                             return self.lex_error("# is an illegal operator char");
                         }
