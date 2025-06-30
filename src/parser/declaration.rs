@@ -1,4 +1,6 @@
-use crate::{ast::{Binding, Declaration, ExpressionNode, FunBinding, Module, Name, OpBinding, OpClause, Operator, PatternNode, Pattern, Use, VarBinding}, common::Result, parser::{lexer::TokenValue, ParserState}};
+use std::any::Any;
+
+use crate::{ast::{Binding, Declaration, ExpressionNode, FunBinding, Module, Name, OpBinding, OpClause, Operator, Pattern, PatternNode, Use, VarBinding}, common::{Location, Result}, parser::{lexer::TokenValue, ParserState}};
 
 
 impl<'a> ParserState<'a> {
@@ -30,7 +32,7 @@ impl<'a> ParserState<'a> {
             (Declaration::Binding(Binding::FunBinding(abind)), Declaration::Binding(Binding::FunBinding(bbind))) if abind.name == bbind.name => {
                 abind.clauses.append(&mut bbind.clauses);
                 true
-            },            
+            },
             (Declaration::Binding(Binding::OpBinding(abind)), Declaration::Binding(Binding::OpBinding(bbind))) if abind.op == bbind.op => {
                 abind.clauses.append(&mut bbind.clauses);
                 true
@@ -54,22 +56,34 @@ impl<'a> ParserState<'a> {
     }
 
     pub(super) fn parse_module_declaration(&mut self) -> Result<Declaration> {
+        let start = self.next_position();
         self.expect(TokenValue::Module)?;
         let name = self.parse_name()?;
+        let pos = self.position();
+        // HACK: assumes id from counter
+        self.metadata.locations.insert(self.counter + 1, Location::at(start, pos));
         Ok(self.module_declaration(name))
     }
 
     pub(super) fn parse_use_declaration(&mut self) -> Result<Declaration> {
+        let start = self.next_position();
         self.expect(TokenValue::Use)?;
         let name = self.parse_name()?;
+        let pos = self.position();
+        // HACK: assumes id from counter
+        self.metadata.locations.insert(self.counter + 1, Location::at(start, pos));
         Ok(self.use_declaration(name))
     }
 
     pub(super) fn parse_binding(&mut self) -> Result<Binding> {
+        let start = self.next_position();
         let initial = self.parse_pattern()?;
         if self.is_next(TokenValue::Equals)? {
             let rhs = self.parse_expression()?;
-            Ok(self.var_binding(initial, rhs))
+            let bind = self.var_binding(initial, rhs);
+            let pos = self.position();
+            self.metadata.locations.insert(bind.id, Location::at(start, pos));
+            Ok(Binding::VarBinding(bind))
         } else {
             if self.peek_operator()? {
                 let op = self.parse_operator()?;
@@ -81,13 +95,21 @@ impl<'a> ParserState<'a> {
                 };
                 self.expect(TokenValue::Equals)?;
                 let rhs = self.parse_expression()?;
-                Ok(self.op_binding(op, initial, rpat, guard, rhs))
+                let bind = self.op_binding(op, initial, rpat, guard, rhs);
+                let pos = self.position();
+                self.metadata.locations.insert(bind.clauses[0].id, Location::at(start, pos));
+                self.metadata.locations.insert(bind.id, Location::at(start, pos));
+                Ok(Binding::OpBinding(bind))
             } else {
                 if let Pattern::Var(name) = initial.pattern {
                     let (args, guard) = self.parse_fun_args()?;
                     self.expect(TokenValue::Equals)?;
                     let rhs = self.parse_expression()?;
-                    Ok(self.fun_binding(name, args, guard, rhs))
+                    let bind = self.fun_binding(name, args, guard, rhs);
+                    let pos = self.position();
+                    self.metadata.locations.insert(bind.clauses[0].id, Location::at(start, pos));
+                    self.metadata.locations.insert(bind.id, Location::at(start, pos));
+                    Ok(Binding::FunBinding(bind))
                 } else {
                     self.error("Binding pattern matches neither a var, fun or operator binding")
                 }
@@ -111,33 +133,33 @@ impl<'a> ParserState<'a> {
         })
     }
 
-    pub(super) fn var_binding(&mut self, pat:PatternNode, rhs:ExpressionNode) -> Binding {
+    pub(super) fn var_binding(&mut self, pat:PatternNode, rhs:ExpressionNode) -> VarBinding {
         self.counter += 1;
-        Binding::VarBinding(VarBinding {
+        VarBinding {
             id: self.counter,
             lhs: pat,
             rhs: rhs
-        })
+        }
     }
 
-    pub(super) fn fun_binding(&mut self, name:Name, args:Vec<PatternNode>, guard: Option<ExpressionNode>, rhs:ExpressionNode) -> Binding {
+    pub(super) fn fun_binding(&mut self, name:Name, args:Vec<PatternNode>, guard: Option<ExpressionNode>, rhs:ExpressionNode) -> FunBinding {
         let clauses = vec![self.fun_clause(args, guard, rhs)];
         self.counter += 1;
-        Binding::FunBinding(FunBinding {
+        FunBinding {
             id: self.counter,
             name:name,
             clauses:clauses
-        })
+        }
     }
 
-    pub(super) fn op_binding(&mut self, op: Operator, lpat:PatternNode, rpat:PatternNode, guard: Option<ExpressionNode>, rhs:ExpressionNode) -> Binding {
+    pub(super) fn op_binding(&mut self, op: Operator, lpat:PatternNode, rpat:PatternNode, guard: Option<ExpressionNode>, rhs:ExpressionNode) -> OpBinding {
         self.counter += 1;
         let clauses = vec![OpClause { id: self.counter, lpat,rpat, guard, body: rhs }];
         self.counter += 1;
-        Binding::OpBinding(OpBinding {
+        OpBinding {
             id: self.counter,
             op:op,
             clauses:clauses
-        })
+        }
     }
 }

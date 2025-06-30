@@ -17,6 +17,9 @@ pub fn parse_declarations(code: &str) -> Result<Vec<Declaration>> {
     let mut state = ParserState::new(code);
     let decls = state.parse_declarations()?;
     // TODO: create a better return value. One that allows for incremental parsing
+    for (node, loc) in state.metadata.locations {
+        println!("{node}: {loc}");
+    } 
     Ok(decls)
 }
 
@@ -51,7 +54,7 @@ pub fn dump_lex(code: &str) -> Result<()> {
 pub fn dump_prog(code: &str) -> Result<()> {
     let decls = parse_declarations(code)?;
     for d in decls {
-        println!("{}", d);
+        println!("{:?}", d);
     }
     Ok(())
 }
@@ -102,6 +105,10 @@ impl<'a> ParserState<'a> {
 
     pub(self) fn position(&self) -> usize {
         self.pos + self.offset
+    }
+
+    pub(self) fn next_position(&mut self) -> usize {
+        self.peek_next_token().map_or(0, |x| x.location.start)
     }
 
     pub(self) fn adjust_offset(&mut self, offset:usize) {

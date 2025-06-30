@@ -1,9 +1,10 @@
-use crate::ast::{Literal, Name, PatternNode, Pattern};
+use crate::{ast::{Literal, Name, Pattern, PatternNode}, common::Location};
 use super::{ ParserState, lexer::TokenValue };
 use crate::common::Result;
 
 impl<'a> ParserState<'a> {
     pub(super) fn parse_pattern(&mut self) -> Result<PatternNode> {
+        let start = self.next_position();
         let tok = self.peek_next_token()?;
         let lhs = match tok.value {
             TokenValue::Underscore => {
@@ -34,13 +35,18 @@ impl<'a> ParserState<'a> {
             let tok = self.get_next_token()?;
             match tok.value {
                 TokenValue::Identifier(name) => {
-                    Ok(self.alias_pattern(lhs, Name::name(&name)))
+                    let pat = self.alias_pattern(lhs, Name::name(&name));
+                    let pos = self.position();
+                    self.metadata.locations.insert(pat.id, Location::at(start, pos));
+                    Ok(pat)
                 },
                 _ => {
                     self.error(&format!("Expected identifier in alias pattern, got {tok:?}"))
                 }
             }
         } else {
+            let pos = self.position();
+            self.metadata.locations.insert(lhs.id, Location::at(start, pos));
             Ok(lhs)
         }
     }

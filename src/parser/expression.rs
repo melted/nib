@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
 use crate::ast::{AstVisitor, Binding, Binop, Cond, ExpressionNode, Expression, FunClause, Literal, Name, Operator, PatternNode};
-use crate::common::Result;
+use crate::common::{Location, Result};
 use crate::parser::helpers::NameOrOperator;
 use crate::parser::lexer::TokenValue;
 use super::ParserState;
@@ -14,17 +14,23 @@ impl<'a> ParserState<'a> {
     pub(super) fn parse_inner_expression(&mut self, min_pred:i32) -> Result<ExpressionNode> {
         let indent = self.indent();
         let last = *self.indent_stack.last().unwrap_or(&0);
+        let start = self.next_position();
         if indent < last {
             return self.error("Sub-expression violates layout by being to the left of parent expression");
         }
         self.indent_stack.push(indent);
         let mut lhs = match self.parse_left_expression() {
-            Ok(exp) => exp, 
+            Ok(exp) => {
+                let pos = self.position();
+                self.metadata.locations.insert(exp.id, Location::at(start, pos));
+                exp
+            }, 
             err@Err(_) => {
                 self.indent_stack.pop();
                 return err;
             }
         };
+
         loop {
             let tok = match self.peek_next_token() {
                 Ok(t) => t,
@@ -94,6 +100,8 @@ impl<'a> ParserState<'a> {
                     return result;
                 }
                 Ok(exp) => {
+                    let pos = self.position();
+                    self.metadata.locations.insert(exp.id, Location::at(start, pos));
                     lhs = exp;
                 }
             }
