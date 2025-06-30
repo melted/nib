@@ -13,11 +13,26 @@ impl<'a> ParserState<'a> {
 
     pub(super) fn parse_inner_expression(&mut self, min_pred:i32) -> Result<ExpressionNode> {
         let indent = self.indent();
-        self.indent_stack.push(indent); // TODO: Is the stack needed? It's not used now.
-        // Also, it may become corrupted on error returns.
-        let mut lhs = self.parse_left_expression()?;
+        let last = *self.indent_stack.last().unwrap_or(&0);
+        if indent < last {
+            return self.error("Sub-expression violates layout by being to the left of parent expression");
+        }
+        self.indent_stack.push(indent);
+        let mut lhs = match self.parse_left_expression() {
+            Ok(exp) => exp, 
+            err@Err(_) => {
+                self.indent_stack.pop();
+                return err;
+            }
+        };
         loop {
-            let tok = self.peek_next_token()?;
+            let tok = match self.peek_next_token() {
+                Ok(t) => t,
+                Err(err) => {
+                    self.indent_stack.pop();
+                    return Err(err);
+                }
+            };
             if self.next_indent() <= indent {
                 self.indent_stack.pop();
                 return Ok(lhs);
@@ -25,7 +40,7 @@ impl<'a> ParserState<'a> {
             let result = match tok.value {
                 TokenValue::Where => { 
                     if min_pred < 2 {
-                        self.parse_where_expression(lhs)?
+                        self.parse_where_expression(lhs)
                     } else {
                         break;
                     }
@@ -33,27 +48,27 @@ impl<'a> ParserState<'a> {
                 TokenValue::Operator(op) => {
                     if min_pred < 6 {
                         self.get_next_token()?;
-                        self.parse_binop_expression(lhs, Operator::Plain(op))?
+                        self.parse_binop_expression(lhs, Operator::Plain(op))
                     } else {
                         break;
                     }
                 },
                 TokenValue::FatRightArrow => {
                     if min_pred < 4 {
-                        self.parse_cond_expression(lhs)?
+                        self.parse_cond_expression(lhs)
                     } else {
                         break;
                     }
                 },
-                TokenValue::Period => self.parse_projection_expression(lhs)?,
+                TokenValue::Period => self.parse_projection_expression(lhs),
                 TokenValue::Identifier(_) => {
                     match self.parse_name_or_operator()? {
                         NameOrOperator::Name(name) if min_pred < 9 => {
                             let var = self.var_expression(name);
-                            self.app_expression(lhs, var)
+                            Ok(self.app_expression(lhs, var))
                         },
                         NameOrOperator::Operator(op) if min_pred < 6 => {
-                            self.parse_binop_expression(lhs, op)?
+                            self.parse_binop_expression(lhs, op)
                         }
                         _ => {
                             break;
@@ -63,17 +78,25 @@ impl<'a> ParserState<'a> {
                 TokenValue::Eof => break,
                 TokenValue::LeftBrace | TokenValue::LeftParen | TokenValue::LeftBracket if min_pred < 9 => {
                     let expr = self.parse_left_expression()?;
-                    self.app_expression(lhs, expr)
+                    Ok(self.app_expression(lhs, expr))
                 },
                 _ if tok.value.is_literal() && min_pred < 9 => {
                     let expr = self.parse_left_expression()?;
-                    self.app_expression(lhs, expr)
+                    Ok(self.app_expression(lhs, expr))
                 }, 
                 _ => {
                     break;
                 }
             };
-            lhs = result;
+            match result {
+                Err(_) => {
+                    self.indent_stack.pop();
+                    return result;
+                }
+                Ok(exp) => {
+                    lhs = exp;
+                }
+            }
         };
         self.indent_stack.pop();
         Ok(lhs)
