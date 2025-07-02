@@ -5,3 +5,7 @@ go a b n = go (a+b) a (n-1)
 inttype = (4).type
 
 max x y = x < y => x; y
+
+a = #mysymbol
+
+b = #[222, 228]

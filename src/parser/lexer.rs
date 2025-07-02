@@ -90,44 +90,6 @@ impl<'a> super::ParserState<'a> {
                         Some(self.simple_token(TokenValue::Period))
                     }
                 },
-                '#' => {
-                    self.next();
-                    match self.chars.peek() {
-                        Some((_, ch)) if identifier_initial_char(*ch) => {
-                            let tok = self.read_identifier()?;
-                            if let TokenValue::Identifier(id) = tok.value {
-                                Some(self.token(TokenValue::Symbol(id)))
-                            } else {
-                                return self.lex_error("not a valid symbol");
-                            }
-                        },
-                        Some((_, ch)) if *ch == '[' => {
-                            self.next();
-                            Some(self.token(TokenValue::HashLeftBracket))
-                        },
-                        Some((_, ch)) if *ch == '(' => {
-                            self.next();
-                            if !self.check_prefix("//") {
-                                let op = self.read_operator()?;
-                                let nt = match op.value {
-                                    TokenValue::Operator(name) => self.token(TokenValue::Symbol(format!("({name})"))),
-                                    _ => return self.lex_error(&format!("Expected operator token, got {:?}", op))
-                                };
-                                if  let Some((_, ')')) = self.chars.peek() {
-                                    self.next();
-                                    Some(nt)
-                                } else {
-                                    return self.lex_error("Unterminated parens symbol operator");
-                                }
-                            } else {
-                                return self.lex_error("# is an illegal operator char");
-                            }
-                        },
-                        _ => {
-                            return self.lex_error("# is an illegal operator char");
-                        }
-                    }
-                },
                 '/' => {
                     if self.check_prefix("//") {
                         self.snarf(|c| *c != '\n')?;
@@ -221,6 +183,7 @@ impl<'a> super::ParserState<'a> {
             match id {
                 "|" => Ok(self.token(TokenValue::Bar)),
                 "=" => Ok(self.token(TokenValue::Equals)),
+                "#" => Ok(self.token(TokenValue::Hash)),
                 "@" => Ok(self.token(TokenValue::As)),
                 "->" => Ok(self.token(TokenValue::RightArrow)),
                 "=>" => Ok(self.token(TokenValue::FatRightArrow)),
@@ -443,8 +406,7 @@ fn forbidden_operator_char(ch:char) -> bool {
     ch == '[' || ch == ']' ||
     ch == '{' || ch == '}' ||
     ch == '.' || ch == ',' ||
-    ch == ';' || ch == '#' ||
-    ch == '`'
+    ch == ';' || ch == '`'
 }
 
 fn operator_char(ch:char) -> bool {
@@ -454,7 +416,6 @@ fn operator_char(ch:char) -> bool {
 #[derive(Debug, Clone, PartialEq)]
 pub enum TokenValue {
     Identifier(String),
-    Symbol(String),
     Operator(String),
     Integer(i64),
     Float(f64),
@@ -467,7 +428,6 @@ pub enum TokenValue {
     // Brackets
     LeftParen,
     RightParen,
-    HashLeftBracket, // #[
     LeftBracket,
     RightBracket,
     LeftBrace,
@@ -487,6 +447,7 @@ pub enum TokenValue {
     Underscore,
     Ellipsis,
     Equals,
+    Hash,
     Backslash,
     RightArrow,
     FatRightArrow,
@@ -518,7 +479,7 @@ impl TokenValue {
         match self {
             TokenValue::Char(_) | TokenValue::String(_) |
             TokenValue::Float(_) | TokenValue::Integer(_) |
-            TokenValue::Symbol(_) | TokenValue::HashLeftBracket|
+            TokenValue::Hash |
             TokenValue::False | TokenValue::True | TokenValue::Nil => true,
             _ => false
         }

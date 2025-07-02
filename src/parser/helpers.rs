@@ -176,11 +176,19 @@ impl<'a> ParserState<'a> {
             TokenValue::Float(x) => Ok(Literal::Real(x)),
             TokenValue::Char(ch) => Ok(Literal::Char(ch)),
             TokenValue::String(s) => Ok(Literal::String(s)),
-            TokenValue::Symbol(s) => Ok(Literal::Symbol(s)),
-            TokenValue::HashLeftBracket => {
-                let bytes = self.parse_separated_by(&mut Self::parse_byte,TokenValue::Comma)?;
-                self.expect(TokenValue::RightBracket)?;
-                Ok(Literal::Bytearray(bytes))
+            TokenValue::Hash => {
+                let tok = self.get_next_token()?;
+                match tok.value  {
+                    TokenValue::Identifier(name) => {
+                        Ok(Literal::Symbol(name))
+                    },
+                    TokenValue::LeftBracket => {
+                        let bytes = self.parse_separated_by(&mut Self::parse_byte,TokenValue::Comma)?;
+                        self.expect(TokenValue::RightBracket)?;
+                        Ok(Literal::Bytearray(bytes))
+                    },
+                    _ => self.error("Expected either a symbol or bytearray after #")
+                }
             },
             _ => {
                 self.error(&format!("Expected a literal got token {token:?}"))
