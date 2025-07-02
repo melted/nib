@@ -43,16 +43,13 @@ impl<'a> ParserState<'a> {
 
     pub(super) fn parse_add_declaration(&mut self, decls:&mut Vec<Declaration>) -> Result<()> {
         let mut decl = self.parse_declaration()?;
-        let Some(mut last) = decls.last_mut() else {
-            decls.push(decl);
-            return Ok(());
-        };
-        if Self::merge_same_binding(&mut last, &mut decl) {
-            Ok(())
-        } else {
-            decls.push(decl);
-            Ok(())
+        if let Some(mut last) = decls.last_mut() {
+            if Self::merge_same_binding(&mut last, &mut decl) {
+                return Ok(());
+            }
         }
+        decls.push(decl);
+        Ok(())
     }
 
     pub(super) fn parse_module_declaration(&mut self) -> Result<Declaration> {
