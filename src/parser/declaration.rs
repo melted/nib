@@ -27,14 +27,20 @@ impl<'a> ParserState<'a> {
         }
     }
 
-    pub(super) fn merge_same_binding(a: &mut Declaration, b:&mut Declaration) -> bool {
+    pub(super) fn merge_same_binding(&mut self, a: &mut Declaration, b:&mut Declaration) -> bool {
         match (a, b) {
             (Declaration::Binding(Binding::FunBinding(abind)), Declaration::Binding(Binding::FunBinding(bbind))) if abind.name == bbind.name => {
                 abind.clauses.append(&mut bbind.clauses);
+                if let Some(bloc) = self.metadata.locations.remove(&bbind.id) {
+                    self.metadata.locations.entry(abind.id).and_modify(|e| e.end = bloc.end);
+                }
                 true
             },
             (Declaration::Binding(Binding::OpBinding(abind)), Declaration::Binding(Binding::OpBinding(bbind))) if abind.op == bbind.op => {
                 abind.clauses.append(&mut bbind.clauses);
+                if let Some(bloc) = self.metadata.locations.remove(&bbind.id) {
+                    self.metadata.locations.entry(abind.id).and_modify(|e| e.end = bloc.end);
+                }
                 true
             },
             _ => false
@@ -44,7 +50,7 @@ impl<'a> ParserState<'a> {
     pub(super) fn parse_add_declaration(&mut self, decls:&mut Vec<Declaration>) -> Result<()> {
         let mut decl = self.parse_declaration()?;
         if let Some(mut last) = decls.last_mut() {
-            if Self::merge_same_binding(&mut last, &mut decl) {
+            if self.merge_same_binding(&mut last, &mut decl) {
                 return Ok(());
             }
         }
