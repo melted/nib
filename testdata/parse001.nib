@@ -14,6 +14,8 @@ fib n = go 1 0 n where
 
 c = 3
 
+module testy.internal
+
 (something 1 2) = make_something ()
 
 a * b = primitive.mul a b

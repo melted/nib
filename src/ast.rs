@@ -1,5 +1,11 @@
 use crate::common::Location;
-use std::{collections::{HashMap, HashSet}, fmt::{write, Display}};
+use std::{collections::{HashMap, HashSet}, fmt::Display};
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Module {
+    pub metadata: Metadata,
+    pub declarations: Vec<Declaration>
+}
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Metadata {
@@ -9,6 +15,7 @@ pub struct Metadata {
     pub locations: HashMap<Node, Location>,
     pub newlines: Vec<usize>,
 }
+
 
 impl Metadata {
     pub fn new(file: Option<String>) -> Self {
@@ -33,8 +40,8 @@ pub enum Annotation {
 // Declarations
 #[derive(Debug, Clone, PartialEq)]
 pub enum Declaration {
-    Module(Module),
-    Use(Use),
+    Module(ModuleDirective),
+    Use(UseDirective),
     Binding(Binding)
 }
 
@@ -109,24 +116,24 @@ impl Display for Binding {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct Module {
+pub struct ModuleDirective {
     pub id: Node,
     pub name: Name
 }
 
-impl Display for Module {
+impl Display for ModuleDirective {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "module {}", self.name)
     }
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct Use {
+pub struct UseDirective {
     pub id: Node,
     pub name: Name
 }
 
-impl Display for Use {
+impl Display for UseDirective {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "use {}", self.name)
     }

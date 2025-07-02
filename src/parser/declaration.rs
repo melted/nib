@@ -1,6 +1,6 @@
 use std::any::Any;
 
-use crate::{ast::{Binding, Declaration, ExpressionNode, FunBinding, Module, Name, Node, OpBinding, OpClause, Operator, Pattern, PatternNode, Use, VarBinding}, common::{Location, Result}, parser::{lexer::TokenValue, ParserState}};
+use crate::{ast::{Binding, Declaration, ExpressionNode, FunBinding, ModuleDirective, Name, Node, OpBinding, OpClause, Operator, Pattern, PatternNode, UseDirective, VarBinding}, common::{Location, Result}, parser::{lexer::TokenValue, ParserState}};
 
 
 impl<'a> ParserState<'a> {
@@ -122,17 +122,17 @@ impl<'a> ParserState<'a> {
         }
     }
 
-    pub(super) fn module_declaration(&mut self, name:Name) -> Module {
+    pub(super) fn module_declaration(&mut self, name:Name) -> ModuleDirective {
         self.counter += 1;
-        Module {
+        ModuleDirective {
             id: self.counter,
             name: name
         }
     }
 
-    pub(super) fn use_declaration(&mut self, name:Name) -> Use {
+    pub(super) fn use_declaration(&mut self, name:Name) -> UseDirective {
         self.counter += 1;
-        Use {
+        UseDirective {
             id: self.counter,
             name: name
         }
