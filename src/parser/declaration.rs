@@ -63,9 +63,9 @@ impl<'a> ParserState<'a> {
         self.expect(TokenValue::Module)?;
         let name = self.parse_name()?;
         let pos = self.position();
-        // HACK: assumes id from counter
-        self.metadata.locations.insert(self.counter + 1, Location::at(start, pos));
-        Ok(self.module_declaration(name))
+        let m = self.module_declaration(name);
+        self.metadata.locations.insert(m.id, Location::at(start, pos));
+        Ok(Declaration::Module(m))
     }
 
     pub(super) fn parse_use_declaration(&mut self) -> Result<Declaration> {
@@ -73,9 +73,9 @@ impl<'a> ParserState<'a> {
         self.expect(TokenValue::Use)?;
         let name = self.parse_name()?;
         let pos = self.position();
-        // HACK: assumes id from counter
-        self.metadata.locations.insert(self.counter + 1, Location::at(start, pos));
-        Ok(self.use_declaration(name))
+        let u = self.use_declaration(name);
+        self.metadata.locations.insert(u.id, Location::at(start, pos));
+        Ok(Declaration::Use(u))
     }
 
     pub(super) fn parse_binding(&mut self) -> Result<Binding> {
@@ -120,20 +120,20 @@ impl<'a> ParserState<'a> {
         }
     }
 
-    pub(super) fn module_declaration(&mut self, name:Name) -> Declaration {
+    pub(super) fn module_declaration(&mut self, name:Name) -> Module {
         self.counter += 1;
-        Declaration::Module(Module {
+        Module {
             id: self.counter,
             name: name
-        })
+        }
     }
 
-    pub(super) fn use_declaration(&mut self, name:Name) -> Declaration {
+    pub(super) fn use_declaration(&mut self, name:Name) -> Use {
         self.counter += 1;
-        Declaration::Use(Use {
+        Use {
             id: self.counter,
             name: name
-        })
+        }
     }
 
     pub(super) fn var_binding(&mut self, pat:PatternNode, rhs:ExpressionNode) -> VarBinding {
