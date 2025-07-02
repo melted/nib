@@ -1,6 +1,6 @@
 use std::any::Any;
 
-use crate::{ast::{Binding, Declaration, ExpressionNode, FunBinding, Module, Name, OpBinding, OpClause, Operator, Pattern, PatternNode, Use, VarBinding}, common::{Location, Result}, parser::{lexer::TokenValue, ParserState}};
+use crate::{ast::{Binding, Declaration, ExpressionNode, FunBinding, Module, Name, Node, OpBinding, OpClause, Operator, Pattern, PatternNode, Use, VarBinding}, common::{Location, Result}, parser::{lexer::TokenValue, ParserState}};
 
 
 impl<'a> ParserState<'a> {
@@ -27,20 +27,22 @@ impl<'a> ParserState<'a> {
         }
     }
 
+    fn merge_locations(&mut self, id_a: Node, id_b: Node) {
+        if let Some(bloc) = self.metadata.locations.remove(&id_b) {
+            self.metadata.locations.entry(id_a).and_modify(|e| e.end = bloc.end);
+        }
+    }
+
     pub(super) fn merge_same_binding(&mut self, a: &mut Declaration, b:&mut Declaration) -> bool {
         match (a, b) {
             (Declaration::Binding(Binding::FunBinding(abind)), Declaration::Binding(Binding::FunBinding(bbind))) if abind.name == bbind.name => {
                 abind.clauses.append(&mut bbind.clauses);
-                if let Some(bloc) = self.metadata.locations.remove(&bbind.id) {
-                    self.metadata.locations.entry(abind.id).and_modify(|e| e.end = bloc.end);
-                }
+                self.merge_locations(abind.id, bbind.id);
                 true
             },
             (Declaration::Binding(Binding::OpBinding(abind)), Declaration::Binding(Binding::OpBinding(bbind))) if abind.op == bbind.op => {
                 abind.clauses.append(&mut bbind.clauses);
-                if let Some(bloc) = self.metadata.locations.remove(&bbind.id) {
-                    self.metadata.locations.entry(abind.id).and_modify(|e| e.end = bloc.end);
-                }
+                self.merge_locations(abind.id, bbind.id);
                 true
             },
             _ => false
