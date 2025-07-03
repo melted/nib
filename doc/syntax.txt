@@ -2,16 +2,16 @@ Let's make a BNF grammar
 
 Program := decl*
 decl := `module` name | `use` name | binding
-binding := binding_lhs [`|` expr] `=` expr
-binding_lhs := pattern | name pattern+ | pattern binop pattern | `do`
+binding := binding_lhs `=` expr
+binding_lhs := pattern | name pattern+ [`|` expr] | pattern binop pattern [`|` expr] | `do`
 pattern := literal | name | `_` | `[` [pattern `,`]* pattern `]` |
           pattern `@` identifier | `(` name pattern+ `)` | name `...`
   
 expr := literal | identifier | expr (expr)+ | expr binop expr | `(` expr `)` | `[` (expr `,`)* expr `]` |
-        `{` ((clause semi)* clause | expr ) `}` | expr `where` (binding semi) binding | expr `=>` expr semi expr |
+        `{` ((clause ;nl)* clause | expr ) `}` | expr `where` (binding ;nl) binding | expr `=>` expr ;nl expr |
         expr `.` expr 
 
-semi := `;` | <newline>
+;nl := `;` | <newline>
 
 clause := pattern+ [`|` expr] `->` expr
 
@@ -32,3 +32,7 @@ qbinop = (identifier `.`)* binop
 symbolchar = unicode symbol except '{} [] ().,;#'
 reserved_symbols = `=` `@` `->` `_` `=>` '|' 
 reserved_words = `module` | `use` | `where` | `_`
+
+---
+
+The core language desugars binops to applications, fun and op bindings to var binding of lambdas. 
