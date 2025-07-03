@@ -1,5 +1,3 @@
-use std::any::Any;
-
 use crate::{ast::{Binding, Declaration, ExpressionNode, FunBinding, ModuleDirective, Name, Node, OpBinding, OpClause, Operator, Pattern, PatternNode, UseDirective, VarBinding}, common::{Location, Result}, parser::{lexer::TokenValue, ParserState}};
 
 
