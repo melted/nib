@@ -2,7 +2,7 @@ use std::iter::Peekable;
 use std::str::CharIndices;
 
 use crate::common::{Error, Location, Result};
-use crate::ast::{Declaration, ExpressionNode, Metadata, Node};
+use crate::ast::{Declaration, ExpressionNode, Metadata, Module, Node};
 use crate::parser::lexer::{Token, TokenValue};
 
 mod declaration;
@@ -13,14 +13,12 @@ mod pattern;
 mod tests;
 
 
-pub fn parse_declarations(code: &str) -> Result<Vec<Declaration>> {
+pub fn parse_declarations(file: Option<String>, code: &str) -> Result<Module> {
     let mut state = ParserState::new(code);
     let decls = state.parse_declarations()?;
-    // TODO: create a better return value. One that allows for incremental parsing
-    for (node, loc) in state.metadata.locations {
-        println!("{node}: {loc}");
-    } 
-    Ok(decls)
+    state.metadata.last_id = state.counter;
+    state.metadata.file = file;
+    Ok(Module { metadata: state.metadata, declarations: decls })
 }
 
 
@@ -52,9 +50,9 @@ pub fn dump_lex(code: &str) -> Result<()> {
 }
 
 pub fn dump_prog(code: &str) -> Result<()> {
-    let decls = parse_declarations(code)?;
-    for d in decls {
-        println!("{:?}", d);
+    let module = parse_declarations(None, code)?;
+    for d in module.declarations {
+        println!("{}", d);
     }
     Ok(())
 }
