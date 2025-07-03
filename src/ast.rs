@@ -14,16 +14,20 @@ pub struct Metadata {
     pub annotations: HashMap<Node, Annotation>,
     pub locations: HashMap<Node, Location>,
     pub newlines: Vec<usize>,
+    pub last_id: Node
 }
 
 
 impl Metadata {
     pub fn new(file: Option<String>) -> Self {
-         Metadata { file: file, 
+         Metadata {
+            file: file, 
             trivia: Vec::new(),
             annotations: HashMap::new(),
             locations: HashMap::new(),
-            newlines: Vec::new() }
+            newlines: Vec::new(),
+            last_id: 0
+        }
     }
 }
 
