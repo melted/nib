@@ -1,4 +1,4 @@
-use crate::{ast::{Binding, Declaration, ExpressionNode, FunBinding, ModuleDirective, Name, Node, OpBinding, OpClause, Operator, Pattern, PatternNode, UseDirective, VarBinding}, common::{Location, Result}, parser::{lexer::TokenValue, ParserState}};
+use crate::{ast::{Binding, Declaration, ExpressionNode, FunBinding, ModuleDirective, Name, OpBinding, OpClause, Operator, Pattern, PatternNode, UseDirective, VarBinding}, common::{Location, Node, Result}, parser::{lexer::TokenValue, ParserState}};
 
 
 impl<'a> ParserState<'a> {

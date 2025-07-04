@@ -1,45 +1,11 @@
-use crate::common::Location;
-use std::{collections::{HashMap, HashSet}, fmt::Display};
+use crate::common::{Metadata, Node};
+use std::{collections::HashSet, fmt::Display};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Module {
     pub metadata: Metadata,
     pub declarations: Vec<Declaration>
 }
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct Metadata {
-    pub file: Option<String>,
-    pub trivia: Vec<Annotation>,
-    pub annotations: HashMap<Node, Annotation>,
-    pub locations: HashMap<Node, Location>,
-    pub newlines: Vec<usize>,
-    pub last_id: Node
-}
-
-
-impl Metadata {
-    pub fn new(file: Option<String>) -> Self {
-         Metadata {
-            file: file, 
-            trivia: Vec::new(),
-            annotations: HashMap::new(),
-            locations: HashMap::new(),
-            newlines: Vec::new(),
-            last_id: 0
-        }
-    }
-}
-
-pub type Node = u32;
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum Annotation {
-    OtherPragma(String),
-    Doc(String),
-    Comment(String),
-}
-
 
 // Declarations
 #[derive(Debug, Clone, PartialEq)]

@@ -1,8 +1,8 @@
 use std::iter::Peekable;
 use std::str::CharIndices;
 
-use crate::common::{Error, Location, Result};
-use crate::ast::{Declaration, ExpressionNode, Metadata, Module, Node};
+use crate::common::{Error, Location, Metadata, Node, Result};
+use crate::ast::{ExpressionNode, Module};
 use crate::parser::lexer::{Token, TokenValue};
 
 mod declaration;

@@ -1,6 +1,40 @@
-use std::{fmt::Display, io};
+use std::{collections::HashMap, fmt::Display, io};
 
 use thiserror::Error;
+
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Metadata {
+    pub file: Option<String>,
+    pub trivia: Vec<Annotation>,
+    pub annotations: HashMap<Node, Annotation>,
+    pub locations: HashMap<Node, Location>,
+    pub newlines: Vec<usize>,
+    pub last_id: Node
+}
+
+
+impl Metadata {
+    pub fn new(file: Option<String>) -> Self {
+         Metadata {
+            file: file, 
+            trivia: Vec::new(),
+            annotations: HashMap::new(),
+            locations: HashMap::new(),
+            newlines: Vec::new(),
+            last_id: 0
+        }
+    }
+}
+
+pub type Node = u32;
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum Annotation {
+    OtherPragma(String),
+    Doc(String),
+    Comment(String),
+}
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Location {

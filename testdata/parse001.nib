@@ -23,3 +23,5 @@ a * b = primitive.mul a b
 global.pi = 3.1415 // should be enough digits
 
 global.flip x f = f x
+
+z = [1,2,3]
