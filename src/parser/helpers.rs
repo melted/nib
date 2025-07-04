@@ -1,4 +1,4 @@
-use crate::{ ast::{self, ExpressionNode, FunClause, Literal, Name,Operator, PatternNode}, common::Result};
+use crate::{ ast::{self, ExpressionNode, FunClause, Literal, Operator, PatternNode}, common::{Name, Result}};
 
 use super::{ParserState, lexer::TokenValue};
 
@@ -159,9 +159,9 @@ impl<'a> ParserState<'a> {
             };
         }
         let ret = if path.is_empty() { 
-                            ast::Name::Plain(id)
+                            Name::Plain(id)
                         } else {
-                            ast::Name::Qualified(path, id)
+                            Name::Qualified(path, id)
                         };
         Ok(NameOrOperator::Name(ret))
     }
@@ -214,6 +214,6 @@ impl<'a> ParserState<'a> {
 }
 
 pub enum NameOrOperator {
-    Name(ast::Name),
+    Name(Name),
     Operator(ast::Operator)
 }

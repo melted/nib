@@ -1,6 +1,6 @@
-use crate::{ast::{Literal, Name, Pattern, PatternNode}, common::Location};
+use crate::{ast::{Literal, Pattern, PatternNode}, common::Location};
 use super::{ ParserState, lexer::TokenValue };
-use crate::common::Result;
+use crate::common::{ Name, Result };
 
 impl<'a> ParserState<'a> {
     pub(super) fn parse_pattern(&mut self) -> Result<PatternNode> {

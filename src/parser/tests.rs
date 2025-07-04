@@ -1,6 +1,6 @@
 #![cfg(test)] 
-use crate::ast::{Binding, Cond, Declaration, Expression, Literal, Name, Pattern};
-use crate::common::Result;
+use crate::ast::{Binding, Cond, Declaration, Expression, Literal, Pattern};
+use crate::common::{ Name, Result };
 use crate::parser::expression::UsedImplicits;
 use crate::parser::{lex, ParserState};
 use crate::parser::lexer::TokenValue;
