@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fmt::Display, io};
+use std::{collections::{HashMap, HashSet}, fmt::Display, io};
 
 use thiserror::Error;
 
@@ -9,6 +9,8 @@ pub struct Metadata {
     pub trivia: Vec<Annotation>,
     pub annotations: HashMap<Node, Annotation>,
     pub locations: HashMap<Node, Location>,
+    pub using: HashSet<Name>,
+    pub base_name: Option<Name>,
     pub newlines: Vec<usize>,
     pub last_id: Node
 }
@@ -21,6 +23,8 @@ impl Metadata {
             trivia: Vec::new(),
             annotations: HashMap::new(),
             locations: HashMap::new(),
+            using: HashSet::new(),
+            base_name: None,
             newlines: Vec::new(),
             last_id: 0
         }

@@ -10,7 +10,7 @@ Idea: They don't need to be, just make a function called that, that takes a valu
 
 I can do this:
 a && b = a => b; false
-a || b = (x where x = a) => x; b
+a || b = a => a; b
 
 Which is clunky.
 

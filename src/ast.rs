@@ -386,7 +386,7 @@ impl Display for Expression {
                     if let Some(guard) = &c.guard {
                         write!(f, "| {} ", guard)?;
                     }
-                    write!(f, "-> {}; ", c.body);
+                    write!(f, "-> {}; ", c.body)?;
                 }
                 write!(f, " }}")?;
             },

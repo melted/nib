@@ -35,4 +35,4 @@ reserved_words = `module` | `use` | `where` | `_`
 
 ---
 
-The core language desugars binops to applications, fun and op bindings to var binding of lambdas. 
+The core language desugars binops to applications, fun and op bindings to var binding of lambdas. Arrays desugar to application of the array constructor, projection desugars to an application of a projection primitive
