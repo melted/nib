@@ -113,6 +113,20 @@ impl Name {
             Name::Qualified(path, base.to_string())
         }
     }
+
+    pub fn append(path:&Name, base:&Name) -> Result<Name> {
+        match (path, base) {
+            (Name::Qualified(path, last), Name::Plain(b)) => {
+                let p = path.clone();
+                p.push(last.clone());
+                Ok(Name::Qualified(p, b.clone()))
+            },
+            (Name::Plain(parent), Name::Plain(b)) => {
+                Ok(Name::Qualified(vec![parent.clone()], b.clone()))
+            },
+            _ => Err(Error::Syntax { msg: "Can't call append on two qualified names".to_string(), loc: Location::at(0,0) })
+        }
+    }
 }
 
 impl Display for Name {
