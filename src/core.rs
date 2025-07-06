@@ -48,17 +48,20 @@ pub fn desugar_expression(expression : ast::ExpressionNode) -> Result<Expression
     todo!()
 }
 
+#[derive(Debug, Clone, PartialEq)]
 pub struct Module {
     pub metadata : Metadata,
     pub bindings : Vec<Binding>
 }
 
+#[derive(Debug, Clone, PartialEq)]
 pub struct Binding {
     pub id : Node,
     pub name : Name,
     pub body : Expression
 }
 
+#[derive(Debug, Clone, PartialEq)]
 pub enum Expression {
     Literal(Node, ast::Literal),
     Var(Node, Var),
@@ -67,12 +70,14 @@ pub enum Expression {
     Where(Node, Box<Expression>, Vec<Binding>)
 }
 
+#[derive(Debug, Clone, PartialEq)]
 pub struct FunClause {
     pub id : Node,
     pub args : Vec<ast::Pattern>,
     pub rhs : Box<Expression>
 }
 
+#[derive(Debug, Clone, PartialEq)]
 pub enum Var {
     Named(String),
     Local(u32)
