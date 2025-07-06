@@ -1,4 +1,6 @@
 
+use std::collections::HashSet;
+
 use crate::{ast, common::{Metadata, Name, Node, Result}};
 
 
@@ -14,8 +16,8 @@ pub fn desugar(module: ast::Module) -> Result<Module> {
                 state.module_name = Some(md.name);
             },
             ast::Declaration::Binding(bind) => {
-                let b = state.desugar_binding(bind)?;
-                state.bindings.push(b);
+                let mut b = state.desugar_binding(bind)?;
+                state.bindings.append(&mut b);
             }
         }
     }
@@ -48,7 +50,7 @@ impl DesugarState {
 }
 
 impl DesugarState {
-    fn desugar_binding(&mut self, binding : ast::Binding) -> Result<Binding> {
+    fn desugar_binding(&mut self, binding : ast::Binding) -> Result<Vec<Binding>> {
         match binding {
             ast::Binding::FunBinding(fb) => self.desugar_funbinding(fb),
             ast::Binding::OpBinding(ob) => self.desugar_opbinding(ob),
@@ -56,17 +58,17 @@ impl DesugarState {
         }
     }
 
-    fn desugar_funbinding(&mut self, binding : ast::FunBinding) -> Result<Binding> {
+    fn desugar_funbinding(&mut self, binding : ast::FunBinding) -> Result<Vec<Binding>> {
         todo!()
     }
 
 
-    fn desugar_opbinding(&mut self, binding : ast::OpBinding) -> Result<Binding> {
+    fn desugar_opbinding(&mut self, binding : ast::OpBinding) -> Result<Vec<Binding>> {
         todo!()
     }
 
 
-    fn desugar_varbinding(&mut self, binding : ast::VarBinding) -> Result<Binding> {
+    fn desugar_varbinding(&mut self, binding : ast::VarBinding) -> Result<Vec<Binding>> {
         todo!()
     }
 
@@ -74,7 +76,13 @@ impl DesugarState {
         todo!()
     }
 
+    fn next_local(&mut self) -> Var {
+        self.last_local += 1;
+        Var::Local(self.last_local)
+    }
+
 }
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct Module {
     pub metadata : Metadata,
@@ -108,4 +116,27 @@ pub struct FunClause {
 pub enum Var {
     Named(String),
     Local(u32)
+}
+
+#[derive(Debug)]
+pub(super) struct UsedVars {
+    pub vars : HashSet<Name>
+}
+
+impl UsedVars {
+    pub(super) fn new() -> Self {
+        UsedVars { vars: HashSet::new() }
+    }
+}
+
+impl ast::AstVisitor for UsedVars {
+    fn on_pattern(&mut self, pat : &ast::PatternNode) -> bool {
+        match &pat.pattern {
+            ast::Pattern::Var(name) => {
+                self.vars.insert(name.to_owned());
+            },
+            _ => {}
+        };
+        true
+    }
 }
