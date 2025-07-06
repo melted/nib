@@ -1,53 +1,80 @@
 
 use crate::{ast, common::{Metadata, Name, Node, Result}};
 
+
 pub fn desugar(module: ast::Module) -> Result<Module> {
-    let mut metadata = module.metadata;
-    let mut module_name = metadata.base_name.clone().unwrap_or(Name::name("default"));
-    let mut bindings = Vec::new();
+    let mut state = DesugarState::new(module.metadata);
+    state.module_name = state.metadata.base_name.clone();
     for d in module.declarations {
         match d {
             ast::Declaration::Use(ud) => {
-                metadata.using.insert(ud.name);
+                state.metadata.using.insert(ud.name);
             },
             ast::Declaration::Module(md) => {
-                module_name = md.name;
+                state.module_name = Some(md.name);
             },
             ast::Declaration::Binding(bind) => {
-                let b = desugar_binding(&module_name, &mut metadata, bind)?;
-                bindings.push(b);
+                let b = state.desugar_binding(bind)?;
+                state.bindings.push(b);
             }
         }
     }
-    Ok(Module { metadata, bindings })
+    Ok(Module { metadata: state.metadata, bindings: state.bindings })
 }
 
-pub fn desugar_binding(module_name: &Name, metadata: &mut Metadata, binding : ast::Binding) -> Result<Binding> {
-    match binding {
-        ast::Binding::FunBinding(fb) => desugar_funbinding(module_name, metadata, fb),
-        ast::Binding::OpBinding(ob) => desugar_opbinding(module_name, metadata, ob),
-        ast::Binding::VarBinding(vb) => desugar_varbinding(module_name, metadata, vb),
+
+struct DesugarState {
+    module_name: Option<Name>,
+    bindings: Vec<Binding>,
+    metadata: Metadata,
+    last_local: u32
+}
+
+impl DesugarState {
+    fn new(metadata: Metadata) -> Self {
+        DesugarState {
+            module_name: None,
+            bindings: Vec::new(),
+            metadata,
+            last_local: 0
+        }
+    }
+
+    fn named(metadata: Metadata, module_name: &Name) -> Self {
+        let mut ds = DesugarState::new(metadata);
+        ds.module_name = Some(module_name.to_owned());
+        ds
     }
 }
 
-pub fn desugar_funbinding(module_name: &Name, metadata: &mut Metadata, binding : ast::FunBinding) -> Result<Binding> {
-    todo!()
+impl DesugarState {
+    fn desugar_binding(&mut self, binding : ast::Binding) -> Result<Binding> {
+        match binding {
+            ast::Binding::FunBinding(fb) => self.desugar_funbinding(fb),
+            ast::Binding::OpBinding(ob) => self.desugar_opbinding(ob),
+            ast::Binding::VarBinding(vb) => self.desugar_varbinding(vb),
+        }
+    }
+
+    fn desugar_funbinding(&mut self, binding : ast::FunBinding) -> Result<Binding> {
+        todo!()
+    }
+
+
+    fn desugar_opbinding(&mut self, binding : ast::OpBinding) -> Result<Binding> {
+        todo!()
+    }
+
+
+    fn desugar_varbinding(&mut self, binding : ast::VarBinding) -> Result<Binding> {
+        todo!()
+    }
+
+    fn desugar_expression(&mut self, expression : ast::ExpressionNode) -> Result<Expression> {
+        todo!()
+    }
+
 }
-
-
-pub fn desugar_opbinding(module_name: &Name, metadata: &mut Metadata, binding : ast::OpBinding) -> Result<Binding> {
-    todo!()
-}
-
-
-pub fn desugar_varbinding(module_name: &Name, metadata: &mut Metadata, binding : ast::VarBinding) -> Result<Binding> {
-    todo!()
-}
-
-pub fn desugar_expression(expression : ast::ExpressionNode) -> Result<Expression> {
-    todo!()
-}
-
 #[derive(Debug, Clone, PartialEq)]
 pub struct Module {
     pub metadata : Metadata,
