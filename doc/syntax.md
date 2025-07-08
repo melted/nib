@@ -1,5 +1,6 @@
 Let's make a BNF grammar
 
+```
 Program := decl*
 decl := `module` name | `use` name | binding
 binding := binding_lhs `=` expr
@@ -32,7 +33,7 @@ qbinop = (identifier `.`)* binop
 symbolchar = unicode symbol except '{} [] ().,;#'
 reserved_symbols = `=` `@` `->` `_` `=>` '|' 
 reserved_words = `module` | `use` | `where` | `_`
-
+```
 ---
 
 The core language desugars binops to applications, fun and op bindings to var binding of lambdas. Arrays desugar to application of the array constructor, projection desugars to an application of a projection primitive

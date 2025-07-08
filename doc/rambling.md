@@ -26,7 +26,7 @@ select todo + syntax where
 
 int.is x = x.type == int
 
-pair = record { first, second }
+pair = record [#first, #second]
 
 xy = pair.make 1 2
 
@@ -47,13 +47,15 @@ p.x = point.x p
 Maybe a special table in the type for fields that should be exposed on instances of the 
 type (type.methods?)
 
+The dot operator is a project form. Doing it on a value v looks up (type v).project 
+
 How to handle zero argument functions? Should they take unit, or should they get called by default when named. In that case, how to name it without calling it? Or should there be a special syntax for calling it?
 
 Guess it has to take something, or there would need to be a special syntax for definitions too. 
 
 But the p.x example has a method that takes a self argument that is on the left side of the dot. Can that syntax work, if the syntax is general, there never need to be definition that has an argument-free function.
 
-bare symbol #blue
+Literal symbol: #blue
 
 # Lambdas
 
@@ -69,6 +71,7 @@ syntax error.
 the argument pattern can be accessed, so a match function could be implemented taking a bunch of one argument lambdas, and running the first one that matches the selector. That would require pattern guards.
 
 Should it be possible to make lambdas with several clauses? Sounds reasonable since we we want functions with several clauses.
+Yes, because we want to use multiclause lambdas to implement conditionals, and to desugar function bindings to var bindings to lambda.
 
 syntax for that
 { [a,b] -> a+b; _ -> error "expect a pair" }
@@ -80,9 +83,8 @@ Arrays: [1,2,3] [1,2,...] [...,2,1] [1,2,...,9,10] [...]
 Bindings: [a, ...] x 
 Alias: [...] as a
 Custom Pattern: (pair x y) (does this need something extra to mark it? say (?pair))
-Guard: (pair x y) | x < 5
+Guard: (pair x y) | x < 5 (part of binding, not pattern)
 Wildcard: _ (other identifiers starting with _ are bindings), wildcard matches anything but doesn't bind
-
 
 # expressions
 
@@ -94,7 +96,7 @@ Applications exp exp+
 Binops exp op exp
 Lambdas {[v*] -> exp }
 Where exp where bindings+
-Case (maybe could be done by sugar)
+pred => on_true; on_false
 
 # bindings
 
@@ -112,13 +114,13 @@ if x t _ = t x
 
 #Top Level
 
-module qualified.name
+`module qualified.name`
 
 says we're in module `qualified.name` by default. There are two special module names, `global` for universally visible names and `current` to access the current scope from inside where-clauses.
 
-import qualified.name
+use qualified.name
 
-makes the module `qualified.name` accessible. `global` is always accessible.
+makes the module or item `qualified.name` available in scope. `global` is always in scope.
 
 Modules are tables.
 
@@ -139,7 +141,7 @@ color = enum #red #blue #green
 
 red `is` color == true
 
-is v t = v.type == t
+is v t = is_symbol v => t.members.(v) != nil; false
 
 No need to build that into the language enum symbols* -> enum-type
 
@@ -165,7 +167,7 @@ What primitive types are needed
 boolean
 integer
 float
-character?
+character
 bigint?
 bytearray (a piece of memory, using byte may give the wrong impression that it can't be used to get other types)
 
