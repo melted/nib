@@ -53,7 +53,11 @@ impl<'a> ParserState<'a> {
 
     pub(super) fn parse_array_pattern(&mut self) -> Result<PatternNode> {
         self.get_next_token()?;
-        let pats = self.parse_separated_by(&mut Self::parse_pattern, TokenValue::Comma)?;
+        let mut pats = Vec::new();
+        pats.push(self.parse_pattern()?);
+        while self.is_next(TokenValue::Comma)? {
+            pats.push(self.parse_pattern()?);
+        }
         self.expect(TokenValue::RightBracket)?;
         Ok(self.array_pattern(pats))
     }
@@ -63,7 +67,10 @@ impl<'a> ParserState<'a> {
         match self.peek_next_token()?.value {
             TokenValue::Identifier(_) => {
                 let name = self.parse_name()?;
-                let pats = self.parse_some(&mut Self::parse_pattern, |t| t != TokenValue::RightParen)?;
+                let mut pats = Vec::new();
+                while self.peek_next_token()?.value != TokenValue::RightParen {
+                    pats.push(self.parse_pattern()?);
+                }
                 self.expect(TokenValue::RightParen)?;
                 Ok(self.custom_pattern(name , pats))
             }

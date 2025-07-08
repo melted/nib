@@ -183,7 +183,15 @@ impl<'a> ParserState<'a> {
     }
 
     pub(super) fn parse_fun_args(&mut self) -> Result<(Vec<PatternNode>, Option<ExpressionNode>)> {
-        let args = self.parse_some1(&mut Self::parse_pattern, |t| t != TokenValue::Bar && t != TokenValue::RightArrow && t != TokenValue::Equals)?;
+        let mut args = Vec::new();
+        args.push(self.parse_pattern()?);
+        loop {
+            let t = self.peek_next_token()?.value;
+            match t {
+                TokenValue::Bar | TokenValue::Equals | TokenValue::RightArrow => break,
+                _ => args.push(self.parse_pattern()?)
+            }
+        }
         let guard = if self.is_next(TokenValue::Bar)? {
             Some(self.parse_expression()?)
         } else {
@@ -236,16 +244,26 @@ impl<'a> ParserState<'a> {
 
     pub(super) fn parse_array_expression(&mut self) -> Result<ExpressionNode> {
         self.expect(TokenValue::LeftBracket)?;
-        let exprs = self.parse_separated_by(&mut Self::parse_expression, TokenValue::Comma)?;
+        let mut exprs = Vec::new();
+        exprs.push(self.parse_expression()?);
+        while self.is_next(TokenValue::Comma)? {
+            exprs.push(self.parse_expression()?);
+        }
         self.expect(TokenValue::RightBracket)?;
         Ok(self.array_expression(exprs))
     }
 
     pub(super) fn parse_projection_expression(&mut self, lhs: ExpressionNode) -> Result<ExpressionNode> {
-        self.expect(TokenValue::Period)?;
         let mut projs = vec![lhs];
-        let mut exprs = self.parse_separated_by(&mut |this| this.parse_inner_expression(10), TokenValue::Period)?;
-        projs.append(&mut exprs);
+        while self.is_next(TokenValue::Period)? {
+            let next = match self.peek_next_token()?.value {
+                TokenValue::Identifier(id) => {
+                    self.literal_expression(Literal::Symbol(id))
+                },
+                _ => self.parse_inner_expression(10)?
+            };
+            projs.push(next);
+        }
         Ok(self.projection_expression(projs))
     }
 

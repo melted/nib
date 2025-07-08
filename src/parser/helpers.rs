@@ -59,47 +59,6 @@ impl<'a> ParserState<'a> {
         Ok(())
     }
 
-    pub(super) fn parse_some<T>(
-        &mut self,
-        inner_parser: &mut impl FnMut(&mut Self) -> Result<T>,
-        until_pred: impl Fn(TokenValue) ->bool 
-    ) -> Result<Vec<T>> {
-        let mut output = Vec::new();
-        while until_pred(self.peek_next_token()?.value) {
-            let res = inner_parser(self)?;
-            output.push(res);
-        }
-        Ok(output)
-    }
-
-    pub(super) fn parse_some1<T> (
-        &mut self,
-        inner_parser: &mut impl FnMut(&mut Self) -> Result<T>,
-        until_pred: impl Fn(TokenValue) ->bool 
-    ) -> Result<Vec<T>> {
-        let mut output = Vec::new();
-        let first = inner_parser(self)?;
-        output.push(first);
-        while until_pred(self.peek_next_token()?.value) {
-            let res = inner_parser(self)?;
-            output.push(res);
-        }
-        Ok(output)
-    }
-
-    pub(super) fn parse_separated_by<T>(
-        &mut self,
-        inner_parser: &mut impl FnMut(&mut Self) -> Result<T>,
-        separator: TokenValue,
-    ) -> Result<Vec<T>> {
-        let mut output = Vec::new();
-        output.push(inner_parser(self)?);
-        while self.is_next(separator.clone())? {
-            output.push(inner_parser(self)?);
-        }
-        Ok(output)
-    }
-
     pub(super) fn try_parse<T>(
         &mut self,
         inner_parser: &mut impl FnMut(&mut Self) -> Result<T>,
@@ -183,7 +142,11 @@ impl<'a> ParserState<'a> {
                         Ok(Literal::Symbol(name))
                     },
                     TokenValue::LeftBracket => {
-                        let bytes = self.parse_separated_by(&mut Self::parse_byte,TokenValue::Comma)?;
+                        let mut bytes = Vec::new();
+                        bytes.push(self.parse_byte()?);
+                        while self.is_next(TokenValue::Comma)? {
+                            bytes.push(self.parse_byte()?);
+                        }
                         self.expect(TokenValue::RightBracket)?;
                         Ok(Literal::Bytearray(bytes))
                     },

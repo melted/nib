@@ -12,7 +12,9 @@ I guess by this I meant, is there a need for pattern literals? I haven't run int
 
 I can do this:
 a && b = a => b; false
-a || b = a => a; b
+a || b = x => x; b
+            where
+                x = a // Not evaluating a twice
 
 Which is clunky.
 

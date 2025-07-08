@@ -18,3 +18,7 @@ length xs = on xs {
 
 my_weird_symbol = #(**)
 
+cond_chain x = x < 5 => "S"
+               x < 10 => "M"
+               x < 15 => "L"
+               "XL"
