@@ -32,7 +32,7 @@ fn lex_squashed_tokens() -> Result<()> {
 #[test]
 fn parse_names() -> Result<()> {
     let mut state = ParserState::new("a.name");
-    let ret = state.parse_name();
+    let ret = state.parse_qualified_name();
     assert!(ret.is_ok());
     match ret {
         Ok(Name::Qualified(p, n)) => {

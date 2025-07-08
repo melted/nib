@@ -2,7 +2,6 @@ use crate::{ ast::{self, ExpressionNode, FunClause, Literal, Operator, PatternNo
 
 use super::{ParserState, lexer::TokenValue};
 
-
 /// General help functions for parsing
 impl<'a> ParserState<'a> {
     pub(super) fn expect(&mut self, t: TokenValue) -> Result<()> {
@@ -78,7 +77,7 @@ impl<'a> ParserState<'a> {
         }
     }
 
-    pub(super) fn parse_name(&mut self) -> Result<Name> {
+    pub(super) fn parse_qualified_name(&mut self) -> Result<Name> {
         match self.parse_name_or_operator()? {
             NameOrOperator::Name(name) => Ok(name),
             _ => self.error("Expected a name, not an operator")

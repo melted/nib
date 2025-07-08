@@ -68,18 +68,12 @@ impl<'a> ParserState<'a> {
                 },
                 TokenValue::Period => self.parse_projection_expression(lhs),
                 TokenValue::Identifier(_) => {
-                    match self.parse_name_or_operator()? {
-                        NameOrOperator::Name(name) if min_pred < 9 => {
-                            let var = self.var_expression(name);
-                            Ok(self.app_expression(lhs, var))
-                        },
-                        NameOrOperator::Operator(op) if min_pred < 6 => {
-                            self.parse_binop_expression(lhs, op)
-                        }
-                        _ => {
+                        if min_pred < 9 {
+                            let rhs = self.parse_inner_expression(9)?;
+                            Ok(self.app_expression(lhs, rhs))
+                        } else {
                             break;
                         }
-                    }
                 },
                 TokenValue::Eof => break,
                 TokenValue::LeftBrace | TokenValue::LeftParen | TokenValue::LeftBracket if min_pred < 9 => {
@@ -258,6 +252,7 @@ impl<'a> ParserState<'a> {
         while self.is_next(TokenValue::Period)? {
             let next = match self.peek_next_token()?.value {
                 TokenValue::Identifier(id) => {
+                    self.get_next_token()?;
                     self.literal_expression(Literal::Symbol(id))
                 },
                 _ => self.parse_inner_expression(10)?

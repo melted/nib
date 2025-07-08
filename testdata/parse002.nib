@@ -9,3 +9,5 @@ max x y = x < y => x; y
 a = #mysymbol
 
 b = #[222, 228]
+
+a = hello a.b.c + 1

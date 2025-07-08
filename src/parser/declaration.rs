@@ -64,7 +64,7 @@ impl<'a> ParserState<'a> {
     pub(super) fn parse_module_declaration(&mut self) -> Result<Declaration> {
         let start = self.next_position();
         self.expect(TokenValue::Module)?;
-        let name = self.parse_name()?;
+        let name = self.parse_qualified_name()?;
         let pos = self.position();
         let m = self.module_declaration(name);
         self.metadata.locations.insert(m.id, Location::at(start, pos));
@@ -74,7 +74,7 @@ impl<'a> ParserState<'a> {
     pub(super) fn parse_use_declaration(&mut self) -> Result<Declaration> {
         let start = self.next_position();
         self.expect(TokenValue::Use)?;
-        let name = self.parse_name()?;
+        let name = self.parse_qualified_name()?;
         let pos = self.position();
         let u = self.use_declaration(name);
         self.metadata.locations.insert(u.id, Location::at(start, pos));

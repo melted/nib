@@ -16,7 +16,7 @@ impl<'a> ParserState<'a> {
                 self.literal_pattern(lit)
             },
             TokenValue::Identifier(_) => {
-                let name = self.parse_name()?;
+                let name = self.parse_qualified_name()?;
                 let ellipsis = self.is_next(TokenValue::Ellipsis)?;
                 if ellipsis {
                     self.ellipsis_pattern(name)
@@ -66,7 +66,7 @@ impl<'a> ParserState<'a> {
         self.expect(TokenValue::LeftParen)?;
         match self.peek_next_token()?.value {
             TokenValue::Identifier(_) => {
-                let name = self.parse_name()?;
+                let name = self.parse_qualified_name()?;
                 let mut pats = Vec::new();
                 while self.peek_next_token()?.value != TokenValue::RightParen {
                     pats.push(self.parse_pattern()?);
