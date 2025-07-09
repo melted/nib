@@ -2,7 +2,6 @@ use std::collections::HashSet;
 
 use crate::ast::{AstVisitor, Binding, Binop, Cond, ExpressionNode, Expression, FunClause, Literal, Operator, PatternNode};
 use crate::common::{Location, Name, Result};
-use crate::parser::helpers::NameOrOperator;
 use crate::parser::lexer::TokenValue;
 use super::ParserState;
 

@@ -78,28 +78,11 @@ impl<'a> ParserState<'a> {
     }
 
     pub(super) fn parse_qualified_name(&mut self) -> Result<Name> {
-        match self.parse_name_or_operator()? {
-            NameOrOperator::Name(name) => Ok(name),
-            _ => self.error("Expected a name, not an operator")
-        }
-    }
-
-    pub(super) fn parse_operator(&mut self) -> Result<Operator> {
-        let NameOrOperator::Operator(op) = self.parse_name_or_operator()? else {
-            return self.error("Expected an operator, not a name");
-        };
-        Ok(op)
-    }
-
-    pub(super) fn parse_name_or_operator(&mut self) -> Result<NameOrOperator> {
         let first = self.get_next_token()?;
         let mut id = match first.value {
             TokenValue::Identifier(id) => id,
-            TokenValue::Operator(id) => {
-                return Ok(NameOrOperator::Operator(ast::Operator::Plain(id)))
-            },
             _ => {
-                return self.error(&format!("Expected identifier or operator, got {:?}", &first.value));
+                return self.error(&format!("Expected identifier, got {:?}", &first.value));
             }
         };
         let mut path = Vec::new();
@@ -108,11 +91,8 @@ impl<'a> ParserState<'a> {
             let next = self.get_next_token()?;
             id = match next.value {
                 TokenValue::Identifier(id) => id,
-                TokenValue::Operator(id) => {
-                    return Ok(NameOrOperator::Operator(ast::Operator::Qualified(path, id)))
-                },
                 _ => {
-                    return self.error(&format!("Expected identifier or operator, got {:?}", &next.value));
+                    return self.error(&format!("Expected identifier, got {:?}", &next.value));
                 }
             };
         }
@@ -121,7 +101,16 @@ impl<'a> ParserState<'a> {
                         } else {
                             Name::Qualified(path, id)
                         };
-        Ok(NameOrOperator::Name(ret))
+        Ok(ret)
+    }
+
+    pub(super) fn parse_operator(&mut self) -> Result<Operator> {
+        match self.get_next_token()?.value {
+            TokenValue::Operator(op) => {
+                Ok(Operator::Plain(op))
+            },
+            t => self.error(&format!("Expected an operator, got {t:?}"))
+        }
     }
 
     pub(super) fn parse_literal(&mut self) -> Result<Literal> {
@@ -173,9 +162,4 @@ impl<'a> ParserState<'a> {
         self.counter += 1;
         FunClause { id: self.counter, args, guard, body }
     }
-}
-
-pub enum NameOrOperator {
-    Name(Name),
-    Operator(ast::Operator)
 }
