@@ -1,7 +1,7 @@
 
-use std::collections::HashSet;
+use std::{collections::HashSet};
 
-use crate::{ast, common::{Metadata, Name, Node, Result}};
+use crate::{ast::{self, PatternNode}, common::{Metadata, Name, Node, Result}};
 
 
 pub fn desugar(module: ast::Module) -> Result<Module> {
@@ -128,9 +128,74 @@ impl DesugarState {
                     args.push(self.desugar_expression(a)?);
                 }
                 Ok(Expression::App(expression.id, args))
+            },
+            ast::Expression::Array(v) => {
+                let mut args = Vec::new();
+                args.push(Expression::Var(self.new_id(), Name::name("array")));
+                for a in v {
+                    args.push(self.desugar_expression(a)?);
+                }
+                Ok(Expression::App(expression.id, args))
+            },
+            ast::Expression::Binop(ast::Binop { op, lhs, rhs }) => {
+                let mut args = Vec::new();
+                args.push(Expression::Var(self.new_id(), op.to_name()));
+                args.push(self.desugar_expression(*lhs)?);
+                args.push(self.desugar_expression(*rhs)?);
+                Ok(Expression::App(expression.id, args))
+            },
+            ast::Expression::Cond(cond) => {
+                let mut clauses = Vec::new();
+                let mut next = cond;
+                loop {
+                    let guard = self.desugar_expression(*next.pred)?;
+                    let rhs = Box::new(self.desugar_expression(*next.on_true)?);
+                    let clause = FunClause { id: self.new_id(), args: vec![], guard: Some(guard), rhs };
+                    clauses.push(clause);
+                    if let ast::Expression::Cond(c) = next.on_false.expr {
+                            next = c;
+                    } else {
+                        let exp = self.desugar_expression(*next.on_false)?;
+                        let last = FunClause { id: self.new_id(), args: vec![self.pattern_wildcard()], guard: None, rhs: Box::new(exp) };
+                        clauses.push(last);
+                        break;
+                    }
+                }
+                Ok(Expression::App(expression.id, vec![Expression::Lambda(self.new_id(), clauses), Expression::Literal(self.new_id(), ast::Literal::Nil)]))
+            },
+            ast::Expression::Lambda(funs) => {
+                let mut clauses = Vec::new(); 
+                for f in funs {
+                    clauses.push(self.desugar_funclause(f)?);
+                }
+                Ok(Expression::Lambda(expression.id, clauses))
+            },
+            ast::Expression::Literal(lit) => Ok(Expression::Literal(expression.id, lit)),
+            ast::Expression::Projection(projs) => {
+                let mut args = Vec::new();
+                args.push(Expression::Var(self.new_id(), Name::name("projection")));
+                for a in projs {
+                    args.push(self.desugar_expression(a)?);
+                }
+                Ok(Expression::App(expression.id, args))
+            },
+            ast::Expression::Var(v) => Ok(Expression::Var(expression.id, v)),
+            ast::Expression::Where(exp, ast_bindings) => {
+                let lhs = self.desugar_expression(*exp)?;
+                let mut binds = Vec::new();
+                for binding in ast_bindings {
+                    let mut b = self.desugar_binding(binding)?;
+                    binds.append(&mut b);
+                }
+                Ok(Expression::Where(expression.id, Box::new(lhs), binds))
             }
-            _ => { todo!() }
         }
+    }
+
+    fn desugar_funclause(&mut self, clause: ast::FunClause) -> Result<FunClause> {
+        let exp = self.desugar_expression(clause.body)?;
+        let guard = clause.guard.map(|g| self.desugar_expression(g)).transpose()?;
+        Ok(FunClause { id: clause.id, args: clause.args, guard, rhs: Box::new(exp)})
     }
 
     fn next_local(&mut self) -> Name {
@@ -141,6 +206,10 @@ impl DesugarState {
     fn new_id(&mut self) -> u32 {
         self.metadata.last_id += 1;
         self.metadata.last_id
+    }
+
+    fn pattern_wildcard(&mut self) -> ast::PatternNode {
+        PatternNode { id: self.new_id(), pattern: ast::Pattern::Wildcard }
     }
 }
 
