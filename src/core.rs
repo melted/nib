@@ -58,29 +58,76 @@ impl DesugarState {
         }
     }
 
-    fn desugar_funbinding(&mut self, binding : ast::FunBinding) -> Result<Vec<Binding>> {
-        todo!()
+    fn desugar_funbinding(&mut self, ast_binding : ast::FunBinding) -> Result<Vec<Binding>> {
+        let name = ast_binding.name;
+        let mut core_clauses = Vec::new();
+        for clause in ast_binding.clauses {
+            let exp = self.desugar_expression(clause.body)?;
+            let guard = clause.guard.map(|g| self.desugar_expression(g)).transpose()?;
+            core_clauses.push(FunClause { id: clause.id, args: clause.args, guard, rhs: Box::new(exp )});
+        }
+        self.metadata.last_id += 1;
+        Ok(vec![Binding{ id: ast_binding.id, name, body: Expression::Lambda(self.metadata.last_id, core_clauses)}])
     }
 
 
-    fn desugar_opbinding(&mut self, binding : ast::OpBinding) -> Result<Vec<Binding>> {
-        todo!()
+    fn desugar_opbinding(&mut self, ast_binding : ast::OpBinding) -> Result<Vec<Binding>> {
+        let name = ast_binding.op.to_name();
+        let mut core_clauses = Vec::new();
+        for clause in ast_binding.clauses {
+            let exp = self.desugar_expression(clause.body)?;
+            let guard = clause.guard.map(|g| self.desugar_expression(g)).transpose()?;
+            core_clauses.push(FunClause { id: clause.id, args: vec![clause.lpat, clause.rpat], guard, rhs: Box::new(exp )});
+        }
+        self.metadata.last_id += 1;
+        Ok(vec![Binding{ id: ast_binding.id, name, body: Expression::Lambda(self.metadata.last_id, core_clauses)}])
     }
 
 
-    fn desugar_varbinding(&mut self, binding : ast::VarBinding) -> Result<Vec<Binding>> {
-        todo!()
+    fn desugar_varbinding(&mut self, ast_binding : ast::VarBinding) -> Result<Vec<Binding>> {
+        let pat = ast_binding.lhs;
+        let rhs = self.desugar_expression(ast_binding.rhs)?;
+        match pat.pattern {
+            ast::Pattern::Var(v) => {
+                Ok(vec![Binding { id: ast_binding.id, name: v, body: rhs }])
+            },
+            ast::Pattern::Wildcard => {
+                Ok(vec![Binding { id: ast_binding.id, name: Name::Plain("".to_string()), body: rhs }])
+            },
+            _ => {
+                let mut visitor = UsedVars::new();
+                pat.visit(&mut visitor);
+                let names : Vec<_>= visitor.vars.into_iter().collect();
+                let v = names.clone().into_iter().map(|n| Expression::Var(self.new_id(), n)).collect();
+                let lam_rhs = Expression::App(self.new_id(), Box::new(Expression::Var(self.new_id(), Name::name("array_mk"))), v);
+                let lam = Expression::Lambda(self.new_id(), vec![FunClause { id: self.new_id(), args: vec![pat], guard: None, rhs: Box::new(lam_rhs)}]);
+                let body = Expression::App(self.new_id(), Box::new(lam), vec![rhs]);
+                let binding = Binding { id: ast_binding.id, name: self.next_local(), body };
+                let mut bindings = vec![binding];
+                for (i, n) in names.into_iter().enumerate() {
+                    let rhs = Expression::App(self.new_id(), Box::new(Expression::Var(self.new_id(), Name::name("array_ref"))), vec![Expression::Literal(self.new_id(), ast::Literal::Integer(i as i64))]);
+                    let bind = Binding { id: self.new_id(), name: n, body: rhs };
+                    bindings.push(bind);
+                }
+                Ok(bindings)
+
+            }  
+        }
     }
 
     fn desugar_expression(&mut self, expression : ast::ExpressionNode) -> Result<Expression> {
         todo!()
     }
 
-    fn next_local(&mut self) -> Var {
+    fn next_local(&mut self) -> Name {
         self.last_local += 1;
-        Var::Local(self.last_local)
+        Name::name(&format!("local.l{}", self.last_local))
     }
 
+    fn new_id(&mut self) -> u32 {
+        self.metadata.last_id += 1;
+        self.metadata.last_id
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -99,7 +146,7 @@ pub struct Binding {
 #[derive(Debug, Clone, PartialEq)]
 pub enum Expression {
     Literal(Node, ast::Literal),
-    Var(Node, Var),
+    Var(Node, Name),
     Lambda(Node, Vec<FunClause>),
     App(Node, Box<Expression>, Vec<Expression>),
     Where(Node, Box<Expression>, Vec<Binding>)
@@ -108,13 +155,14 @@ pub enum Expression {
 #[derive(Debug, Clone, PartialEq)]
 pub struct FunClause {
     pub id : Node,
-    pub args : Vec<ast::Pattern>,
+    pub args : Vec<ast::PatternNode>,
+    pub guard : Option<Expression>,
     pub rhs : Box<Expression>
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Var {
-    Named(String),
+    Named(Name),
     Local(u32)
 }
 

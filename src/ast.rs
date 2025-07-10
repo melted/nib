@@ -474,6 +474,15 @@ pub enum Operator {
     Plain(String)
 }
 
+impl Operator {
+    pub fn to_name(&self) -> Name {
+        match self {
+            Operator::Qualified(path, op) => Name::Qualified(path.clone(), format!("({})", op)),
+            Operator::Plain(op) => Name::Plain(format!("({})", op))
+        }
+    }
+}
+
 impl Display for Operator {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {

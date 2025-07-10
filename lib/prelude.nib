@@ -14,3 +14,20 @@ x && y = x => y (); false
 on x f = f x
 id x = x
 
+// Stuff that need prims
+// =====================
+// apply
+// +, -, *, / (at least type specific ones, maybe can do generic as lib)
+// <, >, <=, >=, !=, == 
+// sim, cos, tan, asin, acos, atan
+// and, or, xor, lsh, rsh, rot, bswap (bit logic)
+// type, set_type 
+// array (ref, set, new, size, fill, copy, slice)
+// bytearray (ref, set, new, fill, size, copy, slice, 8-64bit ops signed unsigned) 
+// symbol (new, new_well_known)
+// table (ref, set, clear, size)
+// char (ord, chr)
+// ptr (peek, poke, offset)
+// IO  
+// Debug
+// 
