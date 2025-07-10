@@ -183,7 +183,14 @@ impl<'a> super::ParserState<'a> {
             match id {
                 "|" => Ok(self.token(TokenValue::Bar)),
                 "=" => Ok(self.token(TokenValue::Equals)),
-                "#" => Ok(self.token(TokenValue::Hash)),
+                "#" => {
+                    if let Some((_, '[')) = self.chars.peek() {
+                        self.next();
+                        Ok(self.token(TokenValue::HashLeftBracket))
+                    } else {
+                        Ok(self.token(TokenValue::Hash))
+                    }
+                },
                 "@" => Ok(self.token(TokenValue::As)),
                 "->" => Ok(self.token(TokenValue::RightArrow)),
                 "=>" => Ok(self.token(TokenValue::FatRightArrow)),
@@ -432,6 +439,7 @@ pub enum TokenValue {
     RightBracket,
     LeftBrace,
     RightBrace,
+    HashLeftBracket,
     // Keywords
     As,
     At,
@@ -479,7 +487,7 @@ impl TokenValue {
         match self {
             TokenValue::Char(_) | TokenValue::String(_) |
             TokenValue::Float(_) | TokenValue::Integer(_) |
-            TokenValue::Hash |
+            TokenValue::Hash | TokenValue::HashLeftBracket |
             TokenValue::False | TokenValue::True | TokenValue::Nil => true,
             _ => false
         }

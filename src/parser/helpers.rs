@@ -129,18 +129,19 @@ impl<'a> ParserState<'a> {
                     TokenValue::Identifier(name) => {
                         Ok(Literal::Symbol(name))
                     },
-                    TokenValue::LeftBracket => {
-                        let mut bytes = Vec::new();
-                        bytes.push(self.parse_byte()?);
-                        while self.is_next(TokenValue::Comma)? {
-                            bytes.push(self.parse_byte()?);
-                        }
-                        self.expect(TokenValue::RightBracket)?;
-                        Ok(Literal::Bytearray(bytes))
-                    },
-                    _ => self.error("Expected either a symbol or bytearray after #")
+
+                    _ => self.error("Expected a symbol")
                 }
             },
+            TokenValue::HashLeftBracket => {
+                let mut bytes = Vec::new();
+                bytes.push(self.parse_byte()?);
+                while self.is_next(TokenValue::Comma)? {
+                    bytes.push(self.parse_byte()?);
+                }
+                self.expect(TokenValue::RightBracket)?;
+                Ok(Literal::Bytearray(bytes))
+            }
             _ => {
                 self.error(&format!("Expected a literal got token {token:?}"))
             }
