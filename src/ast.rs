@@ -7,6 +7,14 @@ pub struct Module {
     pub declarations: Vec<Declaration>
 }
 
+impl Module {
+    pub fn visit(&self, visitor: &mut dyn AstVisitor) {
+        for decl in &self.declarations {
+            decl.visit(visitor);
+        }
+    }
+}
+
 // Declarations
 #[derive(Debug, Clone, PartialEq)]
 pub enum Declaration {
