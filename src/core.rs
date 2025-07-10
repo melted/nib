@@ -98,14 +98,19 @@ impl DesugarState {
                 let mut visitor = UsedVars::new();
                 pat.visit(&mut visitor);
                 let names : Vec<_>= visitor.vars.into_iter().collect();
-                let v = names.clone().into_iter().map(|n| Expression::Var(self.new_id(), n)).collect();
-                let lam_rhs = Expression::App(self.new_id(), Box::new(Expression::Var(self.new_id(), Name::name("array_mk"))), v);
+                let mut v = Vec::new();
+                for n in names.clone() {
+                    v.push(Expression::Var(self.new_id(), n));
+                };
+                let mut arr_mk = vec![Expression::Var(self.new_id(), Name::name("array_mk"))];
+                arr_mk.append(&mut v);
+                let lam_rhs = Expression::App(self.new_id(), arr_mk);
                 let lam = Expression::Lambda(self.new_id(), vec![FunClause { id: self.new_id(), args: vec![pat], guard: None, rhs: Box::new(lam_rhs)}]);
-                let body = Expression::App(self.new_id(), Box::new(lam), vec![rhs]);
+                let body = Expression::App(self.new_id(), vec![lam, rhs]);
                 let binding = Binding { id: ast_binding.id, name: self.next_local(), body };
                 let mut bindings = vec![binding];
                 for (i, n) in names.into_iter().enumerate() {
-                    let rhs = Expression::App(self.new_id(), Box::new(Expression::Var(self.new_id(), Name::name("array_ref"))), vec![Expression::Literal(self.new_id(), ast::Literal::Integer(i as i64))]);
+                    let rhs = Expression::App(self.new_id(), vec![Expression::Var(self.new_id(), Name::name("array_ref")), Expression::Literal(self.new_id(), ast::Literal::Integer(i as i64))]);
                     let bind = Binding { id: self.new_id(), name: n, body: rhs };
                     bindings.push(bind);
                 }
@@ -116,7 +121,16 @@ impl DesugarState {
     }
 
     fn desugar_expression(&mut self, expression : ast::ExpressionNode) -> Result<Expression> {
-        todo!()
+        match expression.expr {
+            ast::Expression::App(x) => {
+                let mut args = Vec::new();
+                for a in x {
+                    args.push(self.desugar_expression(a)?);
+                }
+                Ok(Expression::App(expression.id, args))
+            }
+            _ => { todo!() }
+        }
     }
 
     fn next_local(&mut self) -> Name {
@@ -148,7 +162,7 @@ pub enum Expression {
     Literal(Node, ast::Literal),
     Var(Node, Name),
     Lambda(Node, Vec<FunClause>),
-    App(Node, Box<Expression>, Vec<Expression>),
+    App(Node, Vec<Expression>),
     Where(Node, Box<Expression>, Vec<Binding>)
 }
 

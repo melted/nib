@@ -292,11 +292,19 @@ impl<'a> ParserState<'a> {
         }
     }
 
-    pub(super) fn app_expression(&mut self, f: ExpressionNode, arg: ExpressionNode) -> ExpressionNode {
+    pub(super) fn app_expression(&mut self, mut f:  ExpressionNode, arg: ExpressionNode) -> ExpressionNode {
         self.counter += 1;
-        ExpressionNode {
-            id: self.counter,
-            expr: Expression::App(Box::new(f), Box::new(arg))
+        match f.expr {
+            Expression::App(ref mut args) => {
+                args.push(arg);
+                f
+            },
+            _ => {
+                ExpressionNode {
+                    id: self.counter,
+                    expr: Expression::App(vec![f, arg])
+                }
+            }
         }
     }
 

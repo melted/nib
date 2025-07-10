@@ -293,7 +293,7 @@ pub enum Expression {
     Var(Name),
     Array(Vec<ExpressionNode>),
     Lambda(Vec<FunClause>),
-    App(Box<ExpressionNode>, Box<ExpressionNode>),
+    App(Vec<ExpressionNode>),
     Binop(Binop),
     Where(Box<ExpressionNode>, Vec<Binding>),
     Cond(Cond),
@@ -306,9 +306,10 @@ impl ExpressionNode {
             return;
         }
         match &self.expr {
-            Expression::App(f,arg ) => {
-                f.visit(visitor);
-                arg.visit(visitor);
+            Expression::App(args ) => {
+                for arg in args {
+                    arg.visit(visitor);
+                }
             },
             Expression::Array(elems) => {
                 for e in elems {
@@ -368,7 +369,13 @@ impl Display for Expression {
         match self {
             Expression::Literal(lit) => write!(f, "{}", lit)?,
             Expression::Var(v) => write!(f, "{}", v)?,
-            Expression::App(fun, arg) => write!(f, "({} {})", fun, arg)?,
+            Expression::App(args) => {
+                write!(f, "(")?;
+                for arg in args {
+                    write!(f, "{} ", arg);
+                }
+                write!(f, ")");
+            },
             Expression::Array(arr) => {
                 write!(f, "[")?;
                 for (i, exp) in arr.iter().enumerate() {
