@@ -17,12 +17,17 @@ impl<'a> ParserState<'a> {
             },
             TokenValue::Identifier(_) => {
                 let name = self.parse_qualified_name()?;
-                let ellipsis = self.is_next(TokenValue::Ellipsis)?;
-                if ellipsis {
-                    self.ellipsis_pattern(name)
+                self.var_pattern(name)
+            },
+            TokenValue::Ellipsis => {
+                self.expect(TokenValue::Ellipsis)?;
+                let id = if let TokenValue::Identifier(name) = self.peek_next_token()?.value {
+                    self.get_next_token()?;
+                    Some(Name::Plain(name))
                 } else {
-                    self.var_pattern(name)
-                }
+                    None
+                };
+                self.ellipsis_pattern(id)
             },
             TokenValue::LeftBracket => self.parse_array_pattern()?,
             TokenValue::LeftParen => self.parse_custom_pattern()?,
@@ -105,7 +110,7 @@ impl<'a> ParserState<'a> {
         PatternNode { id: self.counter, pattern: Pattern::Literal(lit) }
     }
 
-    pub(super) fn ellipsis_pattern(&mut self, name:Name) -> PatternNode {
+    pub(super) fn ellipsis_pattern(&mut self, name:Option<Name>) -> PatternNode {
         self.counter += 1;
         PatternNode { id: self.counter, pattern: Pattern::Ellipsis(name) }
     }

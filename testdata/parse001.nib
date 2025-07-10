@@ -27,3 +27,8 @@ global.flip x f = f x
 z = [1,2,3]
 
 f = a b c d e f g
+
+f a ...b = x
+
+g [a, ...] = a
+g _ = 0

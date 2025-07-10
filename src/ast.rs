@@ -212,7 +212,7 @@ pub struct PatternNode {
 #[derive(Debug, Clone, PartialEq)]
 pub enum Pattern {
     Wildcard,
-    Ellipsis(Name),
+    Ellipsis(Option<Name>),
     Literal(Literal),
     Var(Name),
     Array(Vec<PatternNode>),
@@ -273,7 +273,7 @@ impl Display for Pattern {
                 }
                 write!(f, ")")
             },
-            Pattern::Ellipsis(name) => write!(f, "{}...", name),
+            Pattern::Ellipsis(name) => write!(f, "...{}", name.clone().map_or(String::new(), |n| n.to_string())),
             Pattern::Literal(lit) => write!(f, "{}", lit),
             Pattern::Var(var) => write!(f, "{}", var)
          }
