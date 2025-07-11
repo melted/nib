@@ -117,18 +117,15 @@ impl<'a> super::ParserState<'a> {
     }
 
     pub(super) fn rewind_lexer(&mut self, checkpoint:usize) {
-        println!("rewinding from {} to {}", self.position(), checkpoint);
         if checkpoint < self.position() {
             self.chars = self.src[checkpoint..].char_indices().peekable();
             self.adjust_offset(checkpoint);
             self.stashed_token = None;
-            let new_pos = self.position();
             loop {
                 let last_nl = self.metadata.newlines.last().unwrap_or(&0);
                 if self.position() < *last_nl {
                     self.metadata.newlines.pop();
                 } else {
-                    println!("checking {}-{} for whitespace {} {}",*last_nl, self.position(), self.pos, self.offset);
                     self.on_new_line = self.src[*last_nl..self.position()].chars().all(char::is_whitespace);
                     break;
                 }
@@ -184,9 +181,42 @@ impl<'a> super::ParserState<'a> {
                 "|" => Ok(self.token(TokenValue::Bar)),
                 "=" => Ok(self.token(TokenValue::Equals)),
                 "#" => {
-                    if let Some((_, '[')) = self.chars.peek() {
-                        self.next();
-                        Ok(self.token(TokenValue::HashLeftBracket))
+                    if let Some((_, ch)) = self.chars.peek() {
+                        let c = *ch;
+                        match c {
+                            '[' => {
+                                self.next();
+                                Ok(self.token(TokenValue::HashLeftBracket))
+                            },
+                            '(' => {
+                                self.next();
+                                let t = self.read_operator()?;
+                                let id = match t.value {
+                                    TokenValue::Operator(op) => format!("({})", op), 
+                                    _ => {
+                                        return self.lex_error("Expected operator in #() symbol");
+                                    }
+                                };
+                                if let Some((_, ')')) = self.next() {
+                                    Ok(self.token(TokenValue::Symbol(id)))
+                                } else {
+                                    self.lex_error("Expected right paren to close #() symbol")
+                                }
+                            },
+                            _ if identifier_initial_char(c) => {
+                                let t = self.read_identifier()?;
+                                let id = match t.value {
+                                    TokenValue::Identifier(s) => s, 
+                                    _ => {
+                                        return self.lex_error("Expected valid identifier in symbol literal");
+                                    }
+                                };
+                                Ok(self.token(TokenValue::Symbol(id)))
+                            },
+                            _ => {
+                                Ok(self.token(TokenValue::Operator(id.to_string())))
+                            }
+                        }
                     } else {
                         Ok(self.token(TokenValue::Hash))
                     }
@@ -427,6 +457,7 @@ pub enum TokenValue {
     Float(f64),
     Char(char),
     String(String),
+    Symbol(String),
     // punctuation
     Comma,
     Period,
@@ -484,5 +515,11 @@ impl TokenValue {
 impl PartialEq<TokenValue> for Token {
     fn eq(&self, other: &TokenValue) -> bool {
         self.value == *other
+    }
+}
+
+impl PartialEq<Token> for Token {
+    fn eq(&self, other: &Token) -> bool {
+        self.value == other.value
     }
 }

@@ -123,16 +123,7 @@ impl<'a> ParserState<'a> {
             TokenValue::Float(x) => Ok(Literal::Real(x)),
             TokenValue::Char(ch) => Ok(Literal::Char(ch)),
             TokenValue::String(s) => Ok(Literal::String(s)),
-            TokenValue::Hash => {
-                let tok = self.get_next_token()?;
-                match tok.value  {
-                    TokenValue::Identifier(name) => {
-                        Ok(Literal::Symbol(name))
-                    },
-
-                    _ => self.error("Expected a symbol")
-                }
-            },
+            TokenValue::Symbol(s) => Ok(Literal::Symbol(s)),
             TokenValue::HashLeftBracket => {
                 let mut bytes = Vec::new();
                 bytes.push(self.parse_byte()?);
