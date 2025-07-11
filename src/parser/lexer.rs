@@ -503,7 +503,7 @@ pub struct Token {
 impl TokenValue {
     pub(super) fn is_literal(&self) -> bool {
         match self {
-            TokenValue::Char(_) | TokenValue::String(_) |
+            TokenValue::Char(_) | TokenValue::String(_) | TokenValue::Symbol(_) |
             TokenValue::Float(_) | TokenValue::Integer(_) |
             TokenValue::Hash | TokenValue::HashLeftBracket |
             TokenValue::False | TokenValue::True | TokenValue::Nil => true,
