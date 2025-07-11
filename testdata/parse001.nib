@@ -32,3 +32,5 @@ f a ...b = x
 
 g [a, ...] = a
 g _ = 0
+
+[a, b] = divmod 7 3

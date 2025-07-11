@@ -107,10 +107,11 @@ impl DesugarState {
                 let lam_rhs = Expression::App(self.new_id(), arr_mk);
                 let lam = Expression::Lambda(self.new_id(), vec![FunClause { id: self.new_id(), args: vec![pat], guard: None, rhs: Box::new(lam_rhs)}]);
                 let body = Expression::App(self.new_id(), vec![lam, rhs]);
-                let binding = Binding { id: ast_binding.id, name: self.next_local(), body };
+                let nam_arr = self.next_local();
+                let binding = Binding { id: ast_binding.id, name: nam_arr.clone(), body };
                 let mut bindings = vec![binding];
                 for (i, n) in names.into_iter().enumerate() {
-                    let rhs = Expression::App(self.new_id(), vec![Expression::Var(self.new_id(), Name::name("array_ref")), Expression::Literal(self.new_id(), ast::Literal::Integer(i as i64))]);
+                    let rhs = Expression::App(self.new_id(), vec![Expression::Var(self.new_id(), Name::name("array_ref")), Expression::Var(self.new_id(), nam_arr.clone()), Expression::Literal(self.new_id(), ast::Literal::Integer(i as i64))]);
                     let bind = Binding { id: self.new_id(), name: n, body: rhs };
                     bindings.push(bind);
                 }

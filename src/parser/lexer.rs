@@ -380,8 +380,7 @@ impl<'a> super::ParserState<'a> {
         Err(Error::Syntax {
             msg: msg.to_string(),
             loc: self.location_current_token(),
-        }
-        .into())
+        }.into())
     }
 
     fn token(&mut self, token: TokenValue) -> Token {
@@ -444,7 +443,6 @@ pub enum TokenValue {
     As,
     At,
     Do,
-    If,
     Use,
     Module,
     Nil,
@@ -471,17 +469,6 @@ pub struct Token {
     pub on_new_line: bool,
 }
 
-impl Token {
-    pub(super) fn new(value: TokenValue) -> Token {
-        Token {
-            value,
-            location: Location::at(0, 0),
-            on_new_line: false
-        }
-    }
-
-}
-
 impl TokenValue {
     pub(super) fn is_literal(&self) -> bool {
         match self {
@@ -491,18 +478,6 @@ impl TokenValue {
             TokenValue::False | TokenValue::True | TokenValue::Nil => true,
             _ => false
         }
-    }
-}
-
-impl From<TokenValue> for Token {
-    fn from(val: TokenValue) -> Self {
-        Token::new(val)
-    }
-}
-
-impl PartialEq<Token> for Token {
-    fn eq(&self, other: &Token) -> bool {
-        self.value == other.value
     }
 }
 
