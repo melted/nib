@@ -28,6 +28,8 @@ z = [1,2,3]
 
 f = a b c d e f g
 
+_ = print "Look! This is unbound!"
+
 f a ...b = x
 
 g [a, ...] = a

@@ -67,7 +67,7 @@ impl DesugarState {
             core_clauses.push(FunClause { id: clause.id, args: clause.args, guard, rhs: Box::new(exp )});
         }
         self.metadata.last_id += 1;
-        Ok(vec![Binding{ id: ast_binding.id, name, body: Expression::Lambda(self.metadata.last_id, core_clauses)}])
+        Ok(vec![Binding{ id: ast_binding.id, binder: Binder::Public(name), body: Expression::Lambda(self.metadata.last_id, core_clauses)}])
     }
 
 
@@ -80,7 +80,7 @@ impl DesugarState {
             core_clauses.push(FunClause { id: clause.id, args: vec![clause.lpat, clause.rpat], guard, rhs: Box::new(exp )});
         }
         self.metadata.last_id += 1;
-        Ok(vec![Binding{ id: ast_binding.id, name, body: Expression::Lambda(self.metadata.last_id, core_clauses)}])
+        Ok(vec![Binding{ id: ast_binding.id, binder: Binder::Public(name), body: Expression::Lambda(self.metadata.last_id, core_clauses)}])
     }
 
 
@@ -89,10 +89,10 @@ impl DesugarState {
         let rhs = self.desugar_expression(ast_binding.rhs)?;
         match pat.pattern {
             ast::Pattern::Var(v) => {
-                Ok(vec![Binding { id: ast_binding.id, name: v, body: rhs }])
+                Ok(vec![Binding { id: ast_binding.id, binder: Binder::Public(v), body: rhs }])
             },
             ast::Pattern::Wildcard => {
-                Ok(vec![Binding { id: ast_binding.id, name: Name::Plain("".to_string()), body: rhs }])
+                Ok(vec![Binding { id: ast_binding.id, binder: Binder::Unbound, body: rhs }])
             },
             _ => {
                 let mut visitor = UsedVars::new();
@@ -108,11 +108,11 @@ impl DesugarState {
                 let lam = Expression::Lambda(self.new_id(), vec![FunClause { id: self.new_id(), args: vec![pat], guard: None, rhs: Box::new(lam_rhs)}]);
                 let body = Expression::App(self.new_id(), vec![lam, rhs]);
                 let nam_arr = self.next_local();
-                let binding = Binding { id: ast_binding.id, name: nam_arr.clone(), body };
+                let binding = Binding { id: ast_binding.id, binder: Binder::Local(nam_arr.clone()), body };
                 let mut bindings = vec![binding];
                 for (i, n) in names.into_iter().enumerate() {
-                    let rhs = Expression::App(self.new_id(), vec![Expression::Var(self.new_id(), Name::name("array_ref")), Expression::Var(self.new_id(), nam_arr.clone()), Expression::Literal(self.new_id(), ast::Literal::Integer(i as i64))]);
-                    let bind = Binding { id: self.new_id(), name: n, body: rhs };
+                    let rhs = Expression::App(self.new_id(), vec![Expression::Var(self.new_id(), Name::name("array_ref")), Expression::Var(self.new_id(), Name::name(&nam_arr)), Expression::Literal(self.new_id(), ast::Literal::Integer(i as i64))]);
+                    let bind = Binding { id: self.new_id(), binder: Binder::Public(n), body: rhs };
                     bindings.push(bind);
                 }
                 Ok(bindings)
@@ -199,9 +199,9 @@ impl DesugarState {
         Ok(FunClause { id: clause.id, args: clause.args, guard, rhs: Box::new(exp)})
     }
 
-    fn next_local(&mut self) -> Name {
+    fn next_local(&mut self) -> String {
         self.last_local += 1;
-        Name::name(&format!("local.l{}", self.last_local))
+        format!("local.l{}", self.last_local)
     }
 
     fn new_id(&mut self) -> u32 {
@@ -233,13 +233,30 @@ impl Display for Module {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Binding {
     pub id : Node,
-    pub name : Name,
+    pub binder : Binder,
     pub body : Expression
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum Binder {
+    Public(Name),
+    Local(String),
+    Unbound
 }
 
 impl Display for Binding {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "(define {} {})", self.name, self.body)
+        write!(f, "({} {})", self.binder, self.body)
+    }
+}
+
+impl Display for Binder {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Binder::Public(name) => write!(f, "define {} ", name),
+            Binder::Local(s) => write!(f, "local {} ", s),
+            Binder::Unbound => write!(f, "do "),
+        }
     }
 }
 
@@ -258,14 +275,14 @@ impl Display for Expression {
             Expression::App(_, exprs) => {
                 write!(f, "(")?;
                 for e in exprs {
-                    write!(f, "{} ", e);
+                    write!(f, "{} ", e)?;
                 }
                 write!(f, ")")?;
             },
             Expression::Lambda(_, clauses) => {
                 write!(f, "{{ ")?;
                 for c in clauses {
-                    write!(f, "{};", c);
+                    write!(f, "{};", c)?;
                 }
                 write!(f, " }}")?;
             },
@@ -312,7 +329,6 @@ pub enum Var {
     Named(Name),
     Local(u32)
 }
-
 
 
 #[derive(Debug)]
