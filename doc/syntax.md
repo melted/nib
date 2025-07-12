@@ -6,10 +6,10 @@ decl := `module` name | `use` name | binding
 binding := binding_lhs `=` expr
 binding_lhs := pattern | name pattern+ [`|` expr] | pattern binop pattern [`|` expr] | `do`
 pattern := literal | name | `_` | `[` [pattern `,`]* pattern `]` |
-          pattern `@` identifier | `(` name pattern+ `)` | name `...`
+          pattern `@` identifier | `(` name pattern+ `)` | `...` name
   
 expr := literal | identifier | expr (expr)+ | expr binop expr | `(` expr `)` | `[` (expr `,`)* expr `]` |
-        `{` ((clause ;nl)* clause | expr ) `}` | expr `where` (binding ;nl) binding | expr `=>` expr ;nl expr |
+        `{` ((clause ;nl)* clause | expr ) `}` | expr `where` (binding ;nl)* binding | expr `=>` expr ;nl expr |
         expr `.` expr 
 
 ;nl := `;` | <newline>
@@ -28,11 +28,10 @@ identifier = (alpha | `_`) (alphanum | `_`)* and not in reserved_words
 binop = opchar+ not in reserved | `\`` name `\`` 
 
 name = (identifier `.`)* identifier
-qbinop = (identifier `.`)* binop
 
-symbolchar = unicode symbol except '{} [] ().,;#'
-reserved_symbols = `=` `@` `->` `_` `=>` '|' 
-reserved_words = `module` | `use` | `where` | `_`
+opchar = unicode symbol except '{} [] ().,;\'\"'
+reserved_symbols = `=` `@` `->` `_` `=>` '|'
+reserved_words = `module` | `use` | `where` | `true` | `false` | `_`
 ```
 ---
 
