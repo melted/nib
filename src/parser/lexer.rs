@@ -42,17 +42,8 @@ impl<'a> super::ParserState<'a> {
                     if let Some((_, c)) = self.chars.peek() {
                         let c = *c;
                         if !self.check_prefix("//") && operator_char(c) {
-                            let op = self.read_operator()?;
-                            let nt = match op.value {
-                                TokenValue::Operator(name) => self.token(TokenValue::Identifier(format!("({name})"))),
-                                _ => return self.lex_error(&format!("Expected operator token, got {:?}", op))
-                            };
-                            if  let Some((_, ')')) = self.chars.peek() {
-                                self.next();
-                                Some(nt)
-                            } else {
-                                return self.lex_error("Unterminated parens operator");
-                            }
+                            let id = self.read_parenthesized_operator()?;
+                            Some(self.token(TokenValue::Identifier(id)))
                         } else if c == ')' {
                             self.next();
                             Some(self.token(TokenValue::Nil))
@@ -190,18 +181,8 @@ impl<'a> super::ParserState<'a> {
                             },
                             '(' => {
                                 self.next();
-                                let t = self.read_operator()?;
-                                let id = match t.value {
-                                    TokenValue::Operator(op) => format!("({})", op), 
-                                    _ => {
-                                        return self.lex_error("Expected operator in #() symbol");
-                                    }
-                                };
-                                if let Some((_, ')')) = self.next() {
-                                    Ok(self.token(TokenValue::Symbol(id)))
-                                } else {
-                                    self.lex_error("Expected right paren to close #() symbol")
-                                }
+                                let id = self.read_parenthesized_operator()?;
+                                Ok(self.token(TokenValue::Symbol(id)))
                             },
                             _ if identifier_initial_char(c) => {
                                 let t = self.read_identifier()?;
@@ -231,6 +212,21 @@ impl<'a> super::ParserState<'a> {
             }
         } else {
             self.lex_error("Expected a valid operator")
+        }
+    }
+
+    fn read_parenthesized_operator(&mut self) -> Result<String> {
+        let t = self.read_operator()?;
+        let id = match t.value {
+            TokenValue::Operator(op) => format!("({})", op), 
+            _ => {
+                return self.lex_error("Expected operator in parens");
+            }
+        };
+        if let Some((_, ')')) = self.next() {
+            Ok(id)
+        } else {
+            self.lex_error("Expected right paren to close operator expression")
         }
     }
 
