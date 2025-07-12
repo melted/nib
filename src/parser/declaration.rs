@@ -34,14 +34,23 @@ impl<'a> ParserState<'a> {
         }
     }
 
-    pub(super) fn merge_same_binding(&mut self, a: &mut Declaration, b:&mut Declaration) -> bool {
+    pub(super) fn merge_same_declaration(&mut self, a: &mut Declaration, b:&mut Declaration) -> bool {
+        match (a,b) {
+            (Declaration::Binding(ab), Declaration::Binding(bb)) => {
+                self.merge_same_binding(ab, bb)
+            },
+            _ => false
+        }
+    }
+
+    pub(super) fn merge_same_binding(&mut self, a: &mut Binding, b:&mut Binding) -> bool {
         match (a, b) {
-            (Declaration::Binding(Binding::FunBinding(abind)), Declaration::Binding(Binding::FunBinding(bbind))) if abind.name == bbind.name => {
+            (Binding::FunBinding(abind), Binding::FunBinding(bbind)) if abind.name == bbind.name => {
                 abind.clauses.append(&mut bbind.clauses);
                 self.merge_locations(abind.id, bbind.id);
                 true
             },
-            (Declaration::Binding(Binding::OpBinding(abind)), Declaration::Binding(Binding::OpBinding(bbind))) if abind.op == bbind.op => {
+            (Binding::OpBinding(abind), Binding::OpBinding(bbind)) if abind.op == bbind.op => {
                 abind.clauses.append(&mut bbind.clauses);
                 self.merge_locations(abind.id, bbind.id);
                 true
@@ -53,7 +62,7 @@ impl<'a> ParserState<'a> {
     pub(super) fn parse_add_declaration(&mut self, decls:&mut Vec<Declaration>) -> Result<()> {
         let mut decl = self.parse_declaration()?;
         if let Some(mut last) = decls.last_mut() {
-            if self.merge_same_binding(&mut last, &mut decl) {
+            if self.merge_same_declaration(&mut last, &mut decl) {
                 return Ok(());
             }
         }

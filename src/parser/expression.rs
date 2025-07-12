@@ -150,8 +150,14 @@ impl<'a> ParserState<'a> {
             if self.next_indent() <= indent {
                 break;
             }
-            let binding = self.parse_binding()?;
-            bindings.push(binding);
+            let mut binding = self.parse_binding()?;
+            if let Some(mut last) = bindings.last_mut() {
+                if !self.merge_same_binding(&mut last, &mut binding) {
+                    bindings.push(binding);
+                }
+            } else {
+                bindings.push(binding);
+            }
             if !self.semicolon_or_newline()? {
                 break;
             }
