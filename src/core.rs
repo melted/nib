@@ -1,5 +1,5 @@
 
-use std::{collections::HashSet};
+use std::{collections::HashSet, fmt::{write, Display}};
 
 use crate::{ast::{self, PatternNode}, common::{Metadata, Name, Node, Result}};
 
@@ -220,11 +220,27 @@ pub struct Module {
     pub bindings : Vec<Binding>
 }
 
+impl Display for Module {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "{:?}", self.metadata)?;
+        for b in &self.bindings {
+            writeln!(f, "{}", b)?;
+        }
+        Ok(())
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct Binding {
     pub id : Node,
     pub name : Name,
     pub body : Expression
+}
+
+impl Display for Binding {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "(define {} {})", self.name, self.body)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -236,6 +252,41 @@ pub enum Expression {
     Where(Node, Box<Expression>, Vec<Binding>)
 }
 
+impl Display for Expression {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Expression::App(_, exprs) => {
+                write!(f, "(")?;
+                for e in exprs {
+                    write!(f, "{} ", e);
+                }
+                write!(f, ")")?;
+            },
+            Expression::Lambda(_, clauses) => {
+                write!(f, "{{ ")?;
+                for c in clauses {
+                    write!(f, "{};", c);
+                }
+                write!(f, " }}")?;
+            },
+            Expression::Literal(_, lit) => {
+                write!(f, "{}", lit)?;
+            },
+            Expression::Var(_, v) => {
+                write!(f, "{}", v)?;
+            },
+            Expression::Where(_, lhs, binds) => {
+                write!(f, "({} where ", lhs)?;
+                for b in binds {
+                    write!(f, "{}", b)?;
+                }
+                write!(f, ")")?;
+            }
+        }
+        Ok(())
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct FunClause {
     pub id : Node,
@@ -244,11 +295,25 @@ pub struct FunClause {
     pub rhs : Box<Expression>
 }
 
+impl Display for FunClause {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for a in &self.args {
+            write!(f, "{} ", a)?;
+        }
+        if let Some(guard) = &self.guard {
+            write!(f, "| {} ", guard)?;
+        }
+        write!(f, "-> {}", self.rhs)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum Var {
     Named(Name),
     Local(u32)
 }
+
+
 
 #[derive(Debug)]
 pub(super) struct UsedVars {

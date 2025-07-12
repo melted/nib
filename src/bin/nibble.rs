@@ -13,6 +13,6 @@ fn main() -> io::Result<()> {
     parser::dump_prog(&buffer)?;
     let modul = parser::parse_declarations(None, &buffer)?;
     let desugared = core::desugar(modul)?;
-    println!("{:?}", desugared);
+    println!("{}", desugared);
     Ok(())
 }
