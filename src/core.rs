@@ -329,7 +329,9 @@ impl UsedVars {
 impl ast::AstVisitor for UsedVars {
     fn on_pattern(&mut self, pat : &ast::PatternNode) -> bool {
         match &pat.pattern {
-            ast::Pattern::Var(name) => {
+            ast::Pattern::Var(name) |
+            ast::Pattern::Alias(_, name) |
+            ast::Pattern::Ellipsis(Some(name))=> {
                 self.vars.insert(name.to_owned());
             },
             _ => {}

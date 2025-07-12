@@ -34,3 +34,5 @@ g [a, ...] = a
 g _ = 0
 
 [a, b] = divmod 7 3
+
+[a,b]@c = foo "hello"
