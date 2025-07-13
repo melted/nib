@@ -64,7 +64,9 @@ pub enum Error {
     #[error("Syntax error: {} at {}", msg, loc)]
     Syntax { msg: String, loc: Location }, 
     #[error("Error: {}", err)]
-    General { err: anyhow::Error }
+    General { err: anyhow::Error },
+    #[error("Runtime error: {}", msg)]
+    Runtime { msg: String }
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
