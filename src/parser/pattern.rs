@@ -19,15 +19,9 @@ impl<'a> ParserState<'a> {
                 let name = self.parse_qualified_name()?;
                 self.var_pattern(name)
             },
-            TokenValue::Ellipsis => {
-                self.expect(TokenValue::Ellipsis)?;
-                let id = if let TokenValue::Identifier(name) = self.peek_next_token()?.value {
-                    self.get_next_token()?;
-                    Some(Name::Plain(name))
-                } else {
-                    None
-                };
-                self.ellipsis_pattern(id)
+            TokenValue::Ellipsis(name) => {
+                self.get_next_token()?;
+                self.ellipsis_pattern(name.map(|n| Name::name(&n)))
             },
             TokenValue::LeftBracket => self.parse_array_pattern()?,
             TokenValue::LeftParen => self.parse_custom_pattern()?,

@@ -22,3 +22,9 @@ cond_chain x = x < 5 => "S"
                x < 10 => "M"
                x < 15 => "L"
                "XL"
+
+// sequence expressions
+begin ... last = last
+
+// usage: begin (print "hello, ") (print "world")
+

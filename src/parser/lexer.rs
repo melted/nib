@@ -76,7 +76,19 @@ impl<'a> super::ParserState<'a> {
                 '.' => {
                     if self.check_prefix("...") {
                         self.advance(3);
-                        Some(self.token(TokenValue::Ellipsis))
+                        match self.chars.peek() {
+                            Some((_, c)) if identifier_initial_char(*c) => {
+                                let id = self.read_identifier()?;
+                                match id.value {
+                                    TokenValue::Identifier(name) => {
+                                        Some(self.token(TokenValue::Ellipsis(Some(name))))
+                                    }
+                                    _ => return self.lex_error(&format!("Expected valid identifier in ellipsis pattern, got {:?}", id))
+                                }
+                            },
+                            _ => Some(self.token(TokenValue::Ellipsis(None))),
+                        }
+                        
                     } else {
                         Some(self.simple_token(TokenValue::Period))
                     }
@@ -478,7 +490,7 @@ pub enum TokenValue {
     False,
     // Symbols
     Underscore,
-    Ellipsis,
+    Ellipsis(Option<String>),
     Equals,
     Hash,
     Backslash,
