@@ -53,9 +53,11 @@ impl<'a> ParserState<'a> {
     pub(super) fn parse_array_pattern(&mut self) -> Result<PatternNode> {
         self.get_next_token()?;
         let mut pats = Vec::new();
-        pats.push(self.parse_pattern()?);
-        while self.is_next(TokenValue::Comma)? {
+        if !self.peek_next(TokenValue::RightBracket)? {
             pats.push(self.parse_pattern()?);
+            while self.is_next(TokenValue::Comma)? {
+                pats.push(self.parse_pattern()?);
+            }
         }
         self.expect(TokenValue::RightBracket)?;
         Ok(self.array_pattern(pats))

@@ -244,9 +244,11 @@ impl<'a> ParserState<'a> {
     pub(super) fn parse_array_expression(&mut self) -> Result<ExpressionNode> {
         self.expect(TokenValue::LeftBracket)?;
         let mut exprs = Vec::new();
-        exprs.push(self.parse_expression()?);
-        while self.is_next(TokenValue::Comma)? {
+        if !self.peek_next(TokenValue::RightBracket)? {
             exprs.push(self.parse_expression()?);
+            while self.is_next(TokenValue::Comma)? {
+                exprs.push(self.parse_expression()?);
+            }
         }
         self.expect(TokenValue::RightBracket)?;
         Ok(self.array_expression(exprs))

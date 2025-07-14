@@ -28,3 +28,13 @@ begin ... last = last
 
 // usage: begin (print "hello, ") (print "world")
 
+// Sequencing as a binop
+
+a & b = b
+
+// print "hello" & print "world"
+
+// empty arrays
+a = []
+
+[] = make_empty ()
