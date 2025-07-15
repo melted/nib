@@ -121,6 +121,10 @@ impl DesugarState {
         }
     }
 
+    fn desugar_pattern(&mut self, pattern : ast::PatternNode) -> Result<Pattern> {
+        todo!()
+    }
+
     fn desugar_expression(&mut self, expression : ast::ExpressionNode) -> Result<Expression> {
         match expression.expr {
             ast::Expression::App(x) => {
@@ -327,9 +331,18 @@ impl Display for FunClause {
 #[derive(Debug, Clone, PartialEq)]
 pub enum Var {
     Named(Name),
-    Local(u32)
+    Local(usize),
+    Arg(usize)
 }
 
+pub enum Pattern {
+    Wildcard,
+    Ellipsis(Option<Var>),
+    Var(Var),
+    Array(Vec<Pattern>),
+    Custom(Var, Vec<Pattern>),
+    Alias(Box<Pattern>, Var)
+}
 
 #[derive(Debug)]
 pub(super) struct UsedVars {

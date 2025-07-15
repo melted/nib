@@ -9,12 +9,12 @@ mod prims;
 
 pub struct Runtime {
     metadata: HashMap<String, Metadata>,
-    globals: Environment
+    globals: Rc<Table>
 }
 
 impl Runtime {
     pub fn new() -> Self {
-        Runtime { metadata: HashMap::new(), globals: Environment::new() }
+        Runtime { metadata: HashMap::new(), globals: Rc::new(Table::new()) }
     }
 
     pub fn error<T>(&self, msg : &str) -> Result<T> {
@@ -28,18 +28,6 @@ impl Runtime {
         &RUNTIME
     }
     */
-}
-
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct Environment {
-    pub vars : HashMap<String, Value>
-}
-
-impl Environment {
-    fn new() -> Environment {
-        Environment { vars: HashMap::new() }
-    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -115,5 +103,5 @@ impl Bytes {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Closure {
     pub code : core::Expression,
-    pub vars : Environment
+    pub vars : Vec<Value>
 }
