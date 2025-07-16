@@ -13,6 +13,8 @@ x && y = x => y (); false
 // convenience
 on x f = f x
 id x = x
+a & b = b // sequencing
+const a b = a
 
 // Stuff that need prims
 // =====================

@@ -1,6 +1,6 @@
 use std::{cell::LazyCell, collections::{HashMap, HashSet}, rc::Rc, sync::{Arc, LazyLock}};
 
-use crate::{common::{Error, Metadata, Result}, core};
+use crate::{common::{Error, Metadata, Result}, core, runtime::prims::{Arity, Primitive}};
 
 pub mod heap;
 pub mod table;
@@ -33,7 +33,7 @@ impl Runtime {
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
     Nil,
-    Primitive,
+    Primitive(Primitive, Arity),
     Bool(bool),
     Integer(i64),
     Real(f64),

@@ -1,26 +1,67 @@
 use std::collections::HashMap;
+use std::ops::Deref;
 
 use crate::common::Result;
 use crate::runtime::{Runtime, Value};
 
 
 impl Runtime {
-    pub(super) fn call_primitive(&mut self, prim : &str, args: &Vec<Value>) -> Result<Value> {
+    pub(super) fn call_primitive0(&mut self, prim : Primitive) -> Result<Value> {
         match prim {
-            "print" => printer(args),
+            _ => self.error("Boom!")
+        }
+    }
+
+    pub(super) fn call_primitive1(&mut self, prim : Primitive, arg: &Value) -> Result<Value> {
+        match prim {
+            Primitive::Print => printer(arg),
+            _ => self.error("Boom!")
+        }
+    }
+
+    pub(super) fn call_primitive2(&mut self, prim : Primitive, arg: &Value, arg2: &Value) -> Result<Value> {
+        match prim {
+            _ => self.error("Boom!")
+        }
+    }
+
+    pub(super) fn call_primitive3(&mut self, prim : Primitive, arg: &Value, arg2: &Value, arg3: &Value) -> Result<Value> {
+        match prim {
+            _ => self.error("Boom!")
+        }
+    }
+
+    pub(super) fn call_primitive_vararg(&mut self, prim : Primitive, args: &[Value]) -> Result<Value> {
+        match prim {
             _ => self.error("Boom!")
         }
     }
 
     pub(super) fn register_primitives(&mut self) {
-        self.globals.vars.insert("print".to_owned(), Value::Primitive);
+
+        let globs = &mut self.globals.deref().table;
+        globs.insert("print".to_owned(), Value::Primitive(Primitive::Print, Arity::OneArg));
     }
 
 }
 
-fn printer(args: &Vec<Value>) -> Result<Value> {
-    for a in args {
-        print!("{:?}", a);
-    }
+#[derive(Debug, Clone, PartialEq)]
+pub(super) enum Arity {
+    NoArg,
+    OneArg,
+    TwoArg,
+    ThreeArg,
+    VarArg
+}
+
+
+#[derive(Debug, Clone, PartialEq)]
+pub(super) enum Primitive {
+    Print
+
+}
+
+fn printer(arg: &Value) -> Result<Value> {
+    print!("{:?}", arg);
     Ok(Value::Nil)
 }
