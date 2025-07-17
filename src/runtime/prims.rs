@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::ops::Deref;
 
 use crate::common::Result;
-use crate::runtime::{Runtime, Value};
+use crate::runtime::{Runtime, Table, Value};
 
 
 impl Runtime {
@@ -114,6 +114,31 @@ impl Runtime {
     }
 
     fn project(&self, args:&[Value]) -> Result<Value> {
-        todo!()
+        if args.len() < 2 {
+            return self.error("project requires two args");
+        }
+        let mut tab = args[0].clone();
+        let mut slice = &args[1..];
+        loop {
+            match (tab, &slice[0]) {
+                (Value::Table(from), Value::Symbol(sym)) => {
+                    let table_ref = from.borrow();
+                    let table = &table_ref.table;
+                    if table.contains_key(&sym) {
+                        if slice.len() > 1 { 
+                            tab = table[&sym].clone();
+                            slice = &slice[1..];
+                        } else {
+                            return Ok(table[&sym].clone());
+                        }
+                    } else {
+                        return Ok(Value::Nil);
+                    }
+                },
+                _ => {
+                    return self.error("invalid values in projection, must be tables and symbols")
+                }
+            }
+        }
     }
 }
