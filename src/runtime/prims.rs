@@ -38,8 +38,7 @@ impl Runtime {
     }
 
     pub(super) fn register_primitives(&mut self) {
-
-        let globs = &mut self.globals.deref().table;
+        let globs = &mut self.globals.borrow_mut().table;
         globs.insert("print".to_owned(), Value::Primitive(Primitive::Print, Arity::OneArg));
     }
 

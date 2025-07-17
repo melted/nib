@@ -1,4 +1,4 @@
-use std::{cell::LazyCell, collections::{HashMap, HashSet}, rc::Rc, sync::{Arc, LazyLock}};
+use std::{cell::{LazyCell, RefCell}, collections::{HashMap, HashSet}, ops::Deref, rc::Rc, sync::{Arc, LazyLock}};
 
 use crate::{common::{Error, Metadata, Result}, core, runtime::prims::{Arity, Primitive}};
 
@@ -9,12 +9,12 @@ mod prims;
 
 pub struct Runtime {
     metadata: HashMap<String, Metadata>,
-    globals: Rc<Table>
+    globals: Rc<RefCell<Table>>
 }
 
 impl Runtime {
     pub fn new() -> Self {
-        Runtime { metadata: HashMap::new(), globals: Rc::new(Table::new()) }
+        Runtime { metadata: HashMap::new(), globals: new_ref(Table::new()) }
     }
 
     pub fn error<T>(&self, msg : &str) -> Result<T> {
@@ -30,6 +30,10 @@ impl Runtime {
     */
 }
 
+fn new_ref<T>(val : T) -> Rc<RefCell<T>> {
+    Rc::new(RefCell::new(val))
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
     Nil,
@@ -39,11 +43,11 @@ pub enum Value {
     Real(f64),
     Char(char),
     Pointer(u64),
-    Symbol(Rc<Symbol>),
-    Bytes(Rc<Bytes>),
-    Array(Rc<Array>),
-    Table(Rc<Table>),
-    Closure(Rc<Closure>)
+    Symbol(Rc<RefCell<RefCell<Symbol>>>),
+    Bytes(Rc<RefCell<Bytes>>),
+    Array(Rc<RefCell<Array>>),
+    Table(Rc<RefCell<Table>>),
+    Closure(Rc<RefCell<Closure>>)
 }
 
 impl Value {
@@ -53,7 +57,7 @@ impl Value {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Symbol {
-    type_table : Option<Rc<Table>>,
+    type_table : Option<Rc<RefCell<Table>>>,
     symbol : String
 }
 
@@ -65,7 +69,7 @@ impl Symbol {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Table {
-    type_table : Option<Rc<Table>>,
+    type_table : Option<Rc<RefCell<Table>>>,
     table : HashMap<String, Value>
 }
 
@@ -77,7 +81,7 @@ impl Table {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Array {
-    type_table : Option<Rc<Table>>,
+    type_table : Option<Rc<RefCell<Table>>>,
     array : Vec<Value>
 }
 
@@ -90,7 +94,7 @@ impl Array {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Bytes {
-    type_table : Option<Rc<Table>>,
+    type_table : Option<Rc<RefCell<Table>>>,
     bytes : Vec<u8>
 }
 
