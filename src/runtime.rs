@@ -21,6 +21,10 @@ impl Runtime {
         Err(Error::Runtime { msg: msg.to_owned() })
     }
 
+    pub fn add_global(&mut self, name:&str, value:Value) {
+        self.globals.borrow_mut().table.insert(name.to_owned(), value);
+    }
+
 /*     pub fn get_runtime() -> &'static Self {
         static RUNTIME : LazyLock<Runtime> = LazyLock::new(|| {
             Runtime::new()
