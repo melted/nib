@@ -1,4 +1,4 @@
-use std::{cell::{LazyCell, RefCell}, collections::{HashMap, HashSet}, hash::Hash, ops::Deref, rc::Rc, sync::{Arc, LazyLock}};
+use std::{cell::{LazyCell, RefCell}, collections::{HashMap, HashSet}, hash::Hash, ops::Deref, mem, rc::Rc, sync::{Arc, LazyLock}};
 
 use crate::{common::{Error, Metadata, Result}, core, runtime::prims::{Arity, Primitive}};
 
@@ -49,7 +49,7 @@ fn new_ref<T>(val : T) -> Rc<RefCell<T>> {
     Rc::new(RefCell::new(val))
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub enum Value {
     Nil,
     Primitive(Primitive, Arity),
@@ -64,6 +64,26 @@ pub enum Value {
     Table(Rc<RefCell<Table>>),
     Closure(Rc<RefCell<Closure>>)
 }
+
+impl PartialEq for Value {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Primitive(l0, l1), Self::Primitive(r0, r1)) => l0 == r0 && l1 == r1,
+            (Self::Bool(l0), Self::Bool(r0)) => l0 == r0,
+            (Self::Integer(l0), Self::Integer(r0)) => l0 == r0,
+            (Self::Real(l0), Self::Real(r0)) => l0 == r0,
+            (Self::Char(l0), Self::Char(r0)) => l0 == r0,
+            (Self::Pointer(l0), Self::Pointer(r0)) => l0 == r0,
+            (Self::Symbol(l0), Self::Symbol(r0)) => l0 == r0,
+            (Self::Bytes(l0), Self::Bytes(r0)) => l0.as_ptr() == r0.as_ptr(),
+            (Self::Array(l0), Self::Array(r0)) => l0.as_ptr() == r0.as_ptr(),
+            (Self::Table(l0), Self::Table(r0)) => l0.as_ptr() == r0.as_ptr(),
+            (Self::Closure(l0), Self::Closure(r0)) => l0 == r0,
+            _ => std::mem::discriminant(self) == std::mem::discriminant(other),
+        }
+    }
+}
+
 
 impl Value {
 
@@ -143,6 +163,6 @@ impl Bytes {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Closure {
-    pub code : core::Expression,
+    pub code : Rc<core::Expression>,
     pub vars : Vec<Value>
 }
