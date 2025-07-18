@@ -155,6 +155,7 @@ impl Bytes {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Closure {
+    type_table : Option<Rc<RefCell<Table>>>,
     pub code : Rc<core::Expression>,
     pub vars : Vec<Value>
 }
