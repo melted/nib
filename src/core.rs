@@ -335,12 +335,13 @@ pub enum Var {
     Arg(usize)
 }
 
+#[derive(Debug, Clone, PartialEq)]
 pub enum Pattern {
     Wildcard,
+    Literal(ast::Literal), // Create a binding to it instead?
     Ellipsis(Option<Var>),
-    Var(Var),
-    Array(Vec<Pattern>),
-    Custom(Var, Vec<Pattern>),
+    Bind(Var),
+    Custom(Var, Vec<Pattern>), // Subsumes array and typed patterns
     Alias(Box<Pattern>, Var)
 }
 
