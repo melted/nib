@@ -29,25 +29,24 @@ impl<'a> ParserState<'a> {
                 return self.error(&format!("Invalid token {tok:?} at start of pattern"));
             }
         };
-
-        if self.is_next(TokenValue::As)? {
-            let tok = self.get_next_token()?;
-            match tok.value {
-                TokenValue::Identifier(name) => {
-                    let pat = self.alias_pattern(lhs, Name::name(&name));
-                    let pos = self.position();
-                    self.metadata.locations.insert(pat.id, Location::at(start, pos));
-                    Ok(pat)
-                },
-                _ => {
-                    self.error(&format!("Expected identifier in alias pattern, got {tok:?}"))
-                }
+        let pat = match self.peek_next_token()?.value {
+            TokenValue::As => {
+                self.get_next_token()?;
+                let TokenValue::Identifier(name) = self.get_next_token()?.value else {
+                    return self.error(&format!("Expected identifier in alias pattern"));
+                };
+                self.alias_pattern(lhs, Name::name(&name))
+            },
+            TokenValue::Colon => {
+                self.get_next_token()?;
+                let name = self.parse_qualified_name()?;
+                self.typed_pattern(lhs, name)
             }
-        } else {
-            let pos = self.position();
-            self.metadata.locations.insert(lhs.id, Location::at(start, pos));
-            Ok(lhs)
-        }
+            _ => lhs
+        };
+        let pos = self.position();
+        self.metadata.locations.insert(pat.id, Location::at(start, pos));
+        Ok(pat)
     }
 
     pub(super) fn parse_array_pattern(&mut self) -> Result<PatternNode> {
@@ -84,6 +83,11 @@ impl<'a> ParserState<'a> {
     pub(super) fn alias_pattern(&mut self, pattern:PatternNode, alias:Name) -> PatternNode {
         self.counter += 1;
         PatternNode { id: self.counter, pattern: Pattern::Alias(Box::new(pattern), alias) }
+    }
+
+    pub(super) fn typed_pattern(&mut self, pattern:PatternNode, type_name:Name) -> PatternNode {
+        self.counter += 1;
+        PatternNode { id: self.counter, pattern: Pattern::Typed(Box::new(pattern), type_name) }
     }
 
     pub(super) fn array_pattern(&mut self, patterns:Vec<PatternNode>) -> PatternNode {

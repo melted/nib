@@ -71,6 +71,7 @@ impl<'a> super::ParserState<'a> {
                         return self.lex_error("Unterminated '`' operator");
                     }
                 },
+                ':' => Some(self.simple_token(TokenValue::Colon)),
                 ',' => Some(self.simple_token(TokenValue::Comma)),
                 ';' => Some(self.simple_token(TokenValue::Semicolon)),
                 '.' => {
@@ -467,6 +468,7 @@ pub enum TokenValue {
     String(String),
     Symbol(String),
     // punctuation
+    Colon,
     Comma,
     Period,
     Semicolon,

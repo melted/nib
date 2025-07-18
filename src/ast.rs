@@ -217,7 +217,8 @@ pub enum Pattern {
     Var(Name),
     Array(Vec<PatternNode>),
     Alias(Box<PatternNode>, Name),
-    Custom(Name, Vec<PatternNode>)
+    Custom(Name, Vec<PatternNode>),
+    Typed(Box<PatternNode>, Name)
 }
 
 impl PatternNode {
@@ -239,6 +240,9 @@ impl PatternNode {
                     p.visit(visitor);
                 }
             },
+            Pattern::Typed(pat, _) => {
+                pat.visit(visitor);
+            },
             _ => {}
         }
         visitor.on_post_pattern(self);
@@ -256,6 +260,7 @@ impl Display for Pattern {
         match self {
             Pattern::Wildcard => write!(f, "_"),
             Pattern::Alias(pat, alias ) => write!(f, "{}@{} ", pat, alias),
+            Pattern::Typed(pat, typ ) => write!(f, "{}:{} ", pat, typ),
             Pattern::Array(pats) => {
                 write!(f, "[")?;
                 for (i, p) in pats.iter().enumerate() {

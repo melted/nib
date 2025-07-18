@@ -1,4 +1,4 @@
-use std::{cell::{LazyCell, RefCell}, collections::{HashMap, HashSet}, hash::Hash, ops::Deref, mem, rc::Rc, sync::{Arc, LazyLock}};
+use std::{cell::RefCell, collections::HashMap, hash::Hash, rc::Rc};
 
 use crate::{common::{Error, Metadata, Result}, core, runtime::prims::{Arity, Primitive}};
 
@@ -35,14 +35,6 @@ impl Runtime {
     pub fn get_or_add_named_symbol(&mut self, name : &str) -> Symbol {
         self.named_symbols.entry(name.to_owned()).or_insert_with(|| Symbol::named(name)).clone()
     }
-
-/*     pub fn get_runtime() -> &'static Self {
-        static RUNTIME : LazyLock<Runtime> = LazyLock::new(|| {
-            Runtime::new()
-        });
-        &RUNTIME
-    }
-    */
 }
 
 fn new_ref<T>(val : T) -> Rc<RefCell<T>> {
