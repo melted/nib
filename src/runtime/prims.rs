@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::ops::Deref;
 
 use crate::common::Result;
-use crate::runtime::{Runtime, Table, Value};
+use crate::runtime::{new_ref, Runtime, Table, Value};
 
 
 impl Runtime {
@@ -79,7 +79,17 @@ impl Runtime {
     }
 
     pub(super) fn register_type_tables(&mut self) {
-
+        self.add_global("nil", Value::Table(new_ref(Table::new())));
+        self.add_global("bool", Value::Table(new_ref(Table::new())));
+        self.add_global("int", Value::Table(new_ref(Table::new())));
+        self.add_global("float", Value::Table(new_ref(Table::new())));
+        self.add_global("char", Value::Table(new_ref(Table::new())));
+        self.add_global("pointer", Value::Table(new_ref(Table::new())));
+        self.add_global("symbol", Value::Table(new_ref(Table::new())));
+        self.add_global("bytes", Value::Table(new_ref(Table::new())));
+        self.add_global("array", Value::Table(new_ref(Table::new())));
+        self.add_global("table", Value::Table(new_ref(Table::new())));
+        self.add_global("function", Value::Table(new_ref(Table::new())));
     }
 
 }
