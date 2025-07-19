@@ -376,7 +376,8 @@ impl Display for FunClause {
 pub enum Var {
     Named(Name),
     Local(String),
-    Arg(usize)
+    Arg(usize),
+    Closure(usize)
 }
 
 impl Display for Var {
@@ -384,7 +385,8 @@ impl Display for Var {
         match self {
             Var::Named(n) => write!(f, "{}", n),
             Var::Local(s) => write!(f, "local.{}", s),
-            Var::Arg(i) => write!(f, "${}", i)
+            Var::Arg(i) => write!(f, "${}", i),
+            Var::Closure(i) => write!(f, "¤{}", i)
         }
     }
 }

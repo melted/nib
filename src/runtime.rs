@@ -5,7 +5,7 @@ use crate::{common::{Error, Metadata, Result}, core, runtime::prims::{Arity, Pri
 pub mod heap;
 pub mod table;
 mod prims;
-
+mod evaluate;
 
 pub struct Runtime {
     metadata: HashMap<String, Metadata>,
