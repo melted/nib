@@ -64,7 +64,11 @@ impl DesugarState {
         for clause in ast_binding.clauses {
             let exp = self.desugar_expression(clause.body)?;
             let guard = clause.guard.map(|g| self.desugar_expression(g)).transpose()?;
-            core_clauses.push(FunClause { id: clause.id, args: clause.args, guard, rhs: Box::new(exp )});
+            let mut args = Vec::new();
+            for a in clause.args {
+                args.push(self.desugar_pattern(a)?);
+            }
+            core_clauses.push(FunClause { id: clause.id, args, guard, rhs: Box::new(exp )});
         }
         self.metadata.last_id += 1;
         Ok(vec![Binding{ id: ast_binding.id, binder: Binder::Public(name), body: Expression::Lambda(self.metadata.last_id, core_clauses)}])
@@ -77,7 +81,9 @@ impl DesugarState {
         for clause in ast_binding.clauses {
             let exp = self.desugar_expression(clause.body)?;
             let guard = clause.guard.map(|g| self.desugar_expression(g)).transpose()?;
-            core_clauses.push(FunClause { id: clause.id, args: vec![clause.lpat, clause.rpat], guard, rhs: Box::new(exp )});
+            let lpat = self.desugar_pattern(clause.lpat)?;
+            let rpat = self.desugar_pattern(clause.rpat)?;
+            core_clauses.push(FunClause { id: clause.id, args: vec![lpat, rpat], guard, rhs: Box::new(exp )});
         }
         self.metadata.last_id += 1;
         Ok(vec![Binding{ id: ast_binding.id, binder: Binder::Public(name), body: Expression::Lambda(self.metadata.last_id, core_clauses)}])
@@ -105,7 +111,8 @@ impl DesugarState {
                 let mut arr_mk = vec![Expression::Var(self.new_id(), Name::name("array_mk"))];
                 arr_mk.append(&mut v);
                 let lam_rhs = Expression::App(self.new_id(), arr_mk);
-                let lam = Expression::Lambda(self.new_id(), vec![FunClause { id: self.new_id(), args: vec![pat], guard: None, rhs: Box::new(lam_rhs)}]);
+                let npat = self.desugar_pattern(pat)?;
+                let lam = Expression::Lambda(self.new_id(), vec![FunClause { id: self.new_id(), args: vec![npat], guard: None, rhs: Box::new(lam_rhs)}]);
                 let body = Expression::App(self.new_id(), vec![lam, rhs]);
                 let nam_arr = self.next_local();
                 let binding = Binding { id: ast_binding.id, binder: Binder::Local(nam_arr.clone()), body };
@@ -122,7 +129,36 @@ impl DesugarState {
     }
 
     fn desugar_pattern(&mut self, pattern : ast::PatternNode) -> Result<Pattern> {
-        todo!()
+        match pattern.pattern {
+            ast::Pattern::Alias(pat, alias) => {
+                let inner = self.desugar_pattern(*pat)?;
+                Ok(Pattern::Alias(Box::new(inner), Var::Named(alias)))
+            },
+            ast::Pattern::Custom(name, fields) => {
+                let mut args = Vec::new();
+                for f in fields {
+                    args.push(self.desugar_pattern(f)?);
+                }
+                Ok(Pattern::Custom(Var::Named(name), args))
+            },
+            ast::Pattern::Array(fields) => {
+                let mut args = Vec::new();
+                for f in fields {
+                    args.push(self.desugar_pattern(f)?);
+                }
+                Ok(Pattern::Custom(Var::Named(Name::name("array")), args))
+            },
+            ast::Pattern::Ellipsis(name) => {
+                Ok(Pattern::Ellipsis(name.map(|n| Var::Named(n))))
+            },
+            ast::Pattern::Literal(lit) => Ok(Pattern::Literal(lit)),
+            ast::Pattern::Typed(pat, typ) => {
+                let inner = self.desugar_pattern(*pat)?;
+                Ok(Pattern::Custom(Var::Named(typ), vec![inner]))
+            },
+            ast::Pattern::Var(name) => Ok(Pattern::Bind(Var::Named(name))),
+            ast::Pattern::Wildcard => Ok(Pattern::Wildcard)
+         }
     }
 
     fn desugar_expression(&mut self, expression : ast::ExpressionNode) -> Result<Expression> {
@@ -161,7 +197,7 @@ impl DesugarState {
                             next = c;
                     } else {
                         let exp = self.desugar_expression(*next.on_false)?;
-                        let last = FunClause { id: self.new_id(), args: vec![self.pattern_wildcard()], guard: None, rhs: Box::new(exp) };
+                        let last = FunClause { id: self.new_id(), args: vec![Pattern::Wildcard], guard: None, rhs: Box::new(exp) };
                         clauses.push(last);
                         break;
                     }
@@ -199,8 +235,12 @@ impl DesugarState {
 
     fn desugar_funclause(&mut self, clause: ast::FunClause) -> Result<FunClause> {
         let exp = self.desugar_expression(clause.body)?;
+        let mut args = Vec::new();
+        for a in clause.args {
+            args.push(self.desugar_pattern(a)?);
+        }
         let guard = clause.guard.map(|g| self.desugar_expression(g)).transpose()?;
-        Ok(FunClause { id: clause.id, args: clause.args, guard, rhs: Box::new(exp)})
+        Ok(FunClause { id: clause.id, args, guard, rhs: Box::new(exp)})
     }
 
     fn next_local(&mut self) -> String {
@@ -211,10 +251,6 @@ impl DesugarState {
     fn new_id(&mut self) -> u32 {
         self.metadata.last_id += 1;
         self.metadata.last_id
-    }
-
-    fn pattern_wildcard(&mut self) -> ast::PatternNode {
-        PatternNode { id: self.new_id(), pattern: ast::Pattern::Wildcard }
     }
 }
 
@@ -311,7 +347,7 @@ impl Display for Expression {
 #[derive(Debug, Clone, PartialEq)]
 pub struct FunClause {
     pub id : Node,
-    pub args : Vec<ast::PatternNode>,
+    pub args : Vec<Pattern>,
     pub guard : Option<Expression>,
     pub rhs : Box<Expression>
 }
@@ -331,18 +367,53 @@ impl Display for FunClause {
 #[derive(Debug, Clone, PartialEq)]
 pub enum Var {
     Named(Name),
-    Local(usize),
+    Local(String),
     Arg(usize)
+}
+
+impl Display for Var {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Var::Named(n) => write!(f, "{}", n),
+            Var::Local(s) => write!(f, "local.{}", s),
+            Var::Arg(i) => write!(f, "${}", i)
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Pattern {
     Wildcard,
-    Literal(ast::Literal), // Create a binding to it instead?
+    Literal(ast::Literal), // TODO: Create a binding to it instead?
     Ellipsis(Option<Var>),
     Bind(Var),
     Custom(Var, Vec<Pattern>), // Subsumes array and typed patterns
     Alias(Box<Pattern>, Var)
+}
+
+impl Display for Pattern {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Pattern::Alias(pat, alias) => write!(f, "{}@{}", pat, alias),
+            Pattern::Bind(name) => write!(f, "{}", name),
+            Pattern::Custom(name, fields) => {
+                write!(f, "({}", name)?;
+                for field in fields {
+                    write!(f, " {}", field)?;
+                }
+                write!(f, ")")
+            },
+            Pattern::Ellipsis(name) => {
+                write!(f, "...")?;
+                if let Some(n) = name {
+                    write!(f, "{}", n)?;
+                }
+                Ok(())
+            },
+            Pattern::Literal(lit) => write!(f, "{}", lit),
+            Pattern::Wildcard => write!(f, "_")
+        }
+    }
 }
 
 #[derive(Debug)]
