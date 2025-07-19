@@ -14,7 +14,7 @@ impl Runtime {
 
     pub(super) fn call_primitive1(&mut self, prim : Primitive, arg: &Value) -> Result<Value> {
         match prim {
-            Primitive::Print => Self::printer(arg),
+            Primitive::Print => self.printer(arg),
             Primitive::Type => self.type_query(arg),
             _ => self.error("Boom!")
         }
@@ -22,34 +22,34 @@ impl Runtime {
 
     pub(super) fn call_primitive2(&mut self, prim : Primitive, arg: &Value, arg2: &Value) -> Result<Value> {
         match prim {
-            Primitive::AddInt => {
-                if let (Value::Integer(a), Value::Integer(b)) = (arg, arg2) {
-                    Ok(Value::Integer(a + b))
-                } else {
-                    self.error("_add_int requires two integers")
+            Primitive::Add => {
+                match (arg, arg2) {
+                    (Value::Integer(a), Value::Integer(b)) => Ok(Value::Integer(a+b)),
+                    (Value::Real(a), Value::Real(b)) => Ok(Value::Real(a+b)),
+                    _ => self.error(&format!("Can't add {:?} and {:?}", arg, arg2))
                 }
             },
-            Primitive::MulInt => {
-                if let (Value::Integer(a), Value::Integer(b)) = (arg, arg2) {
-                    Ok(Value::Integer(a * b))
-                } else {
-                    self.error("_mul_int requires two integers")
+            Primitive::Sub => {
+                match (arg, arg2) {
+                    (Value::Integer(a), Value::Integer(b)) => Ok(Value::Integer(a-b)),
+                    (Value::Real(a), Value::Real(b)) => Ok(Value::Real(a-b)),
+                    _ => self.error(&format!("Can't subtract {:?} from {:?}", arg2, arg))
                 }
             },
-            Primitive::SubInt => {
-                if let (Value::Integer(a), Value::Integer(b)) = (arg, arg2) {
-                    Ok(Value::Integer(a - b))
-                } else {
-                    self.error("_sub_int requires two integers")
+            Primitive::Mul => {
+                match (arg, arg2) {
+                    (Value::Integer(a), Value::Integer(b)) => Ok(Value::Integer(a*b)),
+                    (Value::Real(a), Value::Real(b)) => Ok(Value::Real(a*b)),
+                    _ => self.error(&format!("Can't multiply {:?} and {:?}", arg, arg2))
                 }
             },
-            Primitive::DivInt => {
-                if let (Value::Integer(a), Value::Integer(b)) = (arg, arg2) {
-                    Ok(Value::Integer(a / b))
-                } else {
-                    self.error("_div_int requires two integers")
+            Primitive::Div => {
+                match (arg, arg2) {
+                    (Value::Integer(a), Value::Integer(b)) => Ok(Value::Integer(a/b)),
+                    (Value::Real(a), Value::Real(b)) => Ok(Value::Real(a/b)),
+                    _ => self.error(&format!("Can't divide {:?} by {:?}", arg, arg2))
                 }
-            }, 
+            },
             _ => self.error("Boom!")
         }
     }
@@ -72,10 +72,14 @@ impl Runtime {
         self.add_global("print", Value::Primitive(Primitive::Print, Arity::OneArg));
         self.add_global("project", Value::Primitive(Primitive::Project, Arity::VarArg));
         self.add_global("type", Value::Primitive(Primitive::Type, Arity::OneArg));
-        self.add_global("_prim_addi", Value::Primitive(Primitive::AddInt, Arity::TwoArg));
-        self.add_global("_prim_subi", Value::Primitive(Primitive::SubInt, Arity::TwoArg));
-        self.add_global("_prim_muli", Value::Primitive(Primitive::MulInt, Arity::TwoArg));
-        self.add_global("_prim_divi", Value::Primitive(Primitive::DivInt, Arity::TwoArg));
+        self.add_global("_prim_add", Value::Primitive(Primitive::Add, Arity::TwoArg));
+        self.add_global("_prim_sub", Value::Primitive(Primitive::Sub, Arity::TwoArg));
+        self.add_global("_prim_mul", Value::Primitive(Primitive::Mul, Arity::TwoArg));
+        self.add_global("_prim_div", Value::Primitive(Primitive::Div, Arity::TwoArg));
+    }
+
+    pub(super) fn register_type_tables(&mut self) {
+
     }
 
 }
@@ -96,21 +100,64 @@ pub enum Primitive {
     Project,
     Type,
 
-    // Integer Math
-    AddInt,
-    SubInt,
-    MulInt,
-    DivInt,
+    // Arítmethic
+    Add,
+    Sub,
+    Mul,
+    Div,
 }
 
 impl Runtime {
-    fn printer(arg: &Value) -> Result<Value> {
+    fn printer(&self, arg: &Value) -> Result<Value> {
         print!("{:?}", arg);
         Ok(Value::Nil)
     }
 
     fn type_query(&self, arg: &Value) -> Result<Value> {
-        todo!()
+        match arg {
+            Value::Nil => Ok(self.get_global("nil").unwrap()),
+            Value::Primitive(_, _) => Ok(self.get_global("prim").unwrap()),
+            Value::Bool(_) => Ok(self.get_global("bool").unwrap()),
+            Value::Integer(_) => Ok(self.get_global("int").unwrap()),
+            Value::Real(_) => Ok(self.get_global("float").unwrap()),
+            Value::Char(_) => Ok(self.get_global("char").unwrap()),
+            Value::Pointer(_) => Ok(self.get_global("pointer").unwrap()),
+            Value::Symbol(sym) => {
+                if let Some(type_table) = &sym.symbol_info.borrow().type_table {
+                    Ok(Value::Table(type_table.clone()))
+                } else {
+                    Ok(self.get_global("symbol").unwrap())
+                }
+            },
+            Value::Array(array) => {
+                if let Some(type_table) = &array.borrow().type_table {
+                    Ok(Value::Table(type_table.clone()))
+                } else {
+                    Ok(self.get_global("array").unwrap())
+                }
+            },
+            Value::Bytes(bytes) => {
+                if let Some(type_table) = &bytes.borrow().type_table {
+                    Ok(Value::Table(type_table.clone()))
+                } else {
+                    Ok(self.get_global("bytes").unwrap())
+                }
+            },
+            Value::Table(table) => {
+                if let Some(type_table) = &table.borrow().type_table {
+                    Ok(Value::Table(type_table.clone()))
+                } else {
+                    Ok(self.get_global("table").unwrap())
+                }
+            },
+            Value::Closure(fun) => {
+                if let Some(type_table) = &fun.borrow().type_table {
+                    Ok(Value::Table(type_table.clone()))
+                } else {
+                    Ok(self.get_global("function").unwrap())
+                }
+            },
+        }
     }
 
     fn project(&self, args:&[Value]) -> Result<Value> {

@@ -35,6 +35,13 @@ impl Runtime {
     pub fn get_or_add_named_symbol(&mut self, name : &str) -> Symbol {
         self.named_symbols.entry(name.to_owned()).or_insert_with(|| Symbol::named(name)).clone()
     }
+
+    pub fn get_global(&self, name:&str) -> Option<Value> {
+        let Some(sym) = self.named_symbols.get(name) else {
+            return None;
+        };
+        self.globals.borrow().table.get(sym).cloned()
+    }
 }
 
 fn new_ref<T>(val : T) -> Rc<RefCell<T>> {
