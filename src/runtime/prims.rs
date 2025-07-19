@@ -167,6 +167,7 @@ impl Runtime {
                     Ok(self.get_global("function").unwrap())
                 }
             },
+            Value::Placeholder(_) => Ok(Value::Nil) // Shouldn't have placeholders in running code.
         }
     }
 

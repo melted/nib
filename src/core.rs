@@ -1,5 +1,5 @@
 
-use std::{collections::HashSet, fmt::{write, Display}};
+use std::{collections::{HashMap, HashSet}, fmt::{write, Display}};
 
 use crate::{ast::{self, PatternNode}, common::{Metadata, Name, Node, Result}};
 
@@ -106,9 +106,9 @@ impl DesugarState {
                 let names : Vec<_>= visitor.vars.into_iter().collect();
                 let mut v = Vec::new();
                 for n in names.clone() {
-                    v.push(Expression::Var(self.new_id(), n));
+                    v.push(self.var(n));
                 };
-                let mut arr_mk = vec![Expression::Var(self.new_id(), Name::name("array_mk"))];
+                let mut arr_mk = vec![self.named_var("_prim_array_mk")];
                 arr_mk.append(&mut v);
                 let lam_rhs = Expression::App(self.new_id(), arr_mk);
                 let npat = self.desugar_pattern(pat)?;
@@ -118,7 +118,7 @@ impl DesugarState {
                 let binding = Binding { id: ast_binding.id, binder: Binder::Local(nam_arr.clone()), body };
                 let mut bindings = vec![binding];
                 for (i, n) in names.into_iter().enumerate() {
-                    let rhs = Expression::App(self.new_id(), vec![Expression::Var(self.new_id(), Name::name("array_ref")), Expression::Var(self.new_id(), Name::name(&nam_arr)), Expression::Literal(self.new_id(), ast::Literal::Integer(i as i64))]);
+                    let rhs = Expression::App(self.new_id(), vec![self.named_var("_prim_array_ref"), self.named_var(&nam_arr), Expression::Literal(self.new_id(), ast::Literal::Integer(i as i64))]);
                     let bind = Binding { id: self.new_id(), binder: Binder::Public(n), body: rhs };
                     bindings.push(bind);
                 }
@@ -172,7 +172,7 @@ impl DesugarState {
             },
             ast::Expression::Array(v) => {
                 let mut args = Vec::new();
-                args.push(Expression::Var(self.new_id(), Name::name("array")));
+                args.push(self.named_var("array"));
                 for a in v {
                     args.push(self.desugar_expression(a)?);
                 }
@@ -180,7 +180,7 @@ impl DesugarState {
             },
             ast::Expression::Binop(ast::Binop { op, lhs, rhs }) => {
                 let mut args = Vec::new();
-                args.push(Expression::Var(self.new_id(), op.to_name()));
+                args.push(self.var(op.to_name()));
                 args.push(self.desugar_expression(*lhs)?);
                 args.push(self.desugar_expression(*rhs)?);
                 Ok(Expression::App(expression.id, args))
@@ -214,13 +214,13 @@ impl DesugarState {
             ast::Expression::Literal(lit) => Ok(Expression::Literal(expression.id, lit)),
             ast::Expression::Projection(projs) => {
                 let mut args = Vec::new();
-                args.push(Expression::Var(self.new_id(), Name::name("projection")));
+                args.push(self.named_var("project"));
                 for a in projs {
                     args.push(self.desugar_expression(a)?);
                 }
                 Ok(Expression::App(expression.id, args))
             },
-            ast::Expression::Var(v) => Ok(Expression::Var(expression.id, v)),
+            ast::Expression::Var(v) => Ok(Expression::Var(expression.id, Var::Named(v))),
             ast::Expression::Where(exp, ast_bindings) => {
                 let lhs = self.desugar_expression(*exp)?;
                 let mut binds = Vec::new();
@@ -251,6 +251,14 @@ impl DesugarState {
     fn new_id(&mut self) -> u32 {
         self.metadata.last_id += 1;
         self.metadata.last_id
+    }
+
+    fn named_var(&mut self, name: &str) -> Expression {
+        Expression::Var(self.new_id(), Var::Named(Name::name(name)))
+    }
+
+    fn var(&mut self, name:Name) -> Expression {
+        Expression::Var(self.new_id(), Var::Named(name))
     }
 }
 
@@ -303,7 +311,7 @@ impl Display for Binder {
 #[derive(Debug, Clone, PartialEq)]
 pub enum Expression {
     Literal(Node, ast::Literal),
-    Var(Node, Name),
+    Var(Node, Var),
     Lambda(Node, Vec<FunClause>),
     App(Node, Vec<Expression>),
     Where(Node, Box<Expression>, Vec<Binding>)
@@ -364,7 +372,7 @@ impl Display for FunClause {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Var {
     Named(Name),
     Local(String),
