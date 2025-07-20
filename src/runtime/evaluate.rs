@@ -1,10 +1,38 @@
 use std::{collections::HashMap, rc::Rc};
 
-use crate::{core::Module, runtime::{Runtime, Value}};
+use crate::{common::{Name, Result}, core::{Binder, Binding, Expression, Module}, runtime::{Runtime, Value}};
 
 impl Runtime {
-    pub(super) fn evaluate(&mut self, code : Module) {
-        todo!()
+    pub(super) fn evaluate(&mut self, code : &mut Module) -> Result<()> {
+        for b in code.bindings.iter_mut() {
+            self.evaluate_binding(b)?;
+        }
+        Ok(())
+    }
+
+    pub(super) fn evaluate_binding(&mut self, binding: &mut Binding) -> Result<()> {
+        let val = self.evaluate_expression(&mut binding.body)?;
+        match binding.binder {
+            Binder::Public(name) => {
+                match name {
+                    Name::Plain(name) => {
+
+                    },
+                    Name::Qualified(path, name) => {
+
+                    }
+                 }
+            },
+            Binder::Local(name) => {
+                self.local_environment.add(&name, &val);
+            },
+            Binder::Unbound => {}
+        }
+        Ok(())
+    }
+
+    pub(super) fn evaluate_expression(&mut self, expression: &mut Expression) -> Result<Value> {
+
     }
 
     pub(super) fn lookup(&mut self, env: &Environment, id: &str) -> Option<Value> {
@@ -15,7 +43,7 @@ impl Runtime {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Environment {
     pub envs: Vec<HashMap<String, Value>>
-}
+} 
 
 impl Environment {
     pub fn new() -> Self {

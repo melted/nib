@@ -1,50 +1,115 @@
 use std::{cell::RefCell, collections::HashMap, env::args, fmt::Display, hash::Hash, rc::Rc};
 
-use crate::{common::{Error, Metadata, Result}, core, runtime::prims::{Arity, Primitive}};
+use crate::{
+    common::{Error, Metadata, Name, Result},
+    core::{self, Var},
+    runtime::{
+        evaluate::Environment,
+        prims::{Arity, Primitive},
+    },
+};
 
-pub mod heap;
-pub mod table;
-mod prims;
 mod evaluate;
+pub mod heap;
+mod prims;
+pub mod table;
 
 pub struct Runtime {
     metadata: HashMap<String, Metadata>,
     globals: Rc<RefCell<Table>>,
-    named_symbols: HashMap<String, Symbol>
+    named_symbols: HashMap<String, Symbol>,
+    local_environment: Environment,
 }
 
 impl Runtime {
     pub fn new() -> Self {
-        Runtime { metadata: HashMap::new(), globals: new_ref(Table::new()), named_symbols: HashMap::new() }
+        Runtime {
+            metadata: HashMap::new(),
+            globals: new_ref(Table::new()),
+            named_symbols: HashMap::new(),
+            local_environment: Environment::new(),
+        }
     }
 
-    pub fn error<T>(&self, msg : &str) -> Result<T> {
-        Err(Error::Runtime { msg: msg.to_owned() })
+    pub fn error<T>(&self, msg: &str) -> Result<T> {
+        Err(Error::Runtime {
+            msg: msg.to_owned(),
+        })
     }
 
-    pub fn add_global(&mut self, name:&str, value:Value) {
-        let sym = self.get_or_add_named_symbol(name);
-        self.globals.borrow_mut().table.insert(sym, value);
+    pub fn add_global(&mut self, name: &str, value: Value) {
+        self.add_to_table(self.globals.clone(), name, &value);
     }
 
-    pub fn delete_global(&mut self, name:&str) {
+    pub fn delete_global(&mut self, name: &str) {
         let sym = self.get_or_add_named_symbol(name);
         self.globals.borrow_mut().table.remove(&sym);
     }
 
-    pub fn get_or_add_named_symbol(&mut self, name : &str) -> Symbol {
-        self.named_symbols.entry(name.to_owned()).or_insert_with(|| Symbol::named(name)).clone()
+    pub fn add_to_table(&mut self, table:Rc<RefCell<Table>>, name:&str, value: &Value) {
+        let sym = self.get_or_add_named_symbol(name);
+        table.borrow_mut().table.insert(sym, value.clone());
     }
 
-    pub fn get_global(&self, name:&str) -> Option<Value> {
+    pub fn get_or_add_named_symbol(&mut self, name: &str) -> Symbol {
+        self.named_symbols
+            .entry(name.to_owned())
+            .or_insert_with(|| Symbol::named(name))
+            .clone()
+    }
+
+    pub fn get_global(&self, name: &str) -> Option<Value> {
         let Some(sym) = self.named_symbols.get(name) else {
             return None;
         };
         self.globals.borrow().table.get(sym).cloned()
     }
+
+    pub fn add_name(&mut self, name: &Name, val: &Value) -> Result<()> {
+        match name {
+            Name::Qualified(path, name) => {
+                let t = self.get_or_create_module_path(path)?;
+                self.add_to_table(t, name, val);
+            },
+            Name::Plain(name) => {
+                self.add_global(name, val.clone());
+            }
+        }
+        Ok(())
+    }
+
+    pub fn get_or_create_module_path(&mut self, path: &[String]) -> Result<Rc<RefCell<Table>>> {
+        let mut rest = path;
+        let mut table = self.globals.clone();
+        match path.get(0) {
+            Some(s) if s == "global" => {
+                rest = &rest[1..];
+            }
+            _ => {}
+        };
+        while !rest.is_empty() {
+            let sym = self.get_or_add_named_symbol(&rest[0]);
+            table = {
+                let t = &mut table.borrow_mut().table;
+                let v = t.get(&sym).clone();
+                match v {
+                    Some(Value::Table(n)) => n.clone(),
+                    None | Some(Value::Nil) => {
+                        let nt = new_ref(Table::new());
+                        t.insert(sym, Value::Table(nt.clone()));
+                        nt
+                    }
+                    _ => {
+                        return self.error(&format!("Illegal module path {:?}", path));
+                    }
+                }
+            }
+        }
+        Ok(table)
+    }
 }
 
-fn new_ref<T>(val : T) -> Rc<RefCell<T>> {
+fn new_ref<T>(val: T) -> Rc<RefCell<T>> {
     Rc::new(RefCell::new(val))
 }
 
@@ -62,7 +127,7 @@ pub enum Value {
     Array(Rc<RefCell<Array>>),
     Table(Rc<RefCell<Table>>),
     Closure(Rc<RefCell<Closure>>),
-    Placeholder(Box<String>) // Hasn't been defined yet, will always be replaced before evaluating
+    Placeholder(Box<Var>), // Hasn't been defined yet, will always be replaced before evaluating
 }
 
 impl PartialEq for Value {
@@ -106,19 +171,25 @@ impl Display for Value {
 }
 
 impl Value {
-
+    pub fn new_table() -> Self {
+        Value::Table(new_ref(Table::new()))
+    }
 }
 
 #[derive(Debug, Clone)]
 pub struct Symbol {
-    symbol_info : Rc<RefCell<SymbolInfo>>
+    symbol_info: Rc<RefCell<SymbolInfo>>,
 }
 
 impl Display for Symbol {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let s = &self.symbol_info.borrow().symbol;
         if s.is_empty() {
-            write!(f, "#anonymous_symbol({:x})", self.symbol_info.as_ptr().addr())
+            write!(
+                f,
+                "#anonymous_symbol({:x})",
+                self.symbol_info.as_ptr().addr()
+            )
         } else {
             write!(f, "#{}", s)
         }
@@ -139,31 +210,38 @@ impl PartialEq for Symbol {
     }
 }
 
-impl Eq for Symbol {
-}
+impl Eq for Symbol {}
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct SymbolInfo {
-    type_table : Option<Rc<RefCell<Table>>>,
-    symbol : String
+    type_table: Option<Rc<RefCell<Table>>>,
+    symbol: String,
 }
 
 impl Symbol {
-    pub fn named(s : &str) -> Self {
-        let info = SymbolInfo { type_table: None, symbol: s.to_owned() };
-        Symbol { symbol_info: new_ref(info) }
+    pub fn named(s: &str) -> Self {
+        let info = SymbolInfo {
+            type_table: None,
+            symbol: s.to_owned(),
+        };
+        Symbol {
+            symbol_info: new_ref(info),
+        }
     }
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Table {
-    type_table : Option<Rc<RefCell<Table>>>,
-    table : HashMap<Symbol, Value>
+    type_table: Option<Rc<RefCell<Table>>>,
+    table: HashMap<Symbol, Value>,
 }
 
 impl Table {
     fn new() -> Self {
-        Table { type_table: None, table: HashMap::new() }
+        Table {
+            type_table: None,
+            table: HashMap::new(),
+        }
     }
 }
 
@@ -183,8 +261,8 @@ impl Display for Table {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Array {
-    type_table : Option<Rc<RefCell<Table>>>,
-    array : Vec<Value>
+    type_table: Option<Rc<RefCell<Table>>>,
+    array: Vec<Value>,
 }
 
 impl Display for Array {
@@ -203,15 +281,17 @@ impl Display for Array {
 
 impl Array {
     fn new() -> Self {
-        Array { type_table: None, array: Vec::new() }
+        Array {
+            type_table: None,
+            array: Vec::new(),
+        }
     }
 }
 
-
 #[derive(Debug, Clone, PartialEq)]
 pub struct Bytes {
-    type_table : Option<Rc<RefCell<Table>>>,
-    bytes : Vec<u8>
+    type_table: Option<Rc<RefCell<Table>>>,
+    bytes: Vec<u8>,
 }
 
 impl Display for Bytes {
@@ -230,20 +310,29 @@ impl Display for Bytes {
 
 impl Bytes {
     fn new() -> Self {
-        Bytes { type_table: None, bytes: Vec::new() }
+        Bytes {
+            type_table: None,
+            bytes: Vec::new(),
+        }
     }
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Closure {
-    type_table : Option<Rc<RefCell<Table>>>,
-    pub code : Rc<RefCell<core::Expression>>,
-    pub args : Vec<Value>,
-    pub vars : Vec<Value>
+    type_table: Option<Rc<RefCell<Table>>>,
+    pub code: Rc<RefCell<core::Expression>>,
+    pub args: Vec<Value>,
+    pub vars: Vec<Value>,
 }
 
 impl Display for Closure {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "#<function:{:x}/{}/{}>", self.code.as_ptr().addr(), self.args.len(),self.vars.len())
+        write!(
+            f,
+            "#<function:{:x}/{}/{}>",
+            self.code.as_ptr().addr(),
+            self.args.len(),
+            self.vars.len()
+        )
     }
 }
