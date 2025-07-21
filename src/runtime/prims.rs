@@ -6,13 +6,13 @@ use crate::runtime::{new_ref, Runtime, Table, Value};
 
 
 impl Runtime {
-    pub(super) fn call_primitive0(&mut self, prim : Primitive) -> Result<Value> {
+    pub(super) fn call_primitive0(&mut self, prim : &Primitive) -> Result<Value> {
         match prim {
             _ => self.error("Boom!")
         }
     }
 
-    pub(super) fn call_primitive1(&mut self, prim : Primitive, arg: &Value) -> Result<Value> {
+    pub(super) fn call_primitive1(&mut self, prim : &Primitive, arg: &Value) -> Result<Value> {
         match prim {
             Primitive::Print => self.printer(arg),
             Primitive::Type => self.type_query(arg),
@@ -20,7 +20,7 @@ impl Runtime {
         }
     }
 
-    pub(super) fn call_primitive2(&mut self, prim : Primitive, arg: &Value, arg2: &Value) -> Result<Value> {
+    pub(super) fn call_primitive2(&mut self, prim : &Primitive, arg: &Value, arg2: &Value) -> Result<Value> {
         match prim {
             Primitive::Add => {
                 match (arg, arg2) {
@@ -54,13 +54,13 @@ impl Runtime {
         }
     }
 
-    pub(super) fn call_primitive3(&mut self, prim : Primitive, arg: &Value, arg2: &Value, arg3: &Value) -> Result<Value> {
+    pub(super) fn call_primitive3(&mut self, prim : &Primitive, arg: &Value, arg2: &Value, arg3: &Value) -> Result<Value> {
         match prim {
             _ => self.error("Boom!")
         }
     }
 
-    pub(super) fn call_primitive_vararg(&mut self, prim : Primitive, args: &[Value]) -> Result<Value> {
+    pub(super) fn call_primitive_vararg(&mut self, prim : &Primitive, args: &[Value]) -> Result<Value> {
         match prim {
             Primitive::Project => self.project(args),
             _ => self.error("Boom!")
@@ -79,17 +79,18 @@ impl Runtime {
     }
 
     pub(super) fn register_type_tables(&mut self) {
-        self.add_global("nil", Value::Table(new_ref(Table::new())));
-        self.add_global("bool", Value::Table(new_ref(Table::new())));
-        self.add_global("int", Value::Table(new_ref(Table::new())));
-        self.add_global("float", Value::Table(new_ref(Table::new())));
-        self.add_global("char", Value::Table(new_ref(Table::new())));
-        self.add_global("pointer", Value::Table(new_ref(Table::new())));
-        self.add_global("symbol", Value::Table(new_ref(Table::new())));
-        self.add_global("bytes", Value::Table(new_ref(Table::new())));
-        self.add_global("array", Value::Table(new_ref(Table::new())));
-        self.add_global("table", Value::Table(new_ref(Table::new())));
-        self.add_global("function", Value::Table(new_ref(Table::new())));
+        self.add_global("nil", Value::new_table());
+        self.add_global("bool", Value::new_table());
+        self.add_global("int", Value::new_table());
+        self.add_global("float", Value::new_table());
+        self.add_global("char", Value::new_table());
+        self.add_global("pointer", Value::new_table());
+        self.add_global("symbol", Value::new_table());
+        self.add_global("bytes", Value::new_table());
+        self.add_global("string", Value::new_table());
+        self.add_global("array", Value::new_table());
+        self.add_global("table", Value::new_table());
+        self.add_global("function", Value::new_table());
     }
 
 }
@@ -166,8 +167,7 @@ impl Runtime {
                 } else {
                     Ok(self.get_global("function").unwrap())
                 }
-            },
-            Value::Placeholder(_) => Ok(Value::Nil) // Shouldn't have placeholders in running code.
+            }
         }
     }
 

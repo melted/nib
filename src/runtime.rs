@@ -2,7 +2,7 @@ use std::{cell::RefCell, collections::HashMap, env::args, fmt::Display, hash::Ha
 
 use crate::{
     common::{Error, Metadata, Name, Result},
-    core::{self, Var},
+    core::FunClause,
     runtime::{
         evaluate::Environment,
         prims::{Arity, Primitive},
@@ -126,8 +126,7 @@ pub enum Value {
     Bytes(Rc<RefCell<Bytes>>),
     Array(Rc<RefCell<Array>>),
     Table(Rc<RefCell<Table>>),
-    Closure(Rc<RefCell<Closure>>),
-    Placeholder(Box<Var>), // Hasn't been defined yet, will always be replaced before evaluating
+    Closure(Rc<RefCell<Closure>>)
 }
 
 impl PartialEq for Value {
@@ -135,7 +134,6 @@ impl PartialEq for Value {
         match (self, other) {
             (Self::Primitive(l0, l1), Self::Primitive(r0, r1)) => l0 == r0 && l1 == r1,
             (Self::Bool(l0), Self::Bool(r0)) => l0 == r0,
-            (Self::Placeholder(l0), Self::Placeholder(r0)) => l0 == r0,
             (Self::Integer(l0), Self::Integer(r0)) => l0 == r0,
             (Self::Real(l0), Self::Real(r0)) => l0 == r0,
             (Self::Char(l0), Self::Char(r0)) => l0 == r0,
@@ -165,7 +163,6 @@ impl Display for Value {
             Value::Array(ref_cell) => write!(f, "{}", &ref_cell.borrow()),
             Value::Table(ref_cell) => write!(f, "{}", &ref_cell.borrow()),
             Value::Closure(ref_cell) => write!(f, "{}", &ref_cell.borrow()),
-            Value::Placeholder(_) => write!(f, "#<placeholder>"),
         }
     }
 }
@@ -174,7 +171,11 @@ impl Value {
     pub fn new_table() -> Self {
         Value::Table(new_ref(Table::new()))
     }
-}
+
+    pub fn new_bytes(bytes : Vec<u8>) -> Self {
+        Value::Bytes(new_ref(Bytes::with(bytes)))
+    }
+} 
 
 #[derive(Debug, Clone)]
 pub struct Symbol {
@@ -308,6 +309,8 @@ impl Display for Bytes {
     }
 }
 
+
+
 impl Bytes {
     fn new() -> Self {
         Bytes {
@@ -315,24 +318,29 @@ impl Bytes {
             bytes: Vec::new(),
         }
     }
+
+    fn with(bytes : Vec<u8>) -> Self {
+        Bytes {
+            type_table: None,
+            bytes: bytes,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Closure {
     type_table: Option<Rc<RefCell<Table>>>,
-    pub code: Rc<RefCell<core::Expression>>,
-    pub args: Vec<Value>,
-    pub vars: Vec<Value>,
+    pub code: Rc<RefCell<Vec<FunClause>>>,
+    pub env: HashMap<String, Value>
 }
 
 impl Display for Closure {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "#<function:{:x}/{}/{}>",
+            "#<function:{:x}/{}>",
             self.code.as_ptr().addr(),
-            self.args.len(),
-            self.vars.len()
+            self.env.len()
         )
     }
 }

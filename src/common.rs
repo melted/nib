@@ -66,7 +66,9 @@ pub enum Error {
     #[error("Error: {}", err)]
     General { err: anyhow::Error },
     #[error("Runtime error: {}", msg)]
-    Runtime { msg: String }
+    Runtime { msg: String },
+    #[error("Desugaring error: {}", msg)]
+    Desugar { msg: String }
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

@@ -1,7 +1,7 @@
 
 use std::{collections::{HashMap, HashSet}, fmt::{write, Display}};
 
-use crate::{ast::{self, PatternNode}, common::{Metadata, Name, Node, Result}};
+use crate::{ast::{self, PatternNode}, common::{Error, Metadata, Name, Node, Result}};
 
 
 pub fn desugar(module: ast::Module) -> Result<Module> {
@@ -132,31 +132,31 @@ impl DesugarState {
         match pattern.pattern {
             ast::Pattern::Alias(pat, alias) => {
                 let inner = self.desugar_pattern(*pat)?;
-                Ok(Pattern::Alias(Box::new(inner), Var::Named(alias)))
+                Ok(Pattern::Alias(Box::new(inner), alias))
             },
             ast::Pattern::Custom(name, fields) => {
                 let mut args = Vec::new();
                 for f in fields {
                     args.push(self.desugar_pattern(f)?);
                 }
-                Ok(Pattern::Custom(Var::Named(name), args))
+                Ok(Pattern::Custom(name, args))
             },
             ast::Pattern::Array(fields) => {
                 let mut args = Vec::new();
                 for f in fields {
                     args.push(self.desugar_pattern(f)?);
                 }
-                Ok(Pattern::Custom(Var::Named(Name::name("array")), args))
+                Ok(Pattern::Custom(Name::name("array"), args))
             },
             ast::Pattern::Ellipsis(name) => {
-                Ok(Pattern::Ellipsis(name.map(|n| Var::Named(n))))
+                Ok(Pattern::Ellipsis(name))
             },
             ast::Pattern::Literal(lit) => Ok(Pattern::Literal(lit)),
             ast::Pattern::Typed(pat, typ) => {
                 let inner = self.desugar_pattern(*pat)?;
-                Ok(Pattern::Custom(Var::Named(typ), vec![inner]))
+                Ok(Pattern::Custom(typ, vec![inner]))
             },
-            ast::Pattern::Var(name) => Ok(Pattern::Bind(Var::Named(name))),
+            ast::Pattern::Var(name) => Ok(Pattern::Bind(name)),
             ast::Pattern::Wildcard => Ok(Pattern::Wildcard)
          }
     }
@@ -220,7 +220,7 @@ impl DesugarState {
                 }
                 Ok(Expression::App(expression.id, args))
             },
-            ast::Expression::Var(v) => Ok(Expression::Var(expression.id, Var::Named(v))),
+            ast::Expression::Var(Name::Plain(n)) => Ok(Expression::Var(expression.id, n)),
             ast::Expression::Where(exp, ast_bindings) => {
                 let lhs = self.desugar_expression(*exp)?;
                 let mut binds = Vec::new();
@@ -230,6 +230,7 @@ impl DesugarState {
                 }
                 Ok(Expression::Where(expression.id, Box::new(lhs), binds))
             }
+            _ => self.error(&format!("couldn't desugar {}", expression))
         }
     }
 
@@ -254,11 +255,17 @@ impl DesugarState {
     }
 
     fn named_var(&mut self, name: &str) -> Expression {
-        Expression::Var(self.new_id(), Var::Named(Name::name(name)))
+        Expression::Var(self.new_id(), name.to_string())
     }
 
     fn var(&mut self, name:Name) -> Expression {
-        Expression::Var(self.new_id(), Var::Named(name))
+        Expression::Var(self.new_id(), name.to_string())
+    }
+
+    fn error<T>(&self, msg:&str) -> Result<T> {
+        Err(Error::Desugar {
+            msg: msg.to_owned(),
+        })
     }
 }
 
@@ -311,7 +318,7 @@ impl Display for Binder {
 #[derive(Debug, Clone, PartialEq)]
 pub enum Expression {
     Literal(Node, ast::Literal),
-    Var(Node, Var),
+    Var(Node, String),
     Lambda(Node, Vec<FunClause>),
     App(Node, Vec<Expression>),
     Where(Node, Box<Expression>, Vec<Binding>)
@@ -395,10 +402,10 @@ impl Display for Var {
 pub enum Pattern {
     Wildcard,
     Literal(ast::Literal), // TODO: Create a binding to it instead?
-    Ellipsis(Option<Var>),
-    Bind(Var),
-    Custom(Var, Vec<Pattern>), // Subsumes array and typed patterns
-    Alias(Box<Pattern>, Var)
+    Ellipsis(Option<Name>),
+    Bind(Name),
+    Custom(Name, Vec<Pattern>), // Subsumes array and typed patterns
+    Alias(Box<Pattern>, Name)
 }
 
 impl Display for Pattern {
