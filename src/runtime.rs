@@ -331,16 +331,15 @@ impl Bytes {
 pub struct Closure {
     type_table: Option<Rc<RefCell<Table>>>,
     pub code: Rc<RefCell<Vec<FunClause>>>,
-    pub env: HashMap<String, Value>
+    pub env: Environment
 }
 
 impl Display for Closure {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "#<function:{:x}/{}>",
+            "#<function:{:x}>",
             self.code.as_ptr().addr(),
-            self.env.len()
         )
     }
 }

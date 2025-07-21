@@ -379,25 +379,6 @@ impl Display for FunClause {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum Var {
-    Named(Name),
-    Local(String),
-    Arg(usize),
-    Closure(usize)
-}
-
-impl Display for Var {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Var::Named(n) => write!(f, "{}", n),
-            Var::Local(s) => write!(f, "local.{}", s),
-            Var::Arg(i) => write!(f, "${}", i),
-            Var::Closure(i) => write!(f, "¤{}", i)
-        }
-    }
-}
-
 #[derive(Debug, Clone, PartialEq)]
 pub enum Pattern {
     Wildcard,
@@ -431,6 +412,14 @@ impl Display for Pattern {
             Pattern::Wildcard => write!(f, "_")
         }
     }
+}
+
+fn free_vars(expr: &Expression) -> HashSet<String> {
+    todo!()
+}
+
+fn bound_vars(pat : &Pattern) -> HashSet<String> {
+    todo!()
 }
 
 #[derive(Debug)]

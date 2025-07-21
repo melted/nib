@@ -2,20 +2,27 @@ use std::{collections::HashMap, rc::Rc};
 
 use log::info;
 
-use crate::{ast::Literal, common::{Error, Result}, core::{Binder, Binding, Expression, Module}, runtime::{new_ref, prims::Arity, Bytes, Runtime, Value}};
+use crate::{ast::Literal, common::{Error, Name, Result}, core::{Binder, Binding, Expression, FunClause, Module}, runtime::{new_ref, prims::Arity, Bytes, Runtime, Value}};
 
 impl Runtime {
     pub(super) fn evaluate(&mut self, code : &mut Module, env:&mut Environment) -> Result<()> {
         for b in code.bindings.iter_mut() {
-            self.evaluate_binding(b, env)?;
+            self.evaluate_binding(b, env, false)?;
         }
         Ok(())
     }
 
-    pub(super) fn evaluate_binding(&mut self, binding: &mut Binding, env:&mut Environment) -> Result<()> {
+    pub(super) fn evaluate_binding(&mut self, binding: &Binding, env:&mut Environment, local:bool) -> Result<()> {
         info!("Evaluating binding {}", binding);
-        let val = self.evaluate_expression(&mut binding.body, env)?;
+        let val = self.evaluate_expression(&binding.body, env)?;
         match &binding.binder {
+
+            Binder::Public(name) if local => {
+                match name {
+                    Name::Plain(s) => env.add(s, &val),
+                    Name::Qualified(_,_) => return self.error(&format!("Qualified name {} in where clause", name))
+                };
+            },
             Binder::Public(name) => {
                 self.add_name(name, &val)?;
             },
@@ -39,12 +46,15 @@ impl Runtime {
             },
             Expression::App(n, exps) => self.evaluate_application(exps, env)?,
             Expression::Literal(n, lit) => self.evaluate_literal(lit)?,
-            Expression::Lambda(n, clauses) => {
-                todo!()
-            },
+            Expression::Lambda(n, clauses) => self.evaluate_lambda(clauses, env)?,
             Expression::Where(n, exp, bindings) => {
                 env.push();
-                todo!()
+                for b in bindings.iter() {
+                    self.evaluate_binding(b, env, true)?;
+                }
+                let val = self.evaluate_expression(exp, env)?;
+                env.pop();
+                val
             }
         };
         Ok(val)
@@ -94,6 +104,13 @@ impl Runtime {
             }
         }
     }
+
+    pub(super) fn evaluate_lambda(&mut self, clauses : &Vec<FunClause>, env:&mut Environment) -> Result<Value> {
+        let mut lexical_env = Environment::new();
+        lexical_env.push();
+
+    }
+
 
     pub(super) fn lookup(&mut self, env: &Environment, id: &str) -> Option<Value> {
         env.get(id).or_else(|| self.get_global(id))
