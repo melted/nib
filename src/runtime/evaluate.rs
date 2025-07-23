@@ -2,7 +2,7 @@ use std::{collections::{HashMap, HashSet}, rc::Rc};
 
 use log::info;
 
-use crate::{ast::Literal, common::{Error, Name, Result}, core::{free_vars, Binder, Binding, Expression, FunClause, Module}, runtime::{new_ref, prims::Arity, Bytes, Closure, Runtime, Value}};
+use crate::{ast::Literal, common::{Error, Name, Result}, core::{free_vars, Binder, Binding, Expression, FunClause, Module, Pattern}, runtime::{new_ref, prims::Arity, Bytes, Closure, Runtime, Value}};
 
 impl Runtime {
     pub(super) fn evaluate(&mut self, code : &mut Module, env:&mut Environment) -> Result<()> {
@@ -94,6 +94,10 @@ impl Runtime {
         for e in exps {
             vals.push(self.evaluate_expression(e, env)?);
         }
+        self.apply_values(&vals)
+    }
+
+    pub(super) fn apply_values(&mut self, vals : &[Value]) -> Result<Value> {
         match &vals[0] {
             Value::Primitive(prim, Arity::OneArg) => self.call_primitive1(prim, &vals[1]),
             Value::Primitive(prim, Arity::TwoArg) => self.call_primitive2(prim, &vals[1], &vals[2]),
@@ -101,6 +105,12 @@ impl Runtime {
             Value::Primitive(prim, Arity::VarArg) => self.call_primitive_vararg(prim, &vals[1..]),
             Value::Closure(closure) => {
                 let c = closure.borrow_mut();
+                let env = &c.env;
+                let clauses = &c.code.borrow();
+                let args = &vals[1..];
+                for clause in clauses.iter() {
+                    
+                }
                 todo!()
             },
             _ => {
@@ -122,6 +132,58 @@ impl Runtime {
         Ok(Value::Closure(new_ref(Closure{ code: new_ref(clauses.clone()), type_table: None, env: lexical_env })))
     }
 
+    pub(super) fn match_patterns(&mut self, args : &[Value], patterns : &[Pattern], env: &Environment) -> Result<Option<HashMap<String, Value>>> {
+        todo!()
+    }
+
+    pub(super) fn match_pattern(&mut self, arg : &Value, pattern : &Pattern, env: &Environment) -> Result<Option<HashMap<String, Value>>> {
+        let mut out = HashMap::new();
+        let val = match pattern {
+            Pattern::Wildcard => Some(out),
+            Pattern::Literal(literal) => {
+                let v = self.evaluate_literal(literal)?;
+                if &v == arg {
+                    Some(out)
+                } else {
+                    None
+                }
+            },
+            Pattern::Ellipsis(Some(name)) | Pattern::Bind(name) => {
+                out.insert(name.to_string(), arg.clone());
+                Some(out)
+            },
+            Pattern::Ellipsis(None) => Some(out),
+            Pattern::Custom(name, patterns) => {
+                let handler = match(name) {
+                    Name::Qualified(_, _) => {
+                        // get qualified name
+                        todo!()
+                    },
+                    Name::Plain(str) => {
+                        let Some(v) = self.lookup(env, str) else {
+                            return self.error(&format!("Failed to find custom pattern handler {}", str));
+                        };
+                        v
+                    }
+                };
+                let fun = match handler {
+                    Value::Closure(_) => handler,
+                    Value::Table(t) => {
+                        let Some(val@Value::Closure(_)) = self.get_from_table(t, "match") else {
+                            return self.error("No match function in table used in custom pattern");
+                        };
+                        val
+                    },
+                    _ => {
+                        return self.error("Custom pattern handler must be a function or a table with a match function");
+                    }
+                };
+                todo!()
+            },
+            Pattern::Alias(pattern, name) => todo!(),
+        };
+        Ok(val)
+    }
 
     pub(super) fn lookup(&mut self, env: &Environment, id: &str) -> Option<Value> {
         env.get(id).or_else(|| self.get_global(id))

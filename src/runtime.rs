@@ -51,6 +51,11 @@ impl Runtime {
         table.borrow_mut().table.insert(sym, value.clone());
     }
 
+    pub fn get_from_table(&mut self, table:Rc<RefCell<Table>>, name:&str) -> Option<Value> {
+        let sym = self.get_or_add_named_symbol(name);
+        table.borrow().table.get(&sym).cloned()
+    }
+
     pub fn get_or_add_named_symbol(&mut self, name: &str) -> Symbol {
         self.named_symbols
             .entry(name.to_owned())
