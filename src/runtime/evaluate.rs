@@ -1,8 +1,8 @@
-use std::{collections::HashMap, rc::Rc};
+use std::{collections::{HashMap, HashSet}, rc::Rc};
 
 use log::info;
 
-use crate::{ast::Literal, common::{Error, Name, Result}, core::{Binder, Binding, Expression, FunClause, Module}, runtime::{new_ref, prims::Arity, Bytes, Runtime, Value}};
+use crate::{ast::Literal, common::{Error, Name, Result}, core::{free_vars, Binder, Binding, Expression, FunClause, Module}, runtime::{new_ref, prims::Arity, Bytes, Closure, Runtime, Value}};
 
 impl Runtime {
     pub(super) fn evaluate(&mut self, code : &mut Module, env:&mut Environment) -> Result<()> {
@@ -46,7 +46,11 @@ impl Runtime {
             },
             Expression::App(n, exps) => self.evaluate_application(exps, env)?,
             Expression::Literal(n, lit) => self.evaluate_literal(lit)?,
-            Expression::Lambda(n, clauses) => self.evaluate_lambda(clauses, env)?,
+            Expression::Lambda(n, clauses) => {
+                let mut free = HashSet::new();
+                free_vars(expression, &mut free);
+                self.evaluate_lambda(clauses, &free, env)?
+            },
             Expression::Where(n, exp, bindings) => {
                 env.push();
                 for b in bindings.iter() {
@@ -105,10 +109,17 @@ impl Runtime {
         }
     }
 
-    pub(super) fn evaluate_lambda(&mut self, clauses : &Vec<FunClause>, env:&mut Environment) -> Result<Value> {
+    pub(super) fn evaluate_lambda(&mut self, clauses : &Vec<FunClause>, free:&HashSet<String>, env:&mut Environment) -> Result<Value> {
         let mut lexical_env = Environment::new();
         lexical_env.push();
 
+        for v in free.iter() {
+            let Some(val) = self.lookup(env, v) else {
+                return self.error(&format!("{} not in scope", v));
+            };
+            lexical_env.add(&v, &val);
+        }
+        Ok(Value::Closure(new_ref(Closure{ code: new_ref(clauses.clone()), type_table: None, env: lexical_env })))
     }
 
 

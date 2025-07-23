@@ -414,12 +414,67 @@ impl Display for Pattern {
     }
 }
 
-fn free_vars(expr: &Expression) -> HashSet<String> {
-    todo!()
+pub fn free_vars(expr: &Expression, vars: &mut HashSet<String>) {
+    match expr {
+        Expression::Literal(_, literal) => {},
+        Expression::Var(_, var) => {vars.insert(var.to_owned()); },
+        Expression::Lambda(_, fun_clauses) => {
+            for c in fun_clauses {
+                let mut used = HashSet::new();
+                let mut bound = HashSet::new();
+                if let Some(g) = &c.guard {
+                    free_vars(g, &mut used);
+                }
+                free_vars(&c.rhs, &mut used);
+                for p in &c.args {
+                    bound_vars(p, &mut bound);
+                }
+
+                for v in used.difference(&bound) {
+                    vars.insert(v.to_owned());
+                }
+            }
+        },
+        Expression::App(_, expressions) => {
+            for e in expressions {
+                free_vars(e, vars);
+            }
+        },
+        Expression::Where(_, expression, bindings) => {
+            let mut used = HashSet::new();
+            let mut bound = HashSet::new();
+            for b in bindings {
+                free_vars(expr, &mut used);
+                match &b.binder {
+                    Binder::Local(n) => { bound.insert(n.to_owned()); },
+                    Binder::Public(n) => { bound.insert(n.to_string()); },
+                    _ => {}
+                };
+            }
+            free_vars(&expression, &mut used);
+            for v in used.difference(&bound) {
+                vars.insert(v.to_owned());
+            }
+        },
+    }
 }
 
-fn bound_vars(pat : &Pattern) -> HashSet<String> {
-    todo!()
+pub fn bound_vars(pat : &Pattern, vars: &mut HashSet<String>) {
+    match pat {
+        Pattern::Ellipsis(Some(name)) | Pattern::Bind(name) => {
+            vars.insert(name.to_string());
+        },
+        Pattern::Custom(name, patterns) => {
+            for p in patterns {
+                bound_vars(p, vars);
+            }
+        },
+        Pattern::Alias(pattern, name) => {
+            bound_vars(&pattern, vars);
+            vars.insert(name.to_string());
+        },
+        _ => {}
+    }
 }
 
 #[derive(Debug)]
@@ -429,7 +484,7 @@ pub(super) struct UsedVars {
 
 impl UsedVars {
     pub(super) fn new() -> Self {
-        UsedVars { vars: HashSet::new() }
+         UsedVars { vars: HashSet::new() }
     }
 }
 
