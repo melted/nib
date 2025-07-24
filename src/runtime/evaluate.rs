@@ -1,8 +1,8 @@
-use std::{collections::{HashMap, HashSet}, rc::Rc};
+use std::{cmp::max, collections::{HashMap, HashSet}, rc::Rc};
 
 use log::info;
 
-use crate::{ast::Literal, common::{Error, Name, Result}, core::{free_vars, Binder, Binding, Expression, FunClause, Module, Pattern}, runtime::{new_ref, prims::Arity, Bytes, Closure, Runtime, Value}};
+use crate::{ast::Literal, common::{Error, Name, Result}, core::{free_vars, Arity, Binder, Binding, Expression, FunClause, Module, Pattern}, runtime::{new_ref, prims, Bytes, Closure, Runtime, Value}};
 
 impl Runtime {
     pub(super) fn evaluate(&mut self, code : &mut Module, env:&mut Environment) -> Result<()> {
@@ -99,10 +99,10 @@ impl Runtime {
 
     pub(super) fn apply_values(&mut self, vals : &[Value]) -> Result<Value> {
         match &vals[0] {
-            Value::Primitive(prim, Arity::OneArg) => self.call_primitive1(prim, &vals[1]),
-            Value::Primitive(prim, Arity::TwoArg) => self.call_primitive2(prim, &vals[1], &vals[2]),
-            Value::Primitive(prim, Arity::ThreeArg) => self.call_primitive3(prim, &vals[1], &vals[2], &vals[3]),
-            Value::Primitive(prim, Arity::VarArg) => self.call_primitive_vararg(prim, &vals[1..]),
+            Value::Primitive(prim, prims::Arity::OneArg) => self.call_primitive1(prim, &vals[1]),
+            Value::Primitive(prim, prims::Arity::TwoArg) => self.call_primitive2(prim, &vals[1], &vals[2]),
+            Value::Primitive(prim, prims::Arity::ThreeArg) => self.call_primitive3(prim, &vals[1], &vals[2], &vals[3]),
+            Value::Primitive(prim, prims::Arity::VarArg) => self.call_primitive_vararg(prim, &vals[1..]),
             Value::Closure(closure) => {
                 let c = closure.borrow_mut();
                 let env = &c.env;
@@ -129,8 +129,23 @@ impl Runtime {
             };
             lexical_env.add(&v, &val);
         }
-        Ok(Value::Closure(new_ref(Closure{ code: new_ref(clauses.clone()), type_table: None, env: lexical_env })))
+        let mut arity = get_arity(&clauses[0].args);
+        for c in clauses[1..].iter() {
+            let next = get_arity(&c.args);
+            match (&arity, &next) {
+                (Arity::Fixed(n), Arity::Fixed(m)) if n == m => {},
+                (Arity::VarArg(n), Arity::VarArg(m)) => {
+                    arity = Arity::VarArg(max(*n, *m));
+                }
+                _ => {
+                    return self.error("Function clauses must have same arity");
+                }
+            }
+        }
+        Ok(Value::Closure(new_ref(Closure{ code: new_ref(clauses.clone()), type_table: None, env: lexical_env, arity })))
     }
+
+
 
     pub(super) fn match_patterns(&mut self, args : &[Value], patterns : &[Pattern], env: &Environment) -> Result<Option<HashMap<String, Value>>> {
         todo!()
@@ -178,15 +193,41 @@ impl Runtime {
                         return self.error("Custom pattern handler must be a function or a table with a match function");
                     }
                 };
-                todo!()
+                let call = vec![fun, arg.clone()];
+                let res = self.apply_values(&call)?;
+                match res {
+                    Value::Array(array) => {
+                        let vals = &array.borrow().array;
+                        self.match_patterns(vals, patterns, env)?
+                    },
+                    Value::Bool(false) => {
+                        None
+                    },
+                    _ => {
+                        return self.error(&format!("Custom pattern handler {} didn't return an array or false", name.to_string()));
+                    }
+                }
             },
-            Pattern::Alias(pattern, name) => todo!(),
+            Pattern::Alias(pattern, name) => {
+                let res = self.match_pattern(arg, pattern, env)?;
+                res.map(|mut vars| { vars.insert(name.to_string(), arg.clone()); vars })
+            },
         };
         Ok(val)
     }
 
     pub(super) fn lookup(&mut self, env: &Environment, id: &str) -> Option<Value> {
         env.get(id).or_else(|| self.get_global(id))
+    }
+}
+
+pub(super) fn get_arity(patterns: &[Pattern]) -> Arity {
+    let vararg = patterns.iter().any(|p| p.is_ellipsis());
+    let len = patterns.len();
+    if vararg {
+        Arity::VarArg(len-1)
+    } else {
+        Arity::Fixed(len)
     }
 }
 

@@ -2,10 +2,10 @@ use std::{cell::RefCell, collections::HashMap, env::args, fmt::Display, hash::Ha
 
 use crate::{
     common::{Error, Metadata, Name, Result},
-    core::FunClause,
+    core::{Arity, FunClause},
     runtime::{
         evaluate::Environment,
-        prims::{Arity, Primitive},
+        prims::Primitive,
     },
 };
 
@@ -161,7 +161,7 @@ fn new_ref<T>(val: T) -> Rc<RefCell<T>> {
 #[derive(Debug, Clone)]
 pub enum Value {
     Nil,
-    Primitive(Primitive, Arity),
+    Primitive(Primitive, prims::Arity),
     Bool(bool),
     Integer(i64),
     Real(f64),
@@ -376,15 +376,17 @@ impl Bytes {
 pub struct Closure {
     type_table: Option<Rc<RefCell<Table>>>,
     pub code: Rc<RefCell<Vec<FunClause>>>,
-    pub env: Environment
+    pub env: Environment,
+    pub arity: Arity
 }
 
 impl Display for Closure {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "#<function:{:x}>",
+            "#<function:{:x}{}>",
             self.code.as_ptr().addr(),
+            self.arity
         )
     }
 }

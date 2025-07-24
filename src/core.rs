@@ -389,6 +389,30 @@ pub enum Pattern {
     Alias(Box<Pattern>, Name)
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum Arity {
+    Fixed(usize),
+    VarArg(usize)
+}
+
+impl Display for Arity {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Arity::Fixed(n) => write!(f, "{}", n),
+            Arity::VarArg(n) => write!(f, "{}+", n),
+        }
+    }
+}
+
+impl Pattern {
+    pub fn is_ellipsis(&self) -> bool {
+        match self {
+            Pattern::Ellipsis(_) => true,
+            _ => false
+        }
+    }
+}
+
 impl Display for Pattern {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
