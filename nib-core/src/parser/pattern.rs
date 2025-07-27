@@ -59,6 +59,7 @@ impl<'a> ParserState<'a> {
             }
         }
         self.expect(TokenValue::RightBracket)?;
+        self.ellipsis_check(&pats)?;
         Ok(self.array_pattern(pats))
     }
 
@@ -72,11 +73,21 @@ impl<'a> ParserState<'a> {
                     pats.push(self.parse_pattern()?);
                 }
                 self.expect(TokenValue::RightParen)?;
+                self.ellipsis_check(&pats)?;
                 Ok(self.custom_pattern(name , pats))
             }
             _ => {
                 self.error("Custom pattern must start with a name")
             }
+        }
+    }
+
+    pub(super) fn ellipsis_check(&self, pats:&[PatternNode]) -> Result<()> {
+        let ellipses = pats.iter().filter(|pn| matches!(pn.pattern, Pattern::Ellipsis(_))).count();
+        if ellipses > 1 {
+            self.error("More than one ellipsis pattern in sequence")
+        } else {
+            Ok(())
         }
     }
 

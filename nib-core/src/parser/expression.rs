@@ -191,6 +191,7 @@ impl<'a> ParserState<'a> {
                 _ => args.push(self.parse_pattern()?)
             }
         }
+        self.ellipsis_check(&args)?;
         let guard = if self.is_next(TokenValue::Bar)? {
             Some(self.parse_expression()?)
         } else {
