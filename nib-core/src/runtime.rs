@@ -3,10 +3,7 @@ use std::{cell::RefCell, collections::HashMap, env::args, fmt::Display, hash::Ha
 use crate::{
     common::{Error, Metadata, Name, Result},
     core::{Arity, FunClause},
-    runtime::{
-        evaluate::Environment,
-        prims::Primitive,
-    },
+    runtime::{evaluate::Environment, prims::Primitive},
 };
 
 mod evaluate;
@@ -46,12 +43,12 @@ impl Runtime {
         self.globals.borrow_mut().table.remove(&sym);
     }
 
-    pub fn add_to_table(&mut self, table:Rc<RefCell<Table>>, name:&str, value: &Value) {
+    pub fn add_to_table(&mut self, table: Rc<RefCell<Table>>, name: &str, value: &Value) {
         let sym = self.get_or_add_named_symbol(name);
         table.borrow_mut().table.insert(sym, value.clone());
     }
 
-    pub fn get_from_table(&mut self, table:Rc<RefCell<Table>>, name:&str) -> Option<Value> {
+    pub fn get_from_table(&mut self, table: Rc<RefCell<Table>>, name: &str) -> Option<Value> {
         let sym = self.get_or_add_named_symbol(name);
         table.borrow().table.get(&sym).cloned()
     }
@@ -75,7 +72,7 @@ impl Runtime {
             Name::Qualified(path, name) => {
                 let t = self.get_or_create_module_path(path)?;
                 self.add_to_table(t, name, val);
-            },
+            }
             Name::Plain(name) => {
                 self.add_global(name, val.clone());
             }
@@ -91,10 +88,8 @@ impl Runtime {
                 } else {
                     None
                 }
-            },
-            Name::Plain(name) => {
-                self.get_global(name)
             }
+            Name::Plain(name) => self.get_global(name),
         }
     }
 
@@ -171,7 +166,7 @@ pub enum Value {
     Bytes(Rc<RefCell<Bytes>>),
     Array(Rc<RefCell<Array>>),
     Table(Rc<RefCell<Table>>),
-    Closure(Rc<RefCell<Closure>>)
+    Closure(Rc<RefCell<Closure>>),
 }
 
 impl PartialEq for Value {
@@ -217,10 +212,10 @@ impl Value {
         Value::Table(new_ref(Table::new()))
     }
 
-    pub fn new_bytes(bytes : Vec<u8>) -> Self {
+    pub fn new_bytes(bytes: Vec<u8>) -> Self {
         Value::Bytes(new_ref(Bytes::with(bytes)))
     }
-} 
+}
 
 #[derive(Debug, Clone)]
 pub struct Symbol {
@@ -354,8 +349,6 @@ impl Display for Bytes {
     }
 }
 
-
-
 impl Bytes {
     fn new() -> Self {
         Bytes {
@@ -364,7 +357,7 @@ impl Bytes {
         }
     }
 
-    fn with(bytes : Vec<u8>) -> Self {
+    fn with(bytes: Vec<u8>) -> Self {
         Bytes {
             type_table: None,
             bytes: bytes,
@@ -377,7 +370,7 @@ pub struct Closure {
     type_table: Option<Rc<RefCell<Table>>>,
     pub code: Rc<RefCell<Vec<FunClause>>>,
     pub env: Environment,
-    pub arity: Arity
+    pub arity: Arity,
 }
 
 impl Display for Closure {

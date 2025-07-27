@@ -1,7 +1,10 @@
-use std::{collections::{HashMap, HashSet}, fmt::Display, io};
+use std::{
+    collections::{HashMap, HashSet},
+    fmt::Display,
+    io,
+};
 
 use thiserror::Error;
-
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Metadata {
@@ -12,21 +15,20 @@ pub struct Metadata {
     pub using: HashSet<Name>,
     pub base_name: Option<Name>,
     pub newlines: Vec<usize>,
-    pub last_id: Node
+    pub last_id: Node,
 }
-
 
 impl Metadata {
     pub fn new(file: Option<String>) -> Self {
-         Metadata {
-            file: file, 
+        Metadata {
+            file: file,
             trivia: Vec::new(),
             annotations: HashMap::new(),
             locations: HashMap::new(),
             using: HashSet::new(),
             base_name: None,
             newlines: Vec::new(),
-            last_id: 0
+            last_id: 0,
         }
     }
 }
@@ -42,12 +44,12 @@ pub enum Annotation {
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Location {
-    pub start:usize,
-    pub end:usize
+    pub start: usize,
+    pub end: usize,
 }
 
 impl Location {
-    pub fn at(start:usize, end:usize) -> Self {
+    pub fn at(start: usize, end: usize) -> Self {
         Location { start, end }
     }
 }
@@ -62,13 +64,13 @@ impl Display for Location {
 #[derive(Error, Debug)]
 pub enum Error {
     #[error("Syntax error: {} at {}", msg, loc)]
-    Syntax { msg: String, loc: Location }, 
+    Syntax { msg: String, loc: Location },
     #[error("Error: {}", err)]
     General { err: anyhow::Error },
     #[error("Runtime error: {}", msg)]
     Runtime { msg: String },
     #[error("Desugaring error: {}", msg)]
-    Desugar { msg: String }
+    Desugar { msg: String },
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
@@ -88,7 +90,7 @@ impl From<Error> for io::Error {
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Name {
     Qualified(Vec<String>, String),
-    Plain(String)
+    Plain(String),
 }
 
 impl Name {
@@ -102,13 +104,13 @@ impl Name {
                 }
                 str.push_str(name);
                 str
-            },
-            Name::Plain(name) => name.clone()
+            }
+            Name::Plain(name) => name.clone(),
         }
     }
 
-    pub fn name(n : &str) -> Self {
-        let mut parts : Vec<&str> = n.split(".").collect();
+    pub fn name(n: &str) -> Self {
+        let mut parts: Vec<&str> = n.split(".").collect();
         if parts.len() == 1 {
             Name::Plain(parts[0].to_string())
         } else {
@@ -118,17 +120,17 @@ impl Name {
         }
     }
 
-    pub fn append(path:&Name, base:&Name) -> Result<Name> {
+    pub fn append(path: &Name, base: &Name) -> Result<Name> {
         match (path, base) {
             (Name::Qualified(path, last), Name::Plain(b)) => {
                 let mut p = path.clone();
                 p.push(last.clone());
                 Ok(Name::Qualified(p, b.clone()))
-            },
+            }
             (Name::Plain(parent), Name::Plain(b)) => {
                 Ok(Name::Qualified(vec![parent.clone()], b.clone()))
-            },
-            _ => panic!("Can't call append on two qualified names")
+            }
+            _ => panic!("Can't call append on two qualified names"),
         }
     }
 }

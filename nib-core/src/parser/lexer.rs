@@ -17,7 +17,7 @@ impl<'a> super::ParserState<'a> {
 
     pub(super) fn get_next_token(&mut self) -> Result<Token> {
         if let Some(tok) = self.stashed_token.take() {
-            return Ok(tok)
+            return Ok(tok);
         }
         while let Some((p, c)) = self.chars.peek() {
             let ch = *c;
@@ -32,11 +32,11 @@ impl<'a> super::ParserState<'a> {
                     self.on_new_line = true;
                     self.next();
                     None
-                },
+                }
                 _ if ch.is_whitespace() => {
                     self.next();
                     None
-                },
+                }
                 '(' => {
                     self.next();
                     if let Some((_, c)) = self.chars.peek() {
@@ -53,7 +53,7 @@ impl<'a> super::ParserState<'a> {
                     } else {
                         Some(self.token(TokenValue::LeftParen))
                     }
-                },
+                }
                 ')' => Some(self.simple_token(TokenValue::RightParen)),
                 '[' => Some(self.simple_token(TokenValue::LeftBracket)),
                 ']' => Some(self.simple_token(TokenValue::RightBracket)),
@@ -70,7 +70,7 @@ impl<'a> super::ParserState<'a> {
                     } else {
                         return self.lex_error("Unterminated '`' operator");
                     }
-                },
+                }
                 ':' => Some(self.simple_token(TokenValue::Colon)),
                 ',' => Some(self.simple_token(TokenValue::Comma)),
                 ';' => Some(self.simple_token(TokenValue::Semicolon)),
@@ -84,16 +84,18 @@ impl<'a> super::ParserState<'a> {
                                     TokenValue::Identifier(name) => {
                                         Some(self.token(TokenValue::Ellipsis(Some(name))))
                                     }
-                                    _ => return self.lex_error(&format!("Expected valid identifier in ellipsis pattern, got {:?}", id))
+                                    _ => return self.lex_error(&format!(
+                                        "Expected valid identifier in ellipsis pattern, got {:?}",
+                                        id
+                                    )),
                                 }
-                            },
+                            }
                             _ => Some(self.token(TokenValue::Ellipsis(None))),
                         }
-                        
                     } else {
                         Some(self.simple_token(TokenValue::Period))
                     }
-                },
+                }
                 '/' => {
                     if self.check_prefix("//") {
                         self.snarf(|c| *c != '\n')?;
@@ -101,12 +103,12 @@ impl<'a> super::ParserState<'a> {
                     } else {
                         Some(self.read_operator()?)
                     }
-                },
+                }
                 '"' => Some(self.read_string()?),
                 '\'' => Some(self.read_char()?),
                 _ if ch.is_numeric() => Some(self.read_number(false)?),
                 _ if identifier_initial_char(ch) => Some(self.read_identifier()?),
-                _ if operator_char(ch) =>  Some(self.read_operator()?),
+                _ if operator_char(ch) => Some(self.read_operator()?),
                 _ => {
                     self.lex_error(format!("Lexing failed at illegal char: {}", ch).as_str())?;
                     None
@@ -120,7 +122,7 @@ impl<'a> super::ParserState<'a> {
         Ok(self.token(TokenValue::Eof))
     }
 
-    pub(super) fn rewind_lexer(&mut self, checkpoint:usize) {
+    pub(super) fn rewind_lexer(&mut self, checkpoint: usize) {
         if checkpoint < self.position() {
             self.chars = self.src[checkpoint..].char_indices().peekable();
             self.adjust_offset(checkpoint);
@@ -130,19 +132,21 @@ impl<'a> super::ParserState<'a> {
                 if self.position() < *last_nl {
                     self.metadata.newlines.pop();
                 } else {
-                    self.on_new_line = self.src[*last_nl..self.position()].chars().all(char::is_whitespace);
+                    self.on_new_line = self.src[*last_nl..self.position()]
+                        .chars()
+                        .all(char::is_whitespace);
                     break;
                 }
             }
         }
     }
 
-    pub(super) fn token_indent(&self, token:Token) -> i32 {
+    pub(super) fn token_indent(&self, token: Token) -> i32 {
         let start = token.location.start;
         for i in self.metadata.newlines.iter().rev() {
             if *i <= start {
-                return (start - i) as i32
-            } 
+                return (start - i) as i32;
+            }
         }
         start as i32
     }
@@ -151,8 +155,8 @@ impl<'a> super::ParserState<'a> {
         let tok = self.peek_next_token();
         match tok {
             Ok(tok) => self.token_indent(tok),
-            _ => 0
-        } 
+            _ => 0,
+        }
     }
 
     fn read_identifier(&mut self) -> Result<Token> {
@@ -168,9 +172,7 @@ impl<'a> super::ParserState<'a> {
                 "false" => Ok(self.token(TokenValue::False)),
                 "where" => Ok(self.token(TokenValue::Where)),
                 "_" => Ok(self.token(TokenValue::Underscore)),
-                _ => {
-                    Ok(self.token(TokenValue::Identifier(id.to_string())))
-                }
+                _ => Ok(self.token(TokenValue::Identifier(id.to_string()))),
             }
         } else {
             self.lex_error("Expected a valid identifier")
@@ -191,37 +193,35 @@ impl<'a> super::ParserState<'a> {
                             '[' => {
                                 self.next();
                                 Ok(self.token(TokenValue::HashLeftBracket))
-                            },
+                            }
                             '(' => {
                                 self.next();
                                 let id = self.read_parenthesized_operator()?;
                                 Ok(self.token(TokenValue::Symbol(id)))
-                            },
+                            }
                             _ if identifier_initial_char(c) => {
                                 let t = self.read_identifier()?;
                                 let id = match t.value {
-                                    TokenValue::Identifier(s) => s, 
+                                    TokenValue::Identifier(s) => s,
                                     _ => {
-                                        return self.lex_error("Expected valid identifier in symbol literal");
+                                        return self.lex_error(
+                                            "Expected valid identifier in symbol literal",
+                                        );
                                     }
                                 };
                                 Ok(self.token(TokenValue::Symbol(id)))
-                            },
-                            _ => {
-                                Ok(self.token(TokenValue::Operator(id.to_string())))
                             }
+                            _ => Ok(self.token(TokenValue::Operator(id.to_string()))),
                         }
                     } else {
                         Ok(self.token(TokenValue::Hash))
                     }
-                },
+                }
                 "@" => Ok(self.token(TokenValue::As)),
                 "->" => Ok(self.token(TokenValue::RightArrow)),
                 "=>" => Ok(self.token(TokenValue::FatRightArrow)),
-                "-" =>  Ok(self.token(TokenValue::Operator(id.to_string()))),
-                _ => {
-                    Ok(self.token(TokenValue::Operator(id.to_string())))
-                }
+                "-" => Ok(self.token(TokenValue::Operator(id.to_string()))),
+                _ => Ok(self.token(TokenValue::Operator(id.to_string()))),
             }
         } else {
             self.lex_error("Expected a valid operator")
@@ -231,7 +231,7 @@ impl<'a> super::ParserState<'a> {
     fn read_parenthesized_operator(&mut self) -> Result<String> {
         let t = self.read_operator()?;
         let id = match t.value {
-            TokenValue::Operator(op) => format!("({})", op), 
+            TokenValue::Operator(op) => format!("({})", op),
             _ => {
                 return self.lex_error("Expected operator in parens");
             }
@@ -260,7 +260,6 @@ impl<'a> super::ParserState<'a> {
         }
         self.lex_error("unterminated string")
     }
-
 
     fn read_char(&mut self) -> Result<Token> {
         self.next();
@@ -291,10 +290,10 @@ impl<'a> super::ParserState<'a> {
             '\'' => '\'',
             'x' => {
                 return self.get_codepoint(char::is_ascii_hexdigit, 16);
-            },
+            }
             c if c.is_ascii_digit() => {
                 return self.get_codepoint(char::is_ascii_digit, 10);
-            },
+            }
             _ => {
                 return self.lex_error("Invalid escape in literal");
             }
@@ -302,7 +301,6 @@ impl<'a> super::ParserState<'a> {
         self.advance(1);
         Ok(ch)
     }
-
 
     fn get_codepoint(&mut self, pred: impl Fn(&char) -> bool, radix: u32) -> Result<char> {
         let start = self.position();
@@ -318,7 +316,7 @@ impl<'a> super::ParserState<'a> {
         }
     }
 
-    fn read_number(&mut self, neg:bool) -> Result<Token> {
+    fn read_number(&mut self, neg: bool) -> Result<Token> {
         let sign = if neg { -1 } else { 1 };
         if self.check_prefix("0x") || self.check_prefix("0X") {
             self.advance(2);
@@ -328,7 +326,7 @@ impl<'a> super::ParserState<'a> {
                 Ok(c) => c,
                 Err(_) => return self.lex_error("Invalid hex numeral"),
             };
-            return Ok(self.token(TokenValue::Integer(sign*bigint)));
+            return Ok(self.token(TokenValue::Integer(sign * bigint)));
         }
         let mut stop = self.snarf(char::is_ascii_digit)?;
         let res = self.peek();
@@ -358,7 +356,7 @@ impl<'a> super::ParserState<'a> {
             Ok(c) => c,
             Err(_) => return self.lex_error("Invalid integer literal"),
         };
-        Ok(self.token(TokenValue::Integer(sign*int)))
+        Ok(self.token(TokenValue::Integer(sign * int)))
     }
 
     fn snarf(&mut self, pred: impl Fn(&char) -> bool) -> Result<usize> {
@@ -419,7 +417,8 @@ impl<'a> super::ParserState<'a> {
         Err(Error::Syntax {
             msg: msg.to_string(),
             loc: self.location_current_token(),
-        }.into())
+        }
+        .into())
     }
 
     fn token(&mut self, token: TokenValue) -> Token {
@@ -428,7 +427,7 @@ impl<'a> super::ParserState<'a> {
         Token {
             value: token,
             location: self.location_current_token(),
-            on_new_line: nl
+            on_new_line: nl,
         }
     }
 
@@ -438,23 +437,28 @@ impl<'a> super::ParserState<'a> {
     }
 }
 
-fn identifier_initial_char(ch:char) -> bool {
+fn identifier_initial_char(ch: char) -> bool {
     ch.is_alphabetic() || ch == '_'
 }
 
-fn identifier_char(ch:char) -> bool {
+fn identifier_char(ch: char) -> bool {
     ch.is_alphanumeric() || ch == '_'
 }
 
-fn forbidden_operator_char(ch:char) -> bool {
-    ch == '(' || ch == ')' ||
-    ch == '[' || ch == ']' ||
-    ch == '{' || ch == '}' ||
-    ch == '.' || ch == ',' ||
-    ch == ';' || ch == '`'
+fn forbidden_operator_char(ch: char) -> bool {
+    ch == '('
+        || ch == ')'
+        || ch == '['
+        || ch == ']'
+        || ch == '{'
+        || ch == '}'
+        || ch == '.'
+        || ch == ','
+        || ch == ';'
+        || ch == '`'
 }
 
-fn operator_char(ch:char) -> bool {
+fn operator_char(ch: char) -> bool {
     (ch.is_symbol() || ch.is_ascii_punctuation()) && !forbidden_operator_char(ch)
 }
 
@@ -513,11 +517,17 @@ pub struct Token {
 impl TokenValue {
     pub(super) fn is_literal(&self) -> bool {
         match self {
-            TokenValue::Char(_) | TokenValue::String(_) | TokenValue::Symbol(_) |
-            TokenValue::Float(_) | TokenValue::Integer(_) |
-            TokenValue::Hash | TokenValue::HashLeftBracket |
-            TokenValue::False | TokenValue::True | TokenValue::Nil => true,
-            _ => false
+            TokenValue::Char(_)
+            | TokenValue::String(_)
+            | TokenValue::Symbol(_)
+            | TokenValue::Float(_)
+            | TokenValue::Integer(_)
+            | TokenValue::Hash
+            | TokenValue::HashLeftBracket
+            | TokenValue::False
+            | TokenValue::True
+            | TokenValue::Nil => true,
+            _ => false,
         }
     }
 }

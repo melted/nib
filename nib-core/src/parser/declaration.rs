@@ -1,8 +1,11 @@
-use crate::{ast::{Binding, Declaration, ExpressionNode, FunBinding,
-    ModuleDirective, OpBinding, OpClause, Operator, Pattern, PatternNode,
-    UseDirective, VarBinding}, common::{Location, Name, Node, Result},
-    parser::{lexer::TokenValue, ParserState}};
-
+use crate::{
+    ast::{
+        Binding, Declaration, ExpressionNode, FunBinding, ModuleDirective, OpBinding, OpClause,
+        Operator, Pattern, PatternNode, UseDirective, VarBinding,
+    },
+    common::{Location, Name, Node, Result},
+    parser::{ParserState, lexer::TokenValue},
+};
 
 impl<'a> ParserState<'a> {
     pub(super) fn parse_declarations(&mut self) -> Result<Vec<Declaration>> {
@@ -30,36 +33,43 @@ impl<'a> ParserState<'a> {
 
     fn merge_locations(&mut self, id_a: Node, id_b: Node) {
         if let Some(bloc) = self.metadata.locations.remove(&id_b) {
-            self.metadata.locations.entry(id_a).and_modify(|e| e.end = bloc.end);
+            self.metadata
+                .locations
+                .entry(id_a)
+                .and_modify(|e| e.end = bloc.end);
         }
     }
 
-    pub(super) fn merge_same_declaration(&mut self, a: &mut Declaration, b:&mut Declaration) -> bool {
-        match (a,b) {
-            (Declaration::Binding(ab), Declaration::Binding(bb)) => {
-                self.merge_same_binding(ab, bb)
-            },
-            _ => false
-        }
-    }
-
-    pub(super) fn merge_same_binding(&mut self, a: &mut Binding, b:&mut Binding) -> bool {
+    pub(super) fn merge_same_declaration(
+        &mut self,
+        a: &mut Declaration,
+        b: &mut Declaration,
+    ) -> bool {
         match (a, b) {
-            (Binding::FunBinding(abind), Binding::FunBinding(bbind)) if abind.name == bbind.name => {
+            (Declaration::Binding(ab), Declaration::Binding(bb)) => self.merge_same_binding(ab, bb),
+            _ => false,
+        }
+    }
+
+    pub(super) fn merge_same_binding(&mut self, a: &mut Binding, b: &mut Binding) -> bool {
+        match (a, b) {
+            (Binding::FunBinding(abind), Binding::FunBinding(bbind))
+                if abind.name == bbind.name =>
+            {
                 abind.clauses.append(&mut bbind.clauses);
                 self.merge_locations(abind.id, bbind.id);
                 true
-            },
+            }
             (Binding::OpBinding(abind), Binding::OpBinding(bbind)) if abind.op == bbind.op => {
                 abind.clauses.append(&mut bbind.clauses);
                 self.merge_locations(abind.id, bbind.id);
                 true
-            },
-            _ => false
+            }
+            _ => false,
         }
     }
 
-    pub(super) fn parse_add_declaration(&mut self, decls:&mut Vec<Declaration>) -> Result<()> {
+    pub(super) fn parse_add_declaration(&mut self, decls: &mut Vec<Declaration>) -> Result<()> {
         let mut decl = self.parse_declaration()?;
         if let Some(mut last) = decls.last_mut() {
             if self.merge_same_declaration(&mut last, &mut decl) {
@@ -76,7 +86,9 @@ impl<'a> ParserState<'a> {
         let name = self.parse_qualified_name()?;
         let pos = self.position();
         let m = self.module_declaration(name);
-        self.metadata.locations.insert(m.id, Location::at(start, pos));
+        self.metadata
+            .locations
+            .insert(m.id, Location::at(start, pos));
         Ok(Declaration::Module(m))
     }
 
@@ -86,7 +98,9 @@ impl<'a> ParserState<'a> {
         let name = self.parse_qualified_name()?;
         let pos = self.position();
         let u = self.use_declaration(name);
-        self.metadata.locations.insert(u.id, Location::at(start, pos));
+        self.metadata
+            .locations
+            .insert(u.id, Location::at(start, pos));
         Ok(Declaration::Use(u))
     }
 
@@ -97,7 +111,9 @@ impl<'a> ParserState<'a> {
             let rhs = self.parse_expression()?;
             let bind = self.var_binding(initial, rhs);
             let pos = self.position();
-            self.metadata.locations.insert(bind.id, Location::at(start, pos));
+            self.metadata
+                .locations
+                .insert(bind.id, Location::at(start, pos));
             Ok(Binding::VarBinding(bind))
         } else {
             if self.peek_operator()? {
@@ -112,8 +128,12 @@ impl<'a> ParserState<'a> {
                 let rhs = self.parse_expression()?;
                 let bind = self.op_binding(op, initial, rpat, guard, rhs);
                 let pos = self.position();
-                self.metadata.locations.insert(bind.clauses[0].id, Location::at(start, pos));
-                self.metadata.locations.insert(bind.id, Location::at(start, pos));
+                self.metadata
+                    .locations
+                    .insert(bind.clauses[0].id, Location::at(start, pos));
+                self.metadata
+                    .locations
+                    .insert(bind.id, Location::at(start, pos));
                 Ok(Binding::OpBinding(bind))
             } else {
                 if let Pattern::Var(name) = initial.pattern {
@@ -122,8 +142,12 @@ impl<'a> ParserState<'a> {
                     let rhs = self.parse_expression()?;
                     let bind = self.fun_binding(name, args, guard, rhs);
                     let pos = self.position();
-                    self.metadata.locations.insert(bind.clauses[0].id, Location::at(start, pos));
-                    self.metadata.locations.insert(bind.id, Location::at(start, pos));
+                    self.metadata
+                        .locations
+                        .insert(bind.clauses[0].id, Location::at(start, pos));
+                    self.metadata
+                        .locations
+                        .insert(bind.id, Location::at(start, pos));
                     Ok(Binding::FunBinding(bind))
                 } else {
                     self.error("Binding pattern matches neither a var, fun or operator binding")
@@ -132,49 +156,68 @@ impl<'a> ParserState<'a> {
         }
     }
 
-    pub(super) fn module_declaration(&mut self, name:Name) -> ModuleDirective {
+    pub(super) fn module_declaration(&mut self, name: Name) -> ModuleDirective {
         self.counter += 1;
         ModuleDirective {
             id: self.counter,
-            name: name
+            name: name,
         }
     }
 
-    pub(super) fn use_declaration(&mut self, name:Name) -> UseDirective {
+    pub(super) fn use_declaration(&mut self, name: Name) -> UseDirective {
         self.counter += 1;
         UseDirective {
             id: self.counter,
-            name: name
+            name: name,
         }
     }
 
-    pub(super) fn var_binding(&mut self, pat:PatternNode, rhs:ExpressionNode) -> VarBinding {
+    pub(super) fn var_binding(&mut self, pat: PatternNode, rhs: ExpressionNode) -> VarBinding {
         self.counter += 1;
         VarBinding {
             id: self.counter,
             lhs: pat,
-            rhs: rhs
+            rhs: rhs,
         }
     }
 
-    pub(super) fn fun_binding(&mut self, name:Name, args:Vec<PatternNode>, guard: Option<ExpressionNode>, rhs:ExpressionNode) -> FunBinding {
+    pub(super) fn fun_binding(
+        &mut self,
+        name: Name,
+        args: Vec<PatternNode>,
+        guard: Option<ExpressionNode>,
+        rhs: ExpressionNode,
+    ) -> FunBinding {
         let clauses = vec![self.fun_clause(args, guard, rhs)];
         self.counter += 1;
         FunBinding {
             id: self.counter,
-            name:name,
-            clauses:clauses
+            name: name,
+            clauses: clauses,
         }
     }
 
-    pub(super) fn op_binding(&mut self, op: Operator, lpat:PatternNode, rpat:PatternNode, guard: Option<ExpressionNode>, rhs:ExpressionNode) -> OpBinding {
+    pub(super) fn op_binding(
+        &mut self,
+        op: Operator,
+        lpat: PatternNode,
+        rpat: PatternNode,
+        guard: Option<ExpressionNode>,
+        rhs: ExpressionNode,
+    ) -> OpBinding {
         self.counter += 1;
-        let clauses = vec![OpClause { id: self.counter, lpat,rpat, guard, body: rhs }];
+        let clauses = vec![OpClause {
+            id: self.counter,
+            lpat,
+            rpat,
+            guard,
+            body: rhs,
+        }];
         self.counter += 1;
         OpBinding {
             id: self.counter,
-            op:op,
-            clauses:clauses
+            op: op,
+            clauses: clauses,
         }
     }
 }

@@ -1,4 +1,7 @@
-use crate::{ ast::{self, ExpressionNode, FunClause, Literal, Operator, PatternNode}, common::{Name, Result}};
+use crate::{
+    ast::{self, ExpressionNode, FunClause, Literal, Operator, PatternNode},
+    common::{Name, Result},
+};
 
 use super::{ParserState, lexer::TokenValue};
 
@@ -27,7 +30,7 @@ impl<'a> ParserState<'a> {
         let next = self.peek_next_token()?;
         match next.value {
             TokenValue::Identifier(_) => Ok(true),
-            _ => Ok(false)
+            _ => Ok(false),
         }
     }
 
@@ -35,7 +38,7 @@ impl<'a> ParserState<'a> {
         let next = self.peek_next_token()?;
         match next.value {
             TokenValue::Operator(_) => Ok(true),
-            _ => Ok(false)
+            _ => Ok(false),
         }
     }
 
@@ -46,11 +49,7 @@ impl<'a> ParserState<'a> {
 
     pub(super) fn peek_next(&mut self, t: TokenValue) -> Result<bool> {
         let next = self.peek_next_token()?;
-        if t == next.value {
-            Ok(true)
-        } else {
-            Ok(false)
-        }
+        if t == next.value { Ok(true) } else { Ok(false) }
     }
 
     pub(super) fn optional_token(&mut self, t: TokenValue) -> Result<()> {
@@ -96,20 +95,18 @@ impl<'a> ParserState<'a> {
                 }
             };
         }
-        let ret = if path.is_empty() { 
-                            Name::Plain(id)
-                        } else {
-                            Name::Qualified(path, id)
-                        };
+        let ret = if path.is_empty() {
+            Name::Plain(id)
+        } else {
+            Name::Qualified(path, id)
+        };
         Ok(ret)
     }
 
     pub(super) fn parse_operator(&mut self) -> Result<Operator> {
         match self.get_next_token()?.value {
-            TokenValue::Operator(op) => {
-                Ok(Operator::Plain(op))
-            },
-            t => self.error(&format!("Expected an operator, got {t:?}"))
+            TokenValue::Operator(op) => Ok(Operator::Plain(op)),
+            t => self.error(&format!("Expected an operator, got {t:?}")),
         }
     }
 
@@ -133,16 +130,16 @@ impl<'a> ParserState<'a> {
                 self.expect(TokenValue::RightBracket)?;
                 Ok(Literal::Bytearray(bytes))
             }
-            _ => {
-                self.error(&format!("Expected a literal got token {token:?}"))
-            }
+            _ => self.error(&format!("Expected a literal got token {token:?}")),
         }
     }
 
     pub(super) fn parse_byte(&mut self) -> Result<u8> {
         if let TokenValue::Integer(b) = self.peek_next_token()?.value {
             self.get_next_token()?;
-            let v:u8 =b.try_into().map_err(|_e|self.new_error(&format!("Invalid bytearray literal: {b:?}")))?;
+            let v: u8 = b
+                .try_into()
+                .map_err(|_e| self.new_error(&format!("Invalid bytearray literal: {b:?}")))?;
             Ok(v)
         } else {
             let tok = self.get_next_token()?;
@@ -150,8 +147,18 @@ impl<'a> ParserState<'a> {
         }
     }
 
-    pub(super) fn fun_clause(&mut self, args:Vec<PatternNode>, guard: Option<ExpressionNode>, body:ExpressionNode) -> FunClause {
+    pub(super) fn fun_clause(
+        &mut self,
+        args: Vec<PatternNode>,
+        guard: Option<ExpressionNode>,
+        body: ExpressionNode,
+    ) -> FunClause {
         self.counter += 1;
-        FunClause { id: self.counter, args, guard, body }
+        FunClause {
+            id: self.counter,
+            args,
+            guard,
+            body,
+        }
     }
 }

@@ -3,8 +3,6 @@ use std::io::{self, Read};
 use nibble::core;
 use nibble::parser;
 
-
-
 fn main() -> io::Result<()> {
     let mut buffer = String::new();
     let mut stdin = io::stdin();

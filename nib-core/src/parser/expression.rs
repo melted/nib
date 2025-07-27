@@ -1,30 +1,36 @@
 use std::collections::HashSet;
 
-use crate::ast::{AstVisitor, Binding, Binop, Cond, ExpressionNode, Expression, FunClause, Literal, Operator, PatternNode};
+use super::ParserState;
+use crate::ast::{
+    AstVisitor, Binding, Binop, Cond, Expression, ExpressionNode, FunClause, Literal, Operator,
+    PatternNode,
+};
 use crate::common::{Location, Name, Result};
 use crate::parser::lexer::TokenValue;
-use super::ParserState;
 
 impl<'a> ParserState<'a> {
     pub(super) fn parse_expression(&mut self) -> Result<ExpressionNode> {
         self.parse_inner_expression(0)
     }
 
-    pub(super) fn parse_inner_expression(&mut self, min_pred:i32) -> Result<ExpressionNode> {
+    pub(super) fn parse_inner_expression(&mut self, min_pred: i32) -> Result<ExpressionNode> {
         let indent = self.indent();
         let last = *self.indent_stack.last().unwrap_or(&0);
         let start = self.next_position();
         if indent < last {
-            return self.error("Sub-expression violates layout by being to the left of parent expression");
+            return self
+                .error("Sub-expression violates layout by being to the left of parent expression");
         }
         self.indent_stack.push(indent);
         let mut lhs = match self.parse_left_expression() {
             Ok(exp) => {
                 let pos = self.position();
-                self.metadata.locations.insert(exp.id, Location::at(start, pos));
+                self.metadata
+                    .locations
+                    .insert(exp.id, Location::at(start, pos));
                 exp
-            }, 
-            err@Err(_) => {
+            }
+            err @ Err(_) => {
                 self.indent_stack.pop();
                 return err;
             }
@@ -43,13 +49,13 @@ impl<'a> ParserState<'a> {
                 return Ok(lhs);
             }
             let result = match tok.value {
-                TokenValue::Where => { 
+                TokenValue::Where => {
                     if min_pred < 2 {
                         self.parse_where_expression(lhs)
                     } else {
                         break;
                     }
-                },
+                }
                 TokenValue::Operator(op) => {
                     if min_pred < 6 {
                         self.get_next_token()?;
@@ -57,32 +63,34 @@ impl<'a> ParserState<'a> {
                     } else {
                         break;
                     }
-                },
+                }
                 TokenValue::FatRightArrow => {
                     if min_pred < 4 {
                         self.parse_cond_expression(lhs)
                     } else {
                         break;
                     }
-                },
+                }
                 TokenValue::Period => self.parse_projection_expression(lhs),
                 TokenValue::Identifier(_) => {
-                        if min_pred < 9 {
-                            let rhs = self.parse_inner_expression(9)?;
-                            Ok(self.app_expression(lhs, rhs))
-                        } else {
-                            break;
-                        }
-                },
+                    if min_pred < 9 {
+                        let rhs = self.parse_inner_expression(9)?;
+                        Ok(self.app_expression(lhs, rhs))
+                    } else {
+                        break;
+                    }
+                }
                 TokenValue::Eof => break,
-                TokenValue::LeftBrace | TokenValue::LeftParen | TokenValue::LeftBracket if min_pred < 9 => {
+                TokenValue::LeftBrace | TokenValue::LeftParen | TokenValue::LeftBracket
+                    if min_pred < 9 =>
+                {
                     let expr = self.parse_left_expression()?;
                     Ok(self.app_expression(lhs, expr))
-                },
+                }
                 _ if tok.value.is_literal() && min_pred < 9 => {
                     let expr = self.parse_left_expression()?;
                     Ok(self.app_expression(lhs, expr))
-                }, 
+                }
                 _ => {
                     break;
                 }
@@ -94,11 +102,13 @@ impl<'a> ParserState<'a> {
                 }
                 Ok(exp) => {
                     let pos = self.position();
-                    self.metadata.locations.insert(exp.id, Location::at(start, pos));
+                    self.metadata
+                        .locations
+                        .insert(exp.id, Location::at(start, pos));
                     lhs = exp;
                 }
             }
-        };
+        }
         self.indent_stack.pop();
         Ok(lhs)
     }
@@ -109,7 +119,7 @@ impl<'a> ParserState<'a> {
             x if x.is_literal() => {
                 let lit = self.parse_literal()?;
                 Ok(self.literal_expression(lit))
-            },
+            }
             TokenValue::LeftBrace => self.parse_lambda_expression(),
             TokenValue::LeftBracket => self.parse_array_expression(),
             TokenValue::LeftParen => self.parse_paren_expression(),
@@ -117,14 +127,12 @@ impl<'a> ParserState<'a> {
                 self.get_next_token()?;
                 let name = Name::name(&name);
                 Ok(self.var_expression(name))
-            },
+            }
             TokenValue::Operator(op) if op == "-" => {
                 // Special rule for prefix -, it's sugar for negate.
                 Ok(self.var_expression(Name::name("negate")))
             }
-            _ => {
-                self.error(&format!("Illegal token in left expression {tok:?}"))
-            }
+            _ => self.error(&format!("Illegal token in left expression {tok:?}")),
         }
     }
 
@@ -135,14 +143,14 @@ impl<'a> ParserState<'a> {
             TokenValue::Semicolon => {
                 self.expect(TokenValue::Semicolon)?;
                 Ok(true)
-            }, 
+            }
             TokenValue::Eof => Ok(false),
             _ if next.on_new_line => Ok(true),
-            _ => Ok(false)
+            _ => Ok(false),
         }
     }
 
-    pub(super) fn parse_where_expression(&mut self, lhs:ExpressionNode) -> Result<ExpressionNode> {
+    pub(super) fn parse_where_expression(&mut self, lhs: ExpressionNode) -> Result<ExpressionNode> {
         self.expect(TokenValue::Where)?;
         let mut bindings = Vec::new();
         let indent = *self.indent_stack.last().unwrap_or(&0);
@@ -165,12 +173,16 @@ impl<'a> ParserState<'a> {
         Ok(self.where_expression(lhs, bindings))
     }
 
-    pub(super) fn parse_binop_expression(&mut self, lhs:ExpressionNode, op:Operator) -> Result<ExpressionNode> {
+    pub(super) fn parse_binop_expression(
+        &mut self,
+        lhs: ExpressionNode,
+        op: Operator,
+    ) -> Result<ExpressionNode> {
         let rhs = self.parse_inner_expression(5)?;
         Ok(self.binop_expression(op, lhs, rhs))
     }
 
-    pub(super) fn parse_cond_expression(&mut self, lhs:ExpressionNode) -> Result<ExpressionNode> {
+    pub(super) fn parse_cond_expression(&mut self, lhs: ExpressionNode) -> Result<ExpressionNode> {
         self.expect(TokenValue::FatRightArrow)?;
         let on_true = self.parse_inner_expression(3)?;
         if self.semicolon_or_newline()? {
@@ -188,7 +200,7 @@ impl<'a> ParserState<'a> {
             let t = self.peek_next_token()?.value;
             match t {
                 TokenValue::Bar | TokenValue::Equals | TokenValue::RightArrow => break,
-                _ => args.push(self.parse_pattern()?)
+                _ => args.push(self.parse_pattern()?),
             }
         }
         self.ellipsis_check(&args)?;
@@ -225,14 +237,13 @@ impl<'a> ParserState<'a> {
         Ok(self.lambda_expression(clauses))
     }
 
-
     pub(super) fn parse_implicit_lambda_expression(&mut self) -> Result<ExpressionNode> {
         self.expect(TokenValue::LeftBrace)?;
         let expr = self.parse_expression()?;
         self.expect(TokenValue::RightBrace)?;
         let mut visitor = UsedImplicits::new();
         expr.visit(&mut visitor);
-        let mut vars : Vec<Name> = visitor.vars.into_iter().collect();
+        let mut vars: Vec<Name> = visitor.vars.into_iter().collect();
         vars.sort();
         let mut pats: Vec<PatternNode> = vars.into_iter().map(|n| self.var_pattern(n)).collect();
         if pats.is_empty() {
@@ -255,15 +266,18 @@ impl<'a> ParserState<'a> {
         Ok(self.array_expression(exprs))
     }
 
-    pub(super) fn parse_projection_expression(&mut self, lhs: ExpressionNode) -> Result<ExpressionNode> {
+    pub(super) fn parse_projection_expression(
+        &mut self,
+        lhs: ExpressionNode,
+    ) -> Result<ExpressionNode> {
         let mut projs = vec![lhs];
         while self.is_next(TokenValue::Period)? {
             let next = match self.peek_next_token()?.value {
                 TokenValue::Identifier(id) => {
                     self.get_next_token()?;
                     self.literal_expression(Literal::Symbol(id))
-                },
-                _ => self.parse_inner_expression(10)?
+                }
+                _ => self.parse_inner_expression(10)?,
             };
             projs.push(next);
         }
@@ -281,7 +295,7 @@ impl<'a> ParserState<'a> {
         self.counter += 1;
         ExpressionNode {
             id: self.counter,
-            expr: Expression::Literal(lit)
+            expr: Expression::Literal(lit),
         }
     }
 
@@ -289,7 +303,7 @@ impl<'a> ParserState<'a> {
         self.counter += 1;
         ExpressionNode {
             id: self.counter,
-            expr: Expression::Var(var)
+            expr: Expression::Var(var),
         }
     }
 
@@ -297,23 +311,25 @@ impl<'a> ParserState<'a> {
         self.counter += 1;
         ExpressionNode {
             id: self.counter,
-            expr: Expression::Array(vals)
+            expr: Expression::Array(vals),
         }
     }
 
-    pub(super) fn app_expression(&mut self, mut f:  ExpressionNode, arg: ExpressionNode) -> ExpressionNode {
+    pub(super) fn app_expression(
+        &mut self,
+        mut f: ExpressionNode,
+        arg: ExpressionNode,
+    ) -> ExpressionNode {
         self.counter += 1;
         match f.expr {
             Expression::App(ref mut args) => {
                 args.push(arg);
                 f
-            },
-            _ => {
-                ExpressionNode {
-                    id: self.counter,
-                    expr: Expression::App(vec![f, arg])
-                }
             }
+            _ => ExpressionNode {
+                id: self.counter,
+                expr: Expression::App(vec![f, arg]),
+            },
         }
     }
 
@@ -321,29 +337,36 @@ impl<'a> ParserState<'a> {
         self.counter += 1;
         ExpressionNode {
             id: self.counter,
-            expr: Expression::Lambda(clauses)
+            expr: Expression::Lambda(clauses),
         }
     }
 
-    pub(super) fn binop_expression(&mut self, op: Operator, lhs: ExpressionNode, rhs: ExpressionNode) -> ExpressionNode {
+    pub(super) fn binop_expression(
+        &mut self,
+        op: Operator,
+        lhs: ExpressionNode,
+        rhs: ExpressionNode,
+    ) -> ExpressionNode {
         self.counter += 1;
         ExpressionNode {
             id: self.counter,
-            expr: Expression::Binop(
-                Binop {
-                    op: op,
-                    lhs: Box::new(lhs),
-                    rhs: Box::new(rhs)
-                }
-            )
+            expr: Expression::Binop(Binop {
+                op: op,
+                lhs: Box::new(lhs),
+                rhs: Box::new(rhs),
+            }),
         }
     }
 
-    pub(super) fn where_expression(&mut self, expr: ExpressionNode, bindings: Vec<Binding>) -> ExpressionNode {
+    pub(super) fn where_expression(
+        &mut self,
+        expr: ExpressionNode,
+        bindings: Vec<Binding>,
+    ) -> ExpressionNode {
         self.counter += 1;
         ExpressionNode {
             id: self.counter,
-            expr: Expression::Where(Box::new(expr), bindings)
+            expr: Expression::Where(Box::new(expr), bindings),
         }
     }
 
@@ -351,33 +374,38 @@ impl<'a> ParserState<'a> {
         self.counter += 1;
         ExpressionNode {
             id: self.counter,
-            expr: Expression::Projection(exprs)
+            expr: Expression::Projection(exprs),
         }
     }
 
-    pub(super) fn cond_expression(&mut self, pred: ExpressionNode, on_true: ExpressionNode, on_false: ExpressionNode) -> ExpressionNode {
+    pub(super) fn cond_expression(
+        &mut self,
+        pred: ExpressionNode,
+        on_true: ExpressionNode,
+        on_false: ExpressionNode,
+    ) -> ExpressionNode {
         self.counter += 1;
         ExpressionNode {
             id: self.counter,
-            expr: Expression::Cond(
-                Cond {
-                    pred: Box::new(pred),
-                    on_true: Box::new(on_true),
-                    on_false: Box::new(on_false)
-                }
-            )
+            expr: Expression::Cond(Cond {
+                pred: Box::new(pred),
+                on_true: Box::new(on_true),
+                on_false: Box::new(on_false),
+            }),
         }
     }
 }
 
 #[derive(Debug)]
 pub(super) struct UsedImplicits {
-    pub vars : HashSet<Name>
+    pub vars: HashSet<Name>,
 }
 
 impl UsedImplicits {
     pub(super) fn new() -> Self {
-        UsedImplicits { vars: HashSet::new() }
+        UsedImplicits {
+            vars: HashSet::new(),
+        }
     }
 }
 

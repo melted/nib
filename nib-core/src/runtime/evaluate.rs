@@ -1,40 +1,59 @@
-use std::{cmp::max, collections::{HashMap, HashSet}, rc::Rc};
+use std::{
+    cmp::max,
+    collections::{HashMap, HashSet},
+    rc::Rc,
+};
 
 use log::info;
 
-use crate::{ast::Literal, common::{Error, Name, Result}, core::{free_vars, Arity, Binder, Binding, Expression, FunClause, Module, Pattern}, runtime::{new_ref, prims, Bytes, Closure, Runtime, Value}};
+use crate::{
+    ast::Literal,
+    common::{Error, Name, Result},
+    core::{Arity, Binder, Binding, Expression, FunClause, Module, Pattern, free_vars},
+    runtime::{Bytes, Closure, Runtime, Value, new_ref, prims},
+};
 
 impl Runtime {
-    pub(super) fn evaluate(&mut self, code : &mut Module, env:&mut Environment) -> Result<()> {
+    pub(super) fn evaluate(&mut self, code: &mut Module, env: &mut Environment) -> Result<()> {
         for b in code.bindings.iter_mut() {
             self.evaluate_binding(b, env, false)?;
         }
         Ok(())
     }
 
-    pub(super) fn evaluate_binding(&mut self, binding: &Binding, env:&mut Environment, local:bool) -> Result<()> {
+    pub(super) fn evaluate_binding(
+        &mut self,
+        binding: &Binding,
+        env: &mut Environment,
+        local: bool,
+    ) -> Result<()> {
         info!("Evaluating binding {}", binding);
         let val = self.evaluate_expression(&binding.body, env)?;
         match &binding.binder {
-
             Binder::Public(name) if local => {
                 match name {
                     Name::Plain(s) => env.add(s, &val),
-                    Name::Qualified(_,_) => return self.error(&format!("Qualified name {} in where clause", name))
+                    Name::Qualified(_, _) => {
+                        return self.error(&format!("Qualified name {} in where clause", name));
+                    }
                 };
-            },
+            }
             Binder::Public(name) => {
                 self.add_name(name, &val)?;
-            },
+            }
             Binder::Local(name) => {
                 env.add(name, &val);
-            },
+            }
             Binder::Unbound => {}
         }
         Ok(())
     }
 
-    pub(super) fn evaluate_expression(&mut self, expression: &Expression, env:&mut Environment) -> Result<Value> {
+    pub(super) fn evaluate_expression(
+        &mut self,
+        expression: &Expression,
+        env: &mut Environment,
+    ) -> Result<Value> {
         info!("Evaluating expression {}", expression);
         let val = match expression {
             Expression::Var(n, id) => {
@@ -43,14 +62,14 @@ impl Runtime {
                     return self.error(&format!("couldn't find variable {} in environment", id));
                 };
                 v
-            },
+            }
             Expression::App(n, exps) => self.evaluate_application(exps, env)?,
             Expression::Literal(n, lit) => self.evaluate_literal(lit)?,
             Expression::Lambda(n, clauses) => {
                 let mut free = HashSet::new();
                 free_vars(expression, &mut free);
                 self.evaluate_lambda(clauses, &free, env)?
-            },
+            }
             Expression::Where(n, exp, bindings) => {
                 env.push();
                 for b in bindings.iter() {
@@ -64,7 +83,7 @@ impl Runtime {
         Ok(val)
     }
 
-    pub(super) fn evaluate_literal(&mut self, literal : &Literal) -> Result<Value> {
+    pub(super) fn evaluate_literal(&mut self, literal: &Literal) -> Result<Value> {
         info!("evaluating literal {}", literal);
         let val = match literal {
             Literal::Nil => Value::Nil,
@@ -76,7 +95,7 @@ impl Runtime {
             Literal::Symbol(sym) => {
                 let s = self.get_or_add_named_symbol(sym);
                 Value::Symbol(s)
-            },
+            }
             Literal::String(s) => {
                 let mut b = Bytes::with(s.clone().as_bytes().to_vec());
                 b.type_table = Some(self.get_or_create_module_path(&["string".to_owned()])?);
@@ -86,7 +105,11 @@ impl Runtime {
         Ok(val)
     }
 
-    pub(super) fn evaluate_application(&mut self, exps : &Vec<Expression>, env:&mut Environment) -> Result<Value> {
+    pub(super) fn evaluate_application(
+        &mut self,
+        exps: &Vec<Expression>,
+        env: &mut Environment,
+    ) -> Result<Value> {
         if exps.len() < 2 {
             return self.error("application requires at least two expressions");
         }
@@ -97,29 +120,36 @@ impl Runtime {
         self.apply_values(&vals)
     }
 
-    pub(super) fn apply_values(&mut self, vals : &[Value]) -> Result<Value> {
+    pub(super) fn apply_values(&mut self, vals: &[Value]) -> Result<Value> {
         match &vals[0] {
             Value::Primitive(prim, prims::Arity::OneArg) => self.call_primitive1(prim, &vals[1]),
-            Value::Primitive(prim, prims::Arity::TwoArg) => self.call_primitive2(prim, &vals[1], &vals[2]),
-            Value::Primitive(prim, prims::Arity::ThreeArg) => self.call_primitive3(prim, &vals[1], &vals[2], &vals[3]),
-            Value::Primitive(prim, prims::Arity::VarArg) => self.call_primitive_vararg(prim, &vals[1..]),
+            Value::Primitive(prim, prims::Arity::TwoArg) => {
+                self.call_primitive2(prim, &vals[1], &vals[2])
+            }
+            Value::Primitive(prim, prims::Arity::ThreeArg) => {
+                self.call_primitive3(prim, &vals[1], &vals[2], &vals[3])
+            }
+            Value::Primitive(prim, prims::Arity::VarArg) => {
+                self.call_primitive_vararg(prim, &vals[1..])
+            }
             Value::Closure(closure) => {
                 let c = closure.borrow_mut();
                 let env = &c.env;
                 let clauses = &c.code.borrow();
                 let args = &vals[1..];
-                for clause in clauses.iter() {
-                    
-                }
+                for clause in clauses.iter() {}
                 todo!()
-            },
-            _ => {
-                self.error(&format!("Not a callable type in application {}", vals[0]))
             }
+            _ => self.error(&format!("Not a callable type in application {}", vals[0])),
         }
     }
 
-    pub(super) fn evaluate_lambda(&mut self, clauses : &Vec<FunClause>, free:&HashSet<String>, env:&mut Environment) -> Result<Value> {
+    pub(super) fn evaluate_lambda(
+        &mut self,
+        clauses: &Vec<FunClause>,
+        free: &HashSet<String>,
+        env: &mut Environment,
+    ) -> Result<Value> {
         let mut lexical_env = Environment::new();
         lexical_env.push();
 
@@ -133,7 +163,7 @@ impl Runtime {
         for c in clauses[1..].iter() {
             let next = get_arity(&c.args);
             match (&arity, &next) {
-                (Arity::Fixed(n), Arity::Fixed(m)) if n == m => {},
+                (Arity::Fixed(n), Arity::Fixed(m)) if n == m => {}
                 (Arity::VarArg(n), Arity::VarArg(m)) => {
                     arity = Arity::VarArg(max(*n, *m));
                 }
@@ -142,41 +172,51 @@ impl Runtime {
                 }
             }
         }
-        Ok(Value::Closure(new_ref(Closure{ code: new_ref(clauses.clone()), type_table: None, env: lexical_env, arity })))
+        Ok(Value::Closure(new_ref(Closure {
+            code: new_ref(clauses.clone()),
+            type_table: None,
+            env: lexical_env,
+            arity,
+        })))
     }
 
-
-
-    pub(super) fn match_patterns(&mut self, args : &[Value], patterns : &[Pattern], env: &Environment) -> Result<Option<HashMap<String, Value>>> {
+    pub(super) fn match_patterns(
+        &mut self,
+        args: &[Value],
+        patterns: &[Pattern],
+        env: &Environment,
+    ) -> Result<Option<HashMap<String, Value>>> {
         todo!()
     }
 
-    pub(super) fn match_pattern(&mut self, arg : &Value, pattern : &Pattern, env: &Environment) -> Result<Option<HashMap<String, Value>>> {
+    pub(super) fn match_pattern(
+        &mut self,
+        arg: &Value,
+        pattern: &Pattern,
+        env: &Environment,
+    ) -> Result<Option<HashMap<String, Value>>> {
         let mut out = HashMap::new();
         let val = match pattern {
             Pattern::Wildcard => Some(out),
             Pattern::Literal(literal) => {
                 let v = self.evaluate_literal(literal)?;
-                if &v == arg {
-                    Some(out)
-                } else {
-                    None
-                }
-            },
+                if &v == arg { Some(out) } else { None }
+            }
             Pattern::Ellipsis(Some(name)) | Pattern::Bind(name) => {
                 out.insert(name.to_string(), arg.clone());
                 Some(out)
-            },
+            }
             Pattern::Ellipsis(None) => Some(out),
             Pattern::Custom(name, patterns) => {
-                let handler = match(name) {
+                let handler = match (name) {
                     Name::Qualified(_, _) => {
                         // get qualified name
                         todo!()
-                    },
+                    }
                     Name::Plain(str) => {
                         let Some(v) = self.lookup(env, str) else {
-                            return self.error(&format!("Failed to find custom pattern handler {}", str));
+                            return self
+                                .error(&format!("Failed to find custom pattern handler {}", str));
                         };
                         v
                     }
@@ -184,11 +224,11 @@ impl Runtime {
                 let fun = match handler {
                     Value::Closure(_) => handler,
                     Value::Table(t) => {
-                        let Some(val@Value::Closure(_)) = self.get_from_table(t, "match") else {
+                        let Some(val @ Value::Closure(_)) = self.get_from_table(t, "match") else {
                             return self.error("No match function in table used in custom pattern");
                         };
                         val
-                    },
+                    }
                     _ => {
                         return self.error("Custom pattern handler must be a function or a table with a match function");
                     }
@@ -199,19 +239,23 @@ impl Runtime {
                     Value::Array(array) => {
                         let vals = &array.borrow().array;
                         self.match_patterns(vals, patterns, env)?
-                    },
-                    Value::Bool(false) => {
-                        None
-                    },
+                    }
+                    Value::Bool(false) => None,
                     _ => {
-                        return self.error(&format!("Custom pattern handler {} didn't return an array or false", name.to_string()));
+                        return self.error(&format!(
+                            "Custom pattern handler {} didn't return an array or false",
+                            name.to_string()
+                        ));
                     }
                 }
-            },
+            }
             Pattern::Alias(pattern, name) => {
                 let res = self.match_pattern(arg, pattern, env)?;
-                res.map(|mut vars| { vars.insert(name.to_string(), arg.clone()); vars })
-            },
+                res.map(|mut vars| {
+                    vars.insert(name.to_string(), arg.clone());
+                    vars
+                })
+            }
         };
         Ok(val)
     }
@@ -225,7 +269,7 @@ pub(super) fn get_arity(patterns: &[Pattern]) -> Arity {
     let vararg = patterns.iter().any(|p| p.is_ellipsis());
     let len = patterns.len();
     if vararg {
-        Arity::VarArg(len-1)
+        Arity::VarArg(len - 1)
     } else {
         Arity::Fixed(len)
     }
@@ -233,8 +277,8 @@ pub(super) fn get_arity(patterns: &[Pattern]) -> Arity {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Environment {
-    pub envs: Vec<HashMap<String, Value>>
-} 
+    pub envs: Vec<HashMap<String, Value>>,
+}
 
 impl Environment {
     pub fn new() -> Self {
@@ -249,7 +293,7 @@ impl Environment {
         self.envs.pop();
     }
 
-    pub fn push_env(&mut self, env : HashMap<String, Value>) {
+    pub fn push_env(&mut self, env: HashMap<String, Value>) {
         self.envs.push(env);
     }
 

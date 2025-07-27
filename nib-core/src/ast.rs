@@ -4,7 +4,7 @@ use std::{collections::HashSet, fmt::Display};
 #[derive(Debug, Clone, PartialEq)]
 pub struct Module {
     pub metadata: Metadata,
-    pub declarations: Vec<Declaration>
+    pub declarations: Vec<Declaration>,
 }
 
 impl Module {
@@ -20,11 +20,11 @@ impl Module {
 pub enum Declaration {
     Module(ModuleDirective),
     Use(UseDirective),
-    Binding(Binding)
+    Binding(Binding),
 }
 
 impl Declaration {
-    pub fn visit(&self, visitor:&mut dyn AstVisitor) {
+    pub fn visit(&self, visitor: &mut dyn AstVisitor) {
         if !visitor.on_declaration(self) {
             return;
         }
@@ -41,7 +41,7 @@ impl Display for Declaration {
         match self {
             Declaration::Module(m) => write!(f, "{}", m),
             Declaration::Use(u) => write!(f, "{}", u),
-            Declaration::Binding(b) => write!(f, "{}", b)
+            Declaration::Binding(b) => write!(f, "{}", b),
         }
     }
 }
@@ -50,11 +50,11 @@ impl Display for Declaration {
 pub enum Binding {
     VarBinding(VarBinding),
     FunBinding(FunBinding),
-    OpBinding(OpBinding)
+    OpBinding(OpBinding),
 }
 
 impl Binding {
-    pub fn visit(&self, visitor:&mut dyn AstVisitor) {
+    pub fn visit(&self, visitor: &mut dyn AstVisitor) {
         if !visitor.on_binding(self) {
             return;
         }
@@ -65,7 +65,7 @@ impl Binding {
                     c.guard.as_ref().map(|g| g.visit(visitor));
                     c.body.visit(visitor);
                 }
-            },
+            }
             Binding::OpBinding(ob) => {
                 for c in &ob.clauses {
                     c.lpat.visit(visitor);
@@ -73,7 +73,7 @@ impl Binding {
                     c.guard.as_ref().map(|e| e.visit(visitor));
                     c.body.visit(visitor);
                 }
-            },
+            }
             Binding::VarBinding(vb) => {
                 vb.lhs.visit(visitor);
                 vb.rhs.visit(visitor);
@@ -88,7 +88,7 @@ impl Display for Binding {
         match self {
             Binding::VarBinding(vb) => write!(f, "{}", vb),
             Binding::FunBinding(fb) => write!(f, "{}", fb),
-            Binding::OpBinding(ob) => write!(f, "{}", ob)
+            Binding::OpBinding(ob) => write!(f, "{}", ob),
         }
     }
 }
@@ -96,7 +96,7 @@ impl Display for Binding {
 #[derive(Debug, Clone, PartialEq)]
 pub struct ModuleDirective {
     pub id: Node,
-    pub name: Name
+    pub name: Name,
 }
 
 impl Display for ModuleDirective {
@@ -108,7 +108,7 @@ impl Display for ModuleDirective {
 #[derive(Debug, Clone, PartialEq)]
 pub struct UseDirective {
     pub id: Node,
-    pub name: Name
+    pub name: Name,
 }
 
 impl Display for UseDirective {
@@ -121,7 +121,7 @@ impl Display for UseDirective {
 pub struct VarBinding {
     pub id: Node,
     pub lhs: PatternNode,
-    pub rhs: ExpressionNode
+    pub rhs: ExpressionNode,
 }
 
 impl Display for VarBinding {
@@ -134,7 +134,7 @@ impl Display for VarBinding {
 pub struct FunBinding {
     pub id: Node,
     pub name: Name,
-    pub clauses: Vec<FunClause>
+    pub clauses: Vec<FunClause>,
 }
 
 impl Display for FunBinding {
@@ -151,7 +151,7 @@ pub struct FunClause {
     pub id: Node,
     pub args: Vec<PatternNode>,
     pub guard: Option<ExpressionNode>,
-    pub body: ExpressionNode
+    pub body: ExpressionNode,
 }
 
 impl Display for FunClause {
@@ -170,7 +170,7 @@ impl Display for FunClause {
 pub struct OpBinding {
     pub id: Node,
     pub op: Operator,
-    pub clauses: Vec<OpClause>
+    pub clauses: Vec<OpClause>,
 }
 
 impl Display for OpBinding {
@@ -188,7 +188,7 @@ pub struct OpClause {
     pub lpat: PatternNode,
     pub rpat: PatternNode,
     pub guard: Option<ExpressionNode>,
-    pub body: ExpressionNode
+    pub body: ExpressionNode,
 }
 
 impl Display for OpClause {
@@ -204,10 +204,9 @@ impl Display for OpClause {
 // Patterns
 #[derive(Debug, Clone, PartialEq)]
 pub struct PatternNode {
-    pub id:Node,
-    pub pattern:Pattern
+    pub id: Node,
+    pub pattern: Pattern,
 }
-
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Pattern {
@@ -218,7 +217,7 @@ pub enum Pattern {
     Array(Vec<PatternNode>),
     Alias(Box<PatternNode>, Name),
     Custom(Name, Vec<PatternNode>),
-    Typed(Box<PatternNode>, Name)
+    Typed(Box<PatternNode>, Name),
 }
 
 impl PatternNode {
@@ -229,20 +228,20 @@ impl PatternNode {
         match &self.pattern {
             Pattern::Alias(pat, _) => {
                 pat.visit(visitor);
-            },
+            }
             Pattern::Array(pats) => {
                 for p in pats {
                     p.visit(visitor);
                 }
-            },
+            }
             Pattern::Custom(_, pats) => {
                 for p in pats {
                     p.visit(visitor);
                 }
-            },
+            }
             Pattern::Typed(pat, _) => {
                 pat.visit(visitor);
-            },
+            }
             _ => {}
         }
         visitor.on_post_pattern(self);
@@ -259,38 +258,41 @@ impl Display for Pattern {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Pattern::Wildcard => write!(f, "_"),
-            Pattern::Alias(pat, alias ) => write!(f, "{}@{} ", pat, alias),
-            Pattern::Typed(pat, typ ) => write!(f, "{}:{} ", pat, typ),
+            Pattern::Alias(pat, alias) => write!(f, "{}@{} ", pat, alias),
+            Pattern::Typed(pat, typ) => write!(f, "{}:{} ", pat, typ),
             Pattern::Array(pats) => {
                 write!(f, "[")?;
                 for (i, p) in pats.iter().enumerate() {
                     write!(f, "{}", p)?;
-                    if i < pats.len() -1 {
+                    if i < pats.len() - 1 {
                         write!(f, ", ")?;
                     }
                 }
                 write!(f, "]")
-            },
+            }
             Pattern::Custom(name, pats) => {
                 write!(f, "({}", name)?;
                 for p in pats {
                     write!(f, " {}", p)?;
                 }
                 write!(f, ")")
-            },
-            Pattern::Ellipsis(name) => write!(f, "...{}", name.clone().map_or(String::new(), |n| n.to_string())),
+            }
+            Pattern::Ellipsis(name) => write!(
+                f,
+                "...{}",
+                name.clone().map_or(String::new(), |n| n.to_string())
+            ),
             Pattern::Literal(lit) => write!(f, "{}", lit),
-            Pattern::Var(var) => write!(f, "{}", var)
-         }
+            Pattern::Var(var) => write!(f, "{}", var),
+        }
     }
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ExpressionNode {
     pub id: Node,
-    pub expr: Expression
+    pub expr: Expression,
 }
-
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Expression {
@@ -302,7 +304,7 @@ pub enum Expression {
     Binop(Binop),
     Where(Box<ExpressionNode>, Vec<Binding>),
     Cond(Cond),
-    Projection(Vec<ExpressionNode>)
+    Projection(Vec<ExpressionNode>),
 }
 
 impl ExpressionNode {
@@ -311,25 +313,29 @@ impl ExpressionNode {
             return;
         }
         match &self.expr {
-            Expression::App(args ) => {
+            Expression::App(args) => {
                 for arg in args {
                     arg.visit(visitor);
                 }
-            },
+            }
             Expression::Array(elems) => {
                 for e in elems {
                     e.visit(visitor);
                 }
-            },
+            }
             Expression::Binop(Binop { op, lhs, rhs }) => {
                 lhs.visit(visitor);
                 rhs.visit(visitor);
-            },
-            Expression::Cond(Cond {pred, on_true, on_false }) => {
+            }
+            Expression::Cond(Cond {
+                pred,
+                on_true,
+                on_false,
+            }) => {
                 pred.visit(visitor);
                 on_true.visit(visitor);
                 on_false.visit(visitor);
-            },
+            }
             Expression::Lambda(clauses) => {
                 for clause in clauses {
                     if let Some(guard) = &clause.guard {
@@ -337,27 +343,26 @@ impl ExpressionNode {
                     }
                     clause.body.visit(visitor);
                 }
-            },
+            }
             Expression::Projection(exps) => {
                 for e in exps {
                     e.visit(visitor);
                 }
-            },
+            }
             Expression::Where(exp, bindings) => {
                 exp.visit(visitor);
                 for b in bindings {
                     b.visit(visitor);
                 }
-            },
+            }
             _ => {}
         }
         visitor.on_post_expression(self);
     }
 
-
     pub fn free_variables(&self) -> HashSet<Name> {
         let mut vars = HashSet::new();
-  //      let mut bound = HashSet::new();
+        //      let mut bound = HashSet::new();
         vars
     }
 }
@@ -380,7 +385,7 @@ impl Display for Expression {
                     write!(f, "{} ", arg);
                 }
                 write!(f, ")");
-            },
+            }
             Expression::Array(arr) => {
                 write!(f, "[")?;
                 for (i, exp) in arr.iter().enumerate() {
@@ -390,13 +395,13 @@ impl Display for Expression {
                     }
                 }
                 write!(f, "]")?;
-            },
-            Expression::Binop(Binop { op, lhs, rhs }) => {
-                write!(f, "({} {} {})", lhs, op, rhs)?
-            },
-            Expression::Cond(Cond { pred, on_true, on_false }) => {
-                write!(f, "({} => {} ; {})", pred, on_true, on_false)?
-            },
+            }
+            Expression::Binop(Binop { op, lhs, rhs }) => write!(f, "({} {} {})", lhs, op, rhs)?,
+            Expression::Cond(Cond {
+                pred,
+                on_true,
+                on_false,
+            }) => write!(f, "({} => {} ; {})", pred, on_true, on_false)?,
             Expression::Lambda(clauses) => {
                 write!(f, "{{ ")?;
                 for c in clauses {
@@ -409,7 +414,7 @@ impl Display for Expression {
                     write!(f, "-> {}; ", c.body)?;
                 }
                 write!(f, " }}")?;
-            },
+            }
             Expression::Projection(exprs) => {
                 for (i, exp) in exprs.iter().enumerate() {
                     write!(f, "{}", exp)?;
@@ -418,7 +423,7 @@ impl Display for Expression {
                     }
                 }
             }
-            Expression::Where(lhs, bindings ) => {
+            Expression::Where(lhs, bindings) => {
                 write!(f, "{} where ", lhs)?;
                 for b in bindings {
                     write!(f, "{}; ", b)?;
@@ -433,14 +438,14 @@ impl Display for Expression {
 pub struct Binop {
     pub op: Operator,
     pub lhs: Box<ExpressionNode>,
-    pub rhs: Box<ExpressionNode>
+    pub rhs: Box<ExpressionNode>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Cond {
     pub pred: Box<ExpressionNode>,
     pub on_true: Box<ExpressionNode>,
-    pub on_false: Box<ExpressionNode>
+    pub on_false: Box<ExpressionNode>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -452,7 +457,7 @@ pub enum Literal {
     Char(char),
     String(String),
     Symbol(String),
-    Bytearray(Vec<u8>)
+    Bytearray(Vec<u8>),
 }
 
 impl Display for Literal {
@@ -483,14 +488,14 @@ impl Display for Literal {
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Operator {
     Qualified(Vec<String>, String),
-    Plain(String)
+    Plain(String),
 }
 
 impl Operator {
     pub fn to_name(&self) -> Name {
         match self {
             Operator::Qualified(path, op) => Name::Qualified(path.clone(), format!("({})", op)),
-            Operator::Plain(op) => Name::Plain(format!("({})", op))
+            Operator::Plain(op) => Name::Plain(format!("({})", op)),
         }
     }
 }
@@ -498,13 +503,13 @@ impl Operator {
 impl Display for Operator {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-           Operator::Qualified(path, op) => {
+            Operator::Qualified(path, op) => {
                 for p in path {
                     write!(f, "{p}.")?;
                 }
                 write!(f, "{op}")?;
-           }
-           Operator::Plain(op) => write!(f, "{op}")?
+            }
+            Operator::Plain(op) => write!(f, "{op}")?,
         }
         Ok(())
     }
@@ -515,32 +520,23 @@ pub trait AstVisitor {
         true
     }
 
-    fn on_post_expression(&mut self, expression: &ExpressionNode) {
-
-    }
+    fn on_post_expression(&mut self, expression: &ExpressionNode) {}
 
     fn on_declaration(&mut self, decl: &Declaration) -> bool {
         true
     }
 
-    fn on_post_declaration(&mut self, decl: &Declaration) {
-
-    }
+    fn on_post_declaration(&mut self, decl: &Declaration) {}
 
     fn on_pattern(&mut self, pat: &PatternNode) -> bool {
         true
     }
 
-    fn on_post_pattern(&mut self, pat: &PatternNode) {
-         
-    }
+    fn on_post_pattern(&mut self, pat: &PatternNode) {}
 
     fn on_binding(&mut self, binding: &Binding) -> bool {
         true
     }
 
-    fn on_post_binding(&mut self, binding: &Binding) {
-
-    }
-
+    fn on_post_binding(&mut self, binding: &Binding) {}
 }

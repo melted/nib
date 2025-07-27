@@ -1,18 +1,13 @@
-
-pub struct Heap {
-
-}
+pub struct Heap {}
 
 pub struct ObjectHeader {
-    header : u64
+    header: u64,
 }
 
-impl ObjectHeader {
-
-}
+impl ObjectHeader {}
 
 pub struct Value {
-    val : u64
+    val: u64,
 }
 
 impl Value {

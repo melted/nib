@@ -1,8 +1,8 @@
 use std::iter::Peekable;
 use std::str::CharIndices;
 
-use crate::common::{Error, Location, Metadata, Node, Result};
 use crate::ast::{ExpressionNode, Module};
+use crate::common::{Error, Location, Metadata, Node, Result};
 use crate::parser::lexer::{Token, TokenValue};
 
 mod declaration;
@@ -12,15 +12,16 @@ pub(crate) mod lexer;
 mod pattern;
 mod tests;
 
-
 pub fn parse_declarations(file: Option<String>, code: &str) -> Result<Module> {
     let mut state = ParserState::new(code);
     let decls = state.parse_declarations()?;
     state.metadata.last_id = state.counter;
     state.metadata.file = file;
-    Ok(Module { metadata: state.metadata, declarations: decls })
+    Ok(Module {
+        metadata: state.metadata,
+        declarations: decls,
+    })
 }
-
 
 pub fn parse_expression(code: &str) -> Result<ExpressionNode> {
     let mut state = ParserState::new(code);
@@ -67,12 +68,13 @@ struct ParserState<'a> {
     indent_stack: Vec<i32>,
     stashed_token: Option<Token>,
     on_new_line: bool,
-    counter: Node
+    counter: Node,
 }
 
 impl<'a> ParserState<'a> {
     fn new(code: &'a str) -> ParserState<'a> {
-        ParserState { metadata: Metadata::new(None),
+        ParserState {
+            metadata: Metadata::new(None),
             src: code,
             chars: code.char_indices().peekable(),
             token_start: 0,
@@ -81,14 +83,14 @@ impl<'a> ParserState<'a> {
             indent_stack: Vec::new(),
             stashed_token: None,
             on_new_line: true,
-            counter: 0
+            counter: 0,
         }
     }
 
     pub(self) fn new_error(&self, msg: &str) -> Error {
         Error::Syntax {
             msg: msg.to_string(),
-            loc: Location::at(self.token_start, self.position()) // TODO: extent of AST element
+            loc: Location::at(self.token_start, self.position()), // TODO: extent of AST element
         }
     }
 
@@ -109,9 +111,8 @@ impl<'a> ParserState<'a> {
         self.peek_next_token().map_or(0, |x| x.location.start)
     }
 
-    pub(self) fn adjust_offset(&mut self, offset:usize) {
+    pub(self) fn adjust_offset(&mut self, offset: usize) {
         self.offset = offset;
         self.pos = 0;
     }
 }
-

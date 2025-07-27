@@ -1,9 +1,9 @@
-#![cfg(test)] 
+#![cfg(test)]
 use crate::ast::{Binding, Cond, Declaration, Expression, Literal, Pattern};
-use crate::common::{ Name, Result };
+use crate::common::{Name, Result};
 use crate::parser::expression::UsedImplicits;
-use crate::parser::{lex, ParserState};
 use crate::parser::lexer::TokenValue;
+use crate::parser::{ParserState, lex};
 
 #[test]
 fn lex_numbers() -> Result<()> {
@@ -39,8 +39,8 @@ fn parse_names() -> Result<()> {
             assert_eq!(n, "name");
             assert_eq!(p.len(), 1);
             assert_eq!(p[0], "a");
-        },
-        _ => assert!(false)
+        }
+        _ => assert!(false),
     }
     Ok(())
 }
@@ -53,11 +53,11 @@ fn parse_string_literal() -> Result<()> {
     Ok(())
 }
 
-    #[test]
+#[test]
 fn parse_bytearray_literal() -> Result<()> {
     let mut state = ParserState::new("#[123,133,123]");
     let lit = state.parse_literal()?;
-    assert!(Literal::Bytearray(vec![123,133,123]) == lit);
+    assert!(Literal::Bytearray(vec![123, 133, 123]) == lit);
     Ok(())
 }
 
@@ -95,8 +95,10 @@ fn parse_module_declaration() -> Result<()> {
     let mut state = ParserState::new("module cool.mod");
     let decl = state.parse_declaration()?;
     if let Declaration::Module(module) = decl {
-        assert_eq!(module.name,
-                   Name::Qualified(vec!["cool".to_string()], "mod".to_string()));
+        assert_eq!(
+            module.name,
+            Name::Qualified(vec!["cool".to_string()], "mod".to_string())
+        );
     } else {
         assert!(false);
     }
@@ -107,13 +109,13 @@ fn parse_module_declaration() -> Result<()> {
 fn parse_custom_pattern() -> Result<()> {
     let mut state = ParserState::new("(pair a b)");
     let pat = state.parse_pattern()?;
-    match &pat.pattern{
-        Pattern::Custom(name,fields ) => {
+    match &pat.pattern {
+        Pattern::Custom(name, fields) => {
             assert_eq!(name.to_string(), "pair");
             assert_eq!(fields[0].pattern, Pattern::Var(Name::name("a")));
             assert_eq!(fields[1].pattern, Pattern::Var(Name::name("b")));
-        },
-        _ => assert!(false)
+        }
+        _ => assert!(false),
     }
     Ok(())
 }
@@ -123,12 +125,12 @@ fn parse_simple_binding() -> Result<()> {
     let mut state = ParserState::new("a = 1");
     let decl = state.parse_declaration()?;
     match decl {
-        Declaration::Binding(Binding::VarBinding(bind )) => {
+        Declaration::Binding(Binding::VarBinding(bind)) => {
             assert_eq!(bind.lhs.pattern, Pattern::Var(Name::name("a")));
             let exp = bind.rhs.expr;
             assert_eq!(exp, Expression::Literal(Literal::Integer(1)));
         }
-        _ => assert!(false)
+        _ => assert!(false),
     }
     Ok(())
 }
@@ -150,7 +152,7 @@ fn parse_lambda_expression() -> Result<()> {
                 return state.error("meh");
             };
         }
-        _ => assert!(false)
+        _ => assert!(false),
     }
     Ok(())
 }
@@ -166,10 +168,10 @@ fn parse_double_binop() -> Result<()> {
                 Expression::Binop(op2) => {
                     assert_eq!(op2.lhs.expr, Expression::Literal(Literal::Integer(2)));
                 }
-                _ => assert!(false)
+                _ => assert!(false),
             }
         }
-        _ => assert!(false)
+        _ => assert!(false),
     }
     Ok(())
 }
@@ -179,7 +181,7 @@ fn lex_double_peek_at_end() -> Result<()> {
     let mut state = ParserState::new("a = 1 + 2");
     for i in 0..5 {
         state.get_next_token()?;
-    };
+    }
     let y = state.peek_next_token()?;
     let z = state.peek_next_token()?;
     assert_eq!(y, z);
@@ -220,8 +222,8 @@ fn parse_implicit_lambda_no_args() -> Result<()> {
         Expression::Lambda(clauses) => {
             assert_eq!(clauses.len(), 1);
             assert_eq!(clauses[0].args.len(), 1);
-        },
-        _ => assert!(false)
+        }
+        _ => assert!(false),
     }
     Ok(())
 }
@@ -257,10 +259,14 @@ fn parse_conditional_expression() -> Result<()> {
     let mut state = ParserState::new("x < y => x; y");
     let exp = state.parse_expression()?;
     match exp.expr {
-        Expression::Cond(Cond {pred, on_true, on_false}) => {
+        Expression::Cond(Cond {
+            pred,
+            on_true,
+            on_false,
+        }) => {
             assert_eq!(on_true.expr, Expression::Var(Name::name("x")));
-        },
-        _ => assert!(false)
+        }
+        _ => assert!(false),
     }
     Ok(())
 }
