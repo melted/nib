@@ -272,6 +272,15 @@ fn parse_conditional_expression() -> Result<()> {
 }
 
 #[test]
+fn disallow_multiple_ellipsises() -> Result<()> {
+    let mut state = ParserState::new("evil ... ... x = x");
+    let res = state.parse_declaration();
+    assert!(res.is_err());
+    Ok(())
+}
+
+
+#[test]
 fn empty_test_skeleton() -> Result<()> {
     let mut state = ParserState::new("");
     Ok(())

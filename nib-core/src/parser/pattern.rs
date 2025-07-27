@@ -1,8 +1,7 @@
 use super::{ParserState, lexer::TokenValue};
-use crate::common::{Name, Result};
 use crate::{
     ast::{Literal, Pattern, PatternNode},
-    common::Location,
+    common::{Location, Name, Result},
 };
 
 impl<'a> ParserState<'a> {
