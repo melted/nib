@@ -384,6 +384,7 @@ pub struct Closure {
     type_table: Option<Rc<RefCell<Table>>>,
     pub code: Rc<RefCell<Vec<FunClause>>>,
     pub env: Environment,
+    pub args: Vec<Value>,
     pub arity: Arity,
 }
 

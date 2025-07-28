@@ -7,8 +7,8 @@ use log::info;
 use crate::{
     ast::Literal,
     common::{Name, Result},
-    core::{Arity, Binder, Binding, Expression, FunClause, Module, Pattern, free_vars},
-    runtime::{Bytes, Closure, Runtime, Value, new_ref},
+    core::{free_vars, Arity, Binder, Binding, Expression, FunClause, Module, Pattern},
+    runtime::{evaluate, new_ref, Bytes, Closure, Runtime, Value},
 };
 
 impl Runtime {
@@ -130,13 +130,30 @@ impl Runtime {
             Value::Primitive(prim, Arity::VarArg(_)) => {
                 self.call_primitive_vararg(prim, &vals[1..])
             }
-            Value::Closure(closure) => {
-                let c = closure.borrow_mut();
-                let env = &c.env;
-                let clauses = &c.code.borrow();
-                let args = &vals[1..];
-                for clause in clauses.iter() {}
-                todo!()
+            Value::Closure(closure_rc) => {
+                let mut closure = closure_rc.borrow_mut(); 
+                vals[1..].into_iter().for_each(|v| closure.args.push(v.clone()));
+                let mut env = closure.env.clone();
+                if closure.args.len() < closure.arity.min_arity() {
+                    return Ok(Value::Closure(closure_rc.clone()));
+                }
+                let clauses = closure.code.borrow();
+                for clause in clauses.iter() {
+                    if let Some(binds) = self.match_patterns(&closure.args, &clause.args, &env)? {
+                        env.push_env(binds);
+                        if let Some(guard) = &clause.guard {
+                            let v = self.evaluate_expression(guard, &mut env)?;
+                            if v == Value::Bool(false) {
+                                env.pop();
+                                continue;
+                            }
+                        }
+                        let v = self.evaluate_expression(&clause.rhs, &mut env);
+                        env.pop();
+                        return v;
+                    }
+                }
+                self.error(&format!("No matching pattern for closure"))
             }
             _ => self.error(&format!("Not a callable type in application {}", vals[0])),
         }
@@ -174,6 +191,7 @@ impl Runtime {
             code: new_ref(clauses.clone()),
             type_table: None,
             env: lexical_env,
+            args: Vec::new(),
             arity,
         })))
     }

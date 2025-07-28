@@ -480,6 +480,14 @@ impl Display for Arity {
     }
 }
 
+impl Arity {
+    pub fn min_arity(&self) -> usize {
+        match self {
+            Arity::Fixed(n) | Arity::VarArg(n) => *n
+        }
+    }
+}
+
 impl Pattern {
     pub fn is_ellipsis(&self) -> bool {
         match self {
