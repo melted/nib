@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::ops::Deref;
 
 use crate::common::Result;
+use crate::core::Arity;
 use crate::runtime::{Runtime, Table, Value, new_ref};
 
 impl Runtime {
@@ -75,16 +76,16 @@ impl Runtime {
 
     pub(super) fn register_primitives(&mut self) {
         self.add_global("global", Value::Table(self.globals.clone()));
-        self.add_global("print", Value::Primitive(Primitive::Print, Arity::OneArg));
+        self.add_global("print", Value::Primitive(Primitive::Print, Arity::Fixed(1)));
         self.add_global(
             "project",
-            Value::Primitive(Primitive::Project, Arity::VarArg),
+            Value::Primitive(Primitive::Project, Arity::VarArg(2)),
         );
-        self.add_global("type", Value::Primitive(Primitive::Type, Arity::OneArg));
-        self.add_global("_prim_add", Value::Primitive(Primitive::Add, Arity::TwoArg));
-        self.add_global("_prim_sub", Value::Primitive(Primitive::Sub, Arity::TwoArg));
-        self.add_global("_prim_mul", Value::Primitive(Primitive::Mul, Arity::TwoArg));
-        self.add_global("_prim_div", Value::Primitive(Primitive::Div, Arity::TwoArg));
+        self.add_global("type", Value::Primitive(Primitive::Type, Arity::Fixed(1)));
+        self.add_global("_prim_add", Value::Primitive(Primitive::Add, Arity::Fixed(2)));
+        self.add_global("_prim_sub", Value::Primitive(Primitive::Sub, Arity::Fixed(2)));
+        self.add_global("_prim_mul", Value::Primitive(Primitive::Mul, Arity::Fixed(2)));
+        self.add_global("_prim_div", Value::Primitive(Primitive::Div, Arity::Fixed(2)));
     }
 
     pub(super) fn register_type_tables(&mut self) {
@@ -101,15 +102,6 @@ impl Runtime {
         self.add_global("table", Value::new_table());
         self.add_global("function", Value::new_table());
     }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum Arity {
-    NoArg,
-    OneArg,
-    TwoArg,
-    ThreeArg,
-    VarArg,
 }
 
 #[derive(Debug, Clone, PartialEq)]

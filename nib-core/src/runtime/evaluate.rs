@@ -122,14 +122,14 @@ impl Runtime {
 
     pub(super) fn apply_values(&mut self, vals: &[Value]) -> Result<Value> {
         match &vals[0] {
-            Value::Primitive(prim, prims::Arity::OneArg) => self.call_primitive1(prim, &vals[1]),
-            Value::Primitive(prim, prims::Arity::TwoArg) => {
+            Value::Primitive(prim, Arity::Fixed(1)) => self.call_primitive1(prim, &vals[1]),
+            Value::Primitive(prim, Arity::Fixed(2)) => {
                 self.call_primitive2(prim, &vals[1], &vals[2])
             }
-            Value::Primitive(prim, prims::Arity::ThreeArg) => {
+            Value::Primitive(prim, Arity::Fixed(3)) => {
                 self.call_primitive3(prim, &vals[1], &vals[2], &vals[3])
             }
-            Value::Primitive(prim, prims::Arity::VarArg) => {
+            Value::Primitive(prim, Arity::VarArg(_)) => {
                 self.call_primitive_vararg(prim, &vals[1..])
             }
             Value::Closure(closure) => {

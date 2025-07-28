@@ -156,7 +156,7 @@ fn new_ref<T>(val: T) -> Rc<RefCell<T>> {
 #[derive(Debug, Clone)]
 pub enum Value {
     Nil,
-    Primitive(Primitive, prims::Arity),
+    Primitive(Primitive, Arity),
     Bool(bool),
     Integer(i64),
     Real(f64),
@@ -192,7 +192,7 @@ impl Display for Value {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Value::Nil => write!(f, "()"),
-            Value::Primitive(primitive, arity) => write!(f, "¤<primitive:{:?}>", primitive),
+            Value::Primitive(primitive, arity) => write!(f, "¤<primitive:{:?}:{}>", primitive, arity),
             Value::Bool(b) => write!(f, "{}", b),
             Value::Integer(i) => write!(f, "{}", i),
             Value::Real(x) => write!(f, "{}", x),
