@@ -187,6 +187,9 @@ impl Runtime {
         let mut current_arg:usize = 0;
         let mut out = HashMap::new();
         for (i, p) in patterns.iter().enumerate() {
+            if current_arg == args.len() {
+                return Ok(None);
+            }
             let res = if let Pattern::Ellipsis(_) = p {
                 let trailing = patterns.len() - i - 1;
                 let ellipsis = Value::new_array(&args[current_arg..args.len()-trailing]);

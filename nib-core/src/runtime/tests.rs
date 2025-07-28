@@ -17,3 +17,14 @@ fn simple_pattern_match() -> Result<()> {
     }
     Ok(())
 }
+
+#[test]
+fn pattern_arity_fail() -> Result<()> {
+    let pats = vec![Pattern::Wildcard, Pattern::Bind(Name::name("x")), Pattern::Wildcard, Pattern::Wildcard];
+    let args = vec![Value::Integer(1), Value::Integer(2), Value::Integer(3)];
+    let mut rt = Runtime::new();
+    let env = Environment::new();
+    let res = rt.match_patterns(&args, &pats, &env)?;
+    assert!(res.is_none());
+    Ok(())
+}
