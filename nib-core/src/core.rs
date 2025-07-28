@@ -341,6 +341,7 @@ impl DesugarState {
     fn error<T>(&self, msg: &str) -> Result<T> {
         Err(Error::Desugar {
             msg: msg.to_owned(),
+            loc: None
         })
     }
 }

@@ -125,6 +125,14 @@ pub enum Primitive {
     Sub,
     Mul,
     Div,
+
+    // Comparison
+    Gt,
+    Gte,
+    Lt,
+    Lte,
+    Eq,
+    NEq,
 }
 
 impl Runtime {

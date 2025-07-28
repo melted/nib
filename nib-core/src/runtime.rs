@@ -1,9 +1,7 @@
-use std::{cell::RefCell, collections::HashMap, fmt::Display, hash::Hash, rc::Rc};
+use std::{cell::RefCell, collections::HashMap, fmt::Display, fs::read_to_string, hash::Hash, rc::Rc};
 
 use crate::{
-    common::{Error, Metadata, Name, Result},
-    core::{Arity, FunClause},
-    runtime::{evaluate::Environment, prims::Primitive},
+    common::{Error, Metadata, Name, Result}, core::{desugar, Arity, FunClause}, parser::parse_declarations, runtime::{evaluate::Environment, prims::Primitive}
 };
 
 mod evaluate;
@@ -16,22 +14,47 @@ pub struct Runtime {
     metadata: HashMap<String, Metadata>,
     globals: Rc<RefCell<Table>>,
     named_symbols: HashMap<String, Symbol>,
-    local_environment: Environment,
+    local_environment: Environment
 }
+
+
+
 
 impl Runtime {
     pub fn new() -> Self {
-        Runtime {
+        let mut rt = Runtime {
             metadata: HashMap::new(),
             globals: new_ref(Table::new()),
             named_symbols: HashMap::new(),
             local_environment: Environment::new(),
-        }
+        };
+        rt.register_primitives();
+        rt.register_type_tables();
+        rt
     }
+
+    pub fn load(&mut self, path:&str) -> Result<()> {
+        let code = read_to_string(path)?;
+        let mut ast_module = parse_declarations(Some(path.to_owned()), &code)?;
+        let mut module = desugar(ast_module)?;
+        let v = self.metadata.insert(path.to_owned(), module.metadata.clone());
+        let mut env = Environment::new();
+        self.evaluate(&mut module, &mut env)
+    }
+
+    pub fn add_code(&mut self, name:&str, code:&str) -> Result<()> {
+        let mut ast_module = parse_declarations(Some(name.to_owned()), code)?;
+        let mut module = desugar(ast_module)?;
+        let v = self.metadata.insert(name.to_owned(), module.metadata.clone());
+        let mut env = Environment::new();
+        self.evaluate(&mut module, &mut env)
+    }
+
 
     pub fn error<T>(&self, msg: &str) -> Result<T> {
         Err(Error::Runtime {
             msg: msg.to_owned(),
+            loc: None
         })
     }
 

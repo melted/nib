@@ -4,6 +4,7 @@ use std::{
     io,
 };
 
+use anyhow::anyhow;
 use thiserror::Error;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -61,6 +62,7 @@ impl Display for Location {
     }
 }
 
+
 #[derive(Error, Debug)]
 pub enum Error {
     #[error("Syntax error: {} at {}", msg, loc)]
@@ -68,9 +70,9 @@ pub enum Error {
     #[error("Error: {}", err)]
     General { err: anyhow::Error },
     #[error("Runtime error: {}", msg)]
-    Runtime { msg: String },
+    Runtime { msg: String,  loc: Option<Location> },
     #[error("Desugaring error: {}", msg)]
-    Desugar { msg: String },
+    Desugar { msg: String, loc: Option<Location> },
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
@@ -78,6 +80,12 @@ pub type Result<T> = std::result::Result<T, Error>;
 impl From<anyhow::Error> for Error {
     fn from(value: anyhow::Error) -> Self {
         Error::General { err: value }
+    }
+}
+
+impl From<io::Error> for Error {
+    fn from(value: io::Error) -> Self {
+        Error::General { err: anyhow!(value) }
     }
 }
 

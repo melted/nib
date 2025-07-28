@@ -32,4 +32,15 @@ const a b = a
 // ptr (peek, poke, offset)
 // IO  
 // Debug
-// 
+//
+
+/// Add two numbers
+a + b = _prim_add a b
+
+/// Subtract b from a
+a - b = _prim_sub a b
+
+/// Multiply two numbers
+a * b = _prim_mul a b
+
+a / d = _prim_div a b

@@ -1,16 +1,19 @@
-use std::io::{self, Read};
+use std::env::args;
+use std::io::{self, stdin, Read};
 
 use nibble::core;
 use nibble::parser;
+use nibble::runtime::Runtime;
 
 fn main() -> io::Result<()> {
-    let mut buffer = String::new();
-    let mut stdin = io::stdin();
-    stdin.read_to_string(&mut buffer)?;
-    parser::dump_lex(&buffer)?;
-    parser::dump_prog(&buffer)?;
-    let modul = parser::parse_declarations(None, &buffer)?;
-    let desugared = core::desugar(modul)?;
-    println!("{}", desugared);
+    let args : Vec<_> = args().collect();
+    let mut rt = Runtime::new();
+    if args.len() < 2 {
+        let mut buffer = String::new();
+        let read = stdin().read_to_string(&mut buffer)?;
+        rt.add_code("stdin", &buffer)?;
+    } else {
+        rt.load(&args[1])?;
+    }
     Ok(())
 }
