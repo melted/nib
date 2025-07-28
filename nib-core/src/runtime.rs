@@ -10,15 +10,13 @@ mod prims;
 pub mod table;
 mod tests;
 
+#[derive(Debug, Clone)]
 pub struct Runtime {
     metadata: HashMap<String, Metadata>,
     globals: Rc<RefCell<Table>>,
     named_symbols: HashMap<String, Symbol>,
     local_environment: Environment
 }
-
-
-
 
 impl Runtime {
     pub fn new() -> Self {
@@ -137,7 +135,8 @@ impl Runtime {
                         return None;
                     }
                 }
-            }
+            };
+            rest = &rest[1..]; 
         }
         Some(table)
     }
@@ -167,7 +166,8 @@ impl Runtime {
                         return self.error(&format!("Illegal module path {:?}", path));
                     }
                 }
-            }
+            };
+            rest = &rest[1..]; 
         }
         Ok(table)
     }

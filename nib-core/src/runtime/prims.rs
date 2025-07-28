@@ -73,7 +73,7 @@ impl Runtime {
     }
 
     pub(super) fn register_primitives(&mut self) {
-        self.add_global("global", Value::Table(self.globals.clone()));
+//        self.add_global("global", Value::Table(self.globals.clone()));
         self.add_global("print", Value::Primitive(Primitive::Print, Arity::Fixed(1)));
         self.add_global(
             "project",

@@ -2,3 +2,4 @@ _ = print 1
 _ = print true
 c = _prim_add 1 2
 _ = print c
+b = print "hello"
