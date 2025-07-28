@@ -3,3 +3,20 @@ _ = print true
 c = _prim_add 1 2
 _ = print c
 b = print "hello"
+
+// Ok, let's be systematic
+// Operators
+a + b = _prim_add a b
+a * b = _prim_mul a b
+a - b = _prim_sub a b
+
+// Function
+inc x = x + 1
+
+// Vararg
+mkarr ...xs = xs
+
+// Use
+_ = print (mkarr 1 2 3 4 5)
+_ = print (2.9 + 1.0)
+_ = print (inc 4)
