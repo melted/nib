@@ -1,10 +1,10 @@
 use std::{
-    collections::{HashMap, HashSet},
-    fmt::{Display, write},
+    collections::HashSet,
+    fmt::Display,
 };
 
 use crate::{
-    ast::{self, PatternNode},
+    ast::{self},
     common::{Error, Metadata, Name, Node, Result},
 };
 

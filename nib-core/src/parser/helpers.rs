@@ -1,5 +1,5 @@
 use crate::{
-    ast::{self, ExpressionNode, FunClause, Literal, Operator, PatternNode},
+    ast::{ExpressionNode, FunClause, Literal, Operator, PatternNode},
     common::{Name, Result},
 };
 

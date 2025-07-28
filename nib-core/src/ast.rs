@@ -361,7 +361,7 @@ impl ExpressionNode {
     }
 
     pub fn free_variables(&self) -> HashSet<Name> {
-        let mut vars = HashSet::new();
+        let vars = HashSet::new();
         //      let mut bound = HashSet::new();
         vars
     }

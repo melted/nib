@@ -1,14 +1,14 @@
 use std::{
-    cmp::max, collections::{HashMap, HashSet}, env::args, rc::Rc
+    cmp::max, collections::{HashMap, HashSet}
 };
 
 use log::info;
 
 use crate::{
     ast::Literal,
-    common::{Error, Name, Result},
+    common::{Name, Result},
     core::{Arity, Binder, Binding, Expression, FunClause, Module, Pattern, free_vars},
-    runtime::{Bytes, Closure, Runtime, Value, new_ref, prims},
+    runtime::{Bytes, Closure, Runtime, Value, new_ref},
 };
 
 impl Runtime {
@@ -229,7 +229,7 @@ impl Runtime {
             }
             Pattern::Ellipsis(None) => Some(out),
             Pattern::Custom(name, patterns) => {
-                let handler = match (name) {
+                let handler = match name {
                     Name::Qualified(_, _) => {
                         // get qualified name
                         todo!()

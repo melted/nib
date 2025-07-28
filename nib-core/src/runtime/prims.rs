@@ -1,9 +1,7 @@
-use std::collections::HashMap;
-use std::ops::Deref;
 
 use crate::common::Result;
 use crate::core::Arity;
-use crate::runtime::{Runtime, Table, Value, new_ref};
+use crate::runtime::{Runtime, Value};
 
 impl Runtime {
     pub(super) fn call_primitive0(&mut self, prim: &Primitive) -> Result<Value> {

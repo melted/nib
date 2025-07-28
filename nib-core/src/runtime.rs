@@ -1,4 +1,4 @@
-use std::{cell::RefCell, collections::HashMap, env::args, fmt::Display, hash::Hash, rc::Rc};
+use std::{cell::RefCell, collections::HashMap, fmt::Display, hash::Hash, rc::Rc};
 
 use crate::{
     common::{Error, Metadata, Name, Result},
