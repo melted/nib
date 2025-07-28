@@ -82,10 +82,22 @@ impl Runtime {
             Value::Primitive(Primitive::Project, Arity::VarArg(2)),
         );
         self.add_global("type", Value::Primitive(Primitive::Type, Arity::Fixed(1)));
-        self.add_global("_prim_add", Value::Primitive(Primitive::Add, Arity::Fixed(2)));
-        self.add_global("_prim_sub", Value::Primitive(Primitive::Sub, Arity::Fixed(2)));
-        self.add_global("_prim_mul", Value::Primitive(Primitive::Mul, Arity::Fixed(2)));
-        self.add_global("_prim_div", Value::Primitive(Primitive::Div, Arity::Fixed(2)));
+        self.add_global(
+            "_prim_add",
+            Value::Primitive(Primitive::Add, Arity::Fixed(2)),
+        );
+        self.add_global(
+            "_prim_sub",
+            Value::Primitive(Primitive::Sub, Arity::Fixed(2)),
+        );
+        self.add_global(
+            "_prim_mul",
+            Value::Primitive(Primitive::Mul, Arity::Fixed(2)),
+        );
+        self.add_global(
+            "_prim_div",
+            Value::Primitive(Primitive::Div, Arity::Fixed(2)),
+        );
     }
 
     pub(super) fn register_type_tables(&mut self) {

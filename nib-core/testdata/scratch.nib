@@ -2,6 +2,9 @@
 
 on what fun = fun what
 
+// simple custom pattern matcher
+cons x xs = [x, xs]
+
 // This works
 // length xs = on xs { () -> 0
 //                    (cons hd tl) -> 1 + length tl }

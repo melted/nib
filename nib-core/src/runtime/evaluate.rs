@@ -1,7 +1,5 @@
 use std::{
-    cmp::max,
-    collections::{HashMap, HashSet},
-    rc::Rc,
+    cmp::max, collections::{HashMap, HashSet}, env::args, rc::Rc
 };
 
 use log::info;
@@ -186,7 +184,27 @@ impl Runtime {
         patterns: &[Pattern],
         env: &Environment,
     ) -> Result<Option<HashMap<String, Value>>> {
-        todo!()
+        let mut current_arg:usize = 0;
+        let mut out = HashMap::new();
+        for (i, p) in patterns.iter().enumerate() {
+            let res = if let Pattern::Ellipsis(_) = p {
+                let trailing = patterns.len() - i - 1;
+                let ellipsis = Value::new_array(&args[current_arg..args.len()-trailing]);
+                let r = self.match_pattern(&ellipsis, p, env)?;
+                current_arg = args.len() - trailing;
+                r
+            } else {
+                let r = self.match_pattern(&args[current_arg], p, env)?;
+                current_arg = current_arg + 1;
+                r
+            };
+            if let Some(vars) = res {
+                vars.into_iter().for_each(|(k, v)| { out.insert(k, v); });
+            } else {
+                return Ok(None);
+            }
+        }
+        Ok(Some(out))
     }
 
     pub(super) fn match_pattern(

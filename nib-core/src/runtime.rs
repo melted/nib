@@ -192,7 +192,9 @@ impl Display for Value {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Value::Nil => write!(f, "()"),
-            Value::Primitive(primitive, arity) => write!(f, "¤<primitive:{:?}:{}>", primitive, arity),
+            Value::Primitive(primitive, arity) => {
+                write!(f, "¤<primitive:{:?}:{}>", primitive, arity)
+            }
             Value::Bool(b) => write!(f, "{}", b),
             Value::Integer(i) => write!(f, "{}", i),
             Value::Real(x) => write!(f, "{}", x),
@@ -214,6 +216,10 @@ impl Value {
 
     pub fn new_bytes(bytes: Vec<u8>) -> Self {
         Value::Bytes(new_ref(Bytes::with(bytes)))
+    }
+
+    pub fn new_array(vals: &[Value]) -> Self {
+        Value::Array(new_ref(Array::with(vals)))
     }
 }
 
@@ -325,6 +331,13 @@ impl Array {
         Array {
             type_table: None,
             array: Vec::new(),
+        }
+    }
+
+    fn with(vals: &[Value]) -> Self {
+        Array {
+            type_table: None,
+            array: vals.to_vec()
         }
     }
 }

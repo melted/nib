@@ -279,7 +279,6 @@ fn disallow_multiple_ellipsises() -> Result<()> {
     Ok(())
 }
 
-
 #[test]
 fn empty_test_skeleton() -> Result<()> {
     let mut state = ParserState::new("");
