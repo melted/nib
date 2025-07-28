@@ -131,12 +131,16 @@ impl Runtime {
                 self.call_primitive_vararg(prim, &vals[1..])
             }
             Value::Closure(closure_rc) => {
-                let mut closure = closure_rc.borrow_mut(); 
-                vals[1..].into_iter().for_each(|v| closure.args.push(v.clone()));
-                let mut env = closure.env.clone();
+                let mut closure = closure_rc.borrow_mut();
+                closure.args.append(&mut vals[1..].to_vec());
                 if closure.args.len() < closure.arity.min_arity() {
                     return Ok(Value::Closure(closure_rc.clone()));
                 }
+                let mut env = closure.env.clone();
+                let mut remaining = match closure.arity {
+                    Arity::Fixed(n) => closure.args.split_off(n),
+                    Arity::VarArg(_) => Vec::new()
+                };
                 let clauses = closure.code.borrow();
                 for clause in clauses.iter() {
                     if let Some(binds) = self.match_patterns(&closure.args, &clause.args, &env)? {
@@ -148,9 +152,13 @@ impl Runtime {
                                 continue;
                             }
                         }
-                        let v = self.evaluate_expression(&clause.rhs, &mut env);
+                        let mut v = self.evaluate_expression(&clause.rhs, &mut env)?;
+                        if remaining.len() > 0 {
+                            remaining.insert(0, v);
+                            v = self.apply_values(&remaining)?;
+                        }
                         env.pop();
-                        return v;
+                        return Ok(v);
                     }
                 }
                 self.error(&format!("No matching pattern for closure"))
