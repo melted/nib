@@ -10,6 +10,7 @@ mod evaluate;
 pub mod heap;
 mod prims;
 pub mod table;
+mod tests;
 
 pub struct Runtime {
     metadata: HashMap<String, Metadata>,
