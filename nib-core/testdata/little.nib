@@ -9,6 +9,7 @@ b = print "hello"
 a + b = _prim_add a b
 a * b = _prim_mul a b
 a - b = _prim_sub a b
+a / b = _prim_div a b
 
 // Function
 inc x = x + 1
@@ -18,5 +19,6 @@ mkarr ...xs = xs
 
 // Use
 _ = print (mkarr 1 2 3 4 5)
-_ = print (2.9 + 1.0)
+ft = 2.9 + 1.0
+_ = print ft
 _ = print (inc 4)

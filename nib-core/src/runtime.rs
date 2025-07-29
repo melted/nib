@@ -1,7 +1,12 @@
-use std::{cell::RefCell, collections::HashMap, fmt::Display, fs::read_to_string, hash::Hash, rc::Rc};
+use std::{
+    cell::RefCell, collections::HashMap, fmt::Display, fs::read_to_string, hash::Hash, rc::Rc,
+};
 
 use crate::{
-    common::{Error, Metadata, Name, Result}, core::{desugar, Arity, FunClause}, parser::parse_declarations, runtime::{evaluate::Environment, prims::Primitive}
+    common::{Error, Metadata, Name, Result},
+    core::{Arity, FunClause, desugar},
+    parser::parse_declarations,
+    runtime::{evaluate::Environment, prims::Primitive},
 };
 
 mod evaluate;
@@ -15,7 +20,7 @@ pub struct Runtime {
     metadata: HashMap<String, Metadata>,
     globals: Rc<RefCell<Table>>,
     named_symbols: HashMap<String, Symbol>,
-    local_environment: Environment
+    local_environment: Environment,
 }
 
 impl Runtime {
@@ -31,28 +36,25 @@ impl Runtime {
         rt
     }
 
-    pub fn load(&mut self, path:&str) -> Result<()> {
+    pub fn load(&mut self, path: &str) -> Result<()> {
         let code = read_to_string(path)?;
-        let mut ast_module = parse_declarations(Some(path.to_owned()), &code)?;
-        let mut module = desugar(ast_module)?;
-        let v = self.metadata.insert(path.to_owned(), module.metadata.clone());
-        let mut env = Environment::new();
-        self.evaluate(&mut module, &mut env)
+        self.add_code(path, &code)
     }
 
-    pub fn add_code(&mut self, name:&str, code:&str) -> Result<()> {
+    pub fn add_code(&mut self, name: &str, code: &str) -> Result<()> {
         let mut ast_module = parse_declarations(Some(name.to_owned()), code)?;
         let mut module = desugar(ast_module)?;
-        let v = self.metadata.insert(name.to_owned(), module.metadata.clone());
+        let v = self
+            .metadata
+            .insert(name.to_owned(), module.metadata.clone());
         let mut env = Environment::new();
         self.evaluate(&mut module, &mut env)
     }
-
 
     pub fn error<T>(&self, msg: &str) -> Result<T> {
         Err(Error::Runtime {
             msg: msg.to_owned(),
-            loc: None
+            loc: None,
         })
     }
 
@@ -136,7 +138,7 @@ impl Runtime {
                     }
                 }
             };
-            rest = &rest[1..]; 
+            rest = &rest[1..];
         }
         Some(table)
     }
@@ -167,7 +169,7 @@ impl Runtime {
                     }
                 }
             };
-            rest = &rest[1..]; 
+            rest = &rest[1..];
         }
         Ok(table)
     }
@@ -361,7 +363,7 @@ impl Array {
     fn with(vals: &[Value]) -> Self {
         Array {
             type_table: None,
-            array: vals.to_vec()
+            array: vals.to_vec(),
         }
     }
 }
@@ -419,5 +421,17 @@ impl Display for Closure {
             self.code.as_ptr().addr(),
             self.arity
         )
+    }
+}
+
+impl Closure {
+    pub fn with_args(&self, args: &[Value]) -> Self {
+        Closure {
+            type_table: self.type_table.clone(),
+            code: self.code.clone(),
+            env: self.env.clone(),
+            args: args.to_vec(),
+            arity: self.arity.clone(),
+        }
     }
 }

@@ -132,18 +132,21 @@ impl Runtime {
             }
             Value::Closure(closure_rc) => {
                 let mut closure = closure_rc.borrow_mut();
-                closure.args.append(&mut vals[1..].to_vec());
-                if closure.args.len() < closure.arity.min_arity() {
-                    return Ok(Value::Closure(closure_rc.clone()));
+                let mut args = Vec::new();
+                args.append(&mut closure.args);
+                args.append(&mut vals[1..].to_vec());
+
+                if args.len() < closure.arity.min_arity() {
+                    return Ok(Value::Closure(new_ref(closure.with_args(&args))));
                 }
                 let mut env = closure.env.clone();
                 let mut remaining = match closure.arity {
-                    Arity::Fixed(n) => closure.args.split_off(n),
+                    Arity::Fixed(n) => args.split_off(n),
                     Arity::VarArg(_) => Vec::new()
                 };
                 let clauses = closure.code.borrow();
                 for clause in clauses.iter() {
-                    if let Some(binds) = self.match_patterns(&closure.args, &clause.args, &env)? {
+                    if let Some(binds) = self.match_patterns(&args, &clause.args, &env)? {
                         env.push_env(binds);
                         if let Some(guard) = &clause.guard {
                             let v = self.evaluate_expression(guard, &mut env)?;
@@ -163,7 +166,9 @@ impl Runtime {
                 }
                 self.error(&format!("No matching pattern for closure"))
             }
-            _ => self.error(&format!("Not a callable type in application {}", vals[0])),
+            _ => {
+                self.error(&format!("Not a callable type in application {}", vals[0]))
+            },
         }
     }
 
