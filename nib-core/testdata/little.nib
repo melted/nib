@@ -22,3 +22,10 @@ _ = print (mkarr 1 2 3 4 5)
 ft = 2.9 + 1.0
 _ = print ft
 _ = print (inc 4)
+
+_ = print (nil_type.name)
+
+fac 0 = 1
+fac x = x * fac (x - 1)
+
+_ = print (fac 4)

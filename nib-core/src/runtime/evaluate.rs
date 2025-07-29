@@ -15,6 +15,15 @@ impl Runtime {
     pub(super) fn evaluate(&mut self, code: &mut Module, env: &mut Environment) -> Result<()> {
         for b in code.bindings.iter_mut() {
             self.evaluate_binding(b, env, false)?;
+            if let Some(hs) = self.closures_to_check.get(&b.name) {
+                for c in hs.clone() {
+                    if let Some(Value::Closure(closure)) = self.lookup(env, &c) {
+                        let mut cl = closure.borrow_mut();
+                        self.replace_undefined(&mut cl.env, env);
+                    }
+                }
+                self.closures_to_check.remove(&b.name);
+            }
         }
         Ok(())
     }
@@ -26,11 +35,14 @@ impl Runtime {
         local: bool,
     ) -> Result<()> {
         info!("Evaluating binding {}", binding);
-        let val = self.evaluate_expression(&binding.body, env)?;
+        let val = self.evaluate_expression(&binding.name, &binding.body, env)?;
+        let is_closure = matches!(val, Value::Closure(_));
         match &binding.binder {
             Binder::Public(name) if local => {
                 match name {
-                    Name::Plain(s) => env.add(s, &val),
+                    Name::Plain(s) => { 
+                        env.add(s, &val);
+                    },
                     Name::Qualified(_, _) => {
                         return self.error(&format!("Qualified name {} in where clause", name));
                     }
@@ -49,6 +61,7 @@ impl Runtime {
 
     pub(super) fn evaluate_expression(
         &mut self,
+        binding_name: &str,
         expression: &Expression,
         env: &mut Environment,
     ) -> Result<Value> {
@@ -61,19 +74,30 @@ impl Runtime {
                 };
                 v
             }
-            Expression::App(n, exps) => self.evaluate_application(exps, env)?,
+            Expression::App(n, exps) => self.evaluate_application(binding_name, exps, env)?,
             Expression::Literal(n, lit) => self.evaluate_literal(lit)?,
             Expression::Lambda(n, clauses) => {
                 let mut free = HashSet::new();
                 free_vars(expression, &mut free);
-                self.evaluate_lambda(clauses, &free, env)?
+                self.evaluate_lambda(binding_name, clauses, &free, env)?
             }
             Expression::Where(n, exp, bindings) => {
                 env.push();
+                let prev_cc = self.closures_to_check.clone();
+                self.closures_to_check = HashMap::new();
                 for b in bindings.iter() {
                     self.evaluate_binding(b, env, true)?;
+                    if let Some(hs) = self.closures_to_check.get(&b.name) {
+                        for c in hs.clone() {
+                            if let Some(Value::Closure(closure)) = self.lookup(env, &c) {
+                                let mut cl = closure.borrow_mut();
+                                self.replace_undefined(&mut cl.env, env);
+                            }
+                        }
+                    }
                 }
-                let val = self.evaluate_expression(exp, env)?;
+                let val = self.evaluate_expression(binding_name, exp, env)?;
+                self.closures_to_check = prev_cc;
                 env.pop();
                 val
             }
@@ -105,6 +129,7 @@ impl Runtime {
 
     pub(super) fn evaluate_application(
         &mut self,
+        binding_name: &str,
         exps: &Vec<Expression>,
         env: &mut Environment,
     ) -> Result<Value> {
@@ -113,12 +138,12 @@ impl Runtime {
         }
         let mut vals = Vec::new();
         for e in exps {
-            vals.push(self.evaluate_expression(e, env)?);
+            vals.push(self.evaluate_expression(binding_name,e, env)?);
         }
-        self.apply_values(&vals)
+        self.apply_values(binding_name, &vals)
     }
 
-    pub(super) fn apply_values(&mut self, vals: &[Value]) -> Result<Value> {
+    pub(super) fn apply_values(&mut self, binding_name: &str, vals: &[Value]) -> Result<Value> {
         match &vals[0] {
             Value::Primitive(prim, Arity::Fixed(1)) => self.call_primitive1(prim, &vals[1]),
             Value::Primitive(prim, Arity::Fixed(2)) => {
@@ -131,14 +156,19 @@ impl Runtime {
                 self.call_primitive_vararg(prim, &vals[1..])
             }
             Value::Closure(closure_rc) => {
-                let mut closure = closure_rc.borrow_mut();
-                let mut args = Vec::new();
-                args.append(&mut closure.args);
-                args.append(&mut vals[1..].to_vec());
+                let mut  args = {
+                    let mut args = Vec::new();
+                    let mut closure = closure_rc.borrow_mut();
 
-                if args.len() < closure.arity.min_arity() {
-                    return Ok(Value::Closure(new_ref(closure.with_args(&args))));
-                }
+                    args.append(&mut closure.args);
+                    args.append(&mut vals[1..].to_vec());
+                    
+                    if args.len() < closure.arity.min_arity() {
+                        return Ok(Value::Closure(new_ref(closure.with_args(&args))));
+                    }
+                    args
+                };
+                let closure = closure_rc.borrow();
                 let mut env = closure.env.clone();
                 let mut remaining = match closure.arity {
                     Arity::Fixed(n) => args.split_off(n),
@@ -149,16 +179,16 @@ impl Runtime {
                     if let Some(binds) = self.match_patterns(&args, &clause.args, &env)? {
                         env.push_env(binds);
                         if let Some(guard) = &clause.guard {
-                            let v = self.evaluate_expression(guard, &mut env)?;
+                            let v = self.evaluate_expression(binding_name,guard, &mut env)?;
                             if v == Value::Bool(false) {
                                 env.pop();
                                 continue;
                             }
                         }
-                        let mut v = self.evaluate_expression(&clause.rhs, &mut env)?;
+                        let mut v = self.evaluate_expression(binding_name,&clause.rhs, &mut env)?;
                         if remaining.len() > 0 {
                             remaining.insert(0, v);
-                            v = self.apply_values(&remaining)?;
+                            v = self.apply_values(binding_name,             &remaining)?;
                         }
                         env.pop();
                         return Ok(v);
@@ -174,6 +204,7 @@ impl Runtime {
 
     pub(super) fn evaluate_lambda(
         &mut self,
+        binding_name: &str,
         clauses: &Vec<FunClause>,
         free: &HashSet<String>,
         env: &mut Environment,
@@ -182,9 +213,11 @@ impl Runtime {
         lexical_env.push();
 
         for v in free.iter() {
-            let Some(val) = self.lookup(env, v) else {
-                return self.error(&format!("{} not in scope", v));
-            };
+            let val = self.lookup(env, v).unwrap_or(Value::Undefined);
+            if val == Value::Undefined {
+                let c = self.closures_to_check.entry(v.to_owned()).or_insert_with(||HashSet::new());
+                c.insert(binding_name.to_owned());
+            }
             lexical_env.add(&v, &val);
         }
         let mut arity = get_arity(&clauses[0].args);
@@ -286,7 +319,7 @@ impl Runtime {
                     }
                 };
                 let call = vec![fun, arg.clone()];
-                let res = self.apply_values(&call)?;
+                let res = self.apply_values(&name.to_string(), &call)?;
                 match res {
                     Value::Array(array) => {
                         let vals = &array.borrow().array;
@@ -314,6 +347,17 @@ impl Runtime {
 
     pub(super) fn lookup(&mut self, env: &Environment, id: &str) -> Option<Value> {
         env.get(id).or_else(|| self.get_global(id))
+    }
+
+    pub fn replace_undefined(&mut self, env : &mut Environment, new_env : &Environment) {
+        let udef:Vec<_> = {
+            env.envs.iter().map(|hm| hm.iter().filter(|&(k, v)| v == &Value::Undefined).map(|(k, v)| k.to_owned())).flatten().collect()
+        };
+        for k in udef {
+            if let Some(v) = self.lookup(new_env, &k) {
+                env.add(&k, &v);
+            }
+        }
     }
 }
 

@@ -1,5 +1,5 @@
 
-use crate::common::Result;
+use crate::common::{Name, Result};
 use crate::core::Arity;
 use crate::runtime::{Runtime, Value};
 
@@ -28,22 +28,71 @@ impl Runtime {
             Primitive::Add => match (arg, arg2) {
                 (Value::Integer(a), Value::Integer(b)) => Ok(Value::Integer(a + b)),
                 (Value::Real(a), Value::Real(b)) => Ok(Value::Real(a + b)),
+                (Value::Integer(a), Value::Real(b)) => Ok(Value::Real(*a as f64 + b)),
+                (Value::Real(a), Value::Integer(b)) => Ok(Value::Real(a + *b as f64)),
                 _ => self.error(&format!("Can't add {:?} and {:?}", arg, arg2)),
             },
             Primitive::Sub => match (arg, arg2) {
                 (Value::Integer(a), Value::Integer(b)) => Ok(Value::Integer(a - b)),
                 (Value::Real(a), Value::Real(b)) => Ok(Value::Real(a - b)),
+                (Value::Integer(a), Value::Real(b)) => Ok(Value::Real(*a as f64 - b)),
+                (Value::Real(a), Value::Integer(b)) => Ok(Value::Real(a - *b as f64)),
                 _ => self.error(&format!("Can't subtract {:?} from {:?}", arg2, arg)),
             },
             Primitive::Mul => match (arg, arg2) {
                 (Value::Integer(a), Value::Integer(b)) => Ok(Value::Integer(a * b)),
                 (Value::Real(a), Value::Real(b)) => Ok(Value::Real(a * b)),
+                (Value::Integer(a), Value::Real(b)) => Ok(Value::Real(*a as f64 * b)),
+                (Value::Real(a), Value::Integer(b)) => Ok(Value::Real(a * *b as f64)),
                 _ => self.error(&format!("Can't multiply {:?} and {:?}", arg, arg2)),
             },
             Primitive::Div => match (arg, arg2) {
                 (Value::Integer(a), Value::Integer(b)) => Ok(Value::Integer(a / b)),
                 (Value::Real(a), Value::Real(b)) => Ok(Value::Real(a / b)),
+                (Value::Integer(a), Value::Real(b)) => Ok(Value::Real(*a as f64 / b)),
+                (Value::Real(a), Value::Integer(b)) => Ok(Value::Real(a / *b as f64)),
                 _ => self.error(&format!("Can't divide {:?} by {:?}", arg, arg2)),
+            },
+            Primitive::Gte => match (arg, arg2) {
+                (Value::Integer(a), Value::Integer(b)) => Ok(Value::Bool(a >= b)),
+                (Value::Real(a), Value::Real(b)) => Ok(Value::Bool(a >= b)),
+                (Value::Integer(a), Value::Real(b)) => Ok(Value::Bool(*a as f64 >= *b)),
+                (Value::Real(a), Value::Integer(b)) => Ok(Value::Bool(*a >= *b as f64)),
+                (Value::Char(a), Value::Char(b)) => Ok(Value::Bool(a >= b)),
+                _ => self.error(&format!("Can't compare {:?} with {:?}", arg, arg2)),
+            },
+            Primitive::Gt => match (arg, arg2) {
+                (Value::Integer(a), Value::Integer(b)) => Ok(Value::Bool(a > b)),
+                (Value::Real(a), Value::Real(b)) => Ok(Value::Bool(a > b)),
+                (Value::Integer(a), Value::Real(b)) => Ok(Value::Bool(*a as f64 > *b)),
+                (Value::Real(a), Value::Integer(b)) => Ok(Value::Bool(*a > *b as f64)),
+                (Value::Char(a), Value::Char(b)) => Ok(Value::Bool(a > b)),
+                _ => self.error(&format!("Can't compare {:?} with {:?}", arg, arg2)),
+            },
+            Primitive::Lte => match (arg, arg2) {
+                (Value::Integer(a), Value::Integer(b)) => Ok(Value::Bool(a <= b)),
+                (Value::Real(a), Value::Real(b)) => Ok(Value::Bool(a <= b)),
+                (Value::Integer(a), Value::Real(b)) => Ok(Value::Bool(*a as f64 <= *b)),
+                (Value::Real(a), Value::Integer(b)) => Ok(Value::Bool(*a <= *b as f64)),
+                (Value::Char(a), Value::Char(b)) => Ok(Value::Bool(a <= b)),
+                _ => self.error(&format!("Can't compare {:?} with {:?}", arg, arg2)),
+            },
+            Primitive::Lt => match (arg, arg2) {
+                (Value::Integer(a), Value::Integer(b)) => Ok(Value::Bool(a < b)),
+                (Value::Real(a), Value::Real(b)) => Ok(Value::Bool(a < b)),
+                (Value::Integer(a), Value::Real(b)) => Ok(Value::Bool((*a as f64) < *b)),
+                (Value::Real(a), Value::Integer(b)) => Ok(Value::Bool(*a < *b as f64)),
+                (Value::Char(a), Value::Char(b)) => Ok(Value::Bool(a < b)),
+                _ => self.error(&format!("Can't compare {:?} with {:?}", arg, arg2)),
+            },
+            Primitive::Eq => match (arg, arg2) {
+                (Value::Integer(a), Value::Integer(b)) => Ok(Value::Bool(a == b)),
+                (Value::Real(a), Value::Real(b)) => Ok(Value::Bool(a == b)),
+                (Value::Integer(a), Value::Real(b)) => Ok(Value::Bool(*a as f64 == *b)),
+                (Value::Real(a), Value::Integer(b)) => Ok(Value::Bool(*a == *b as f64)),
+                (Value::Char(a), Value::Char(b)) => Ok(Value::Bool(a == b)),
+                (Value::Bool(a), Value::Bool(b)) => Ok(Value::Bool(a == b)),
+                _ => self.error(&format!("Can't compare {:?} with {:?}", arg, arg2)),
             },
             _ => self.error("Boom!"),
         }
@@ -72,7 +121,7 @@ impl Runtime {
         }
     }
 
-    pub(super) fn register_primitives(&mut self) {
+    pub(super) fn register_primitives(&mut self) -> Result<()> {
 //        self.add_global("global", Value::Table(self.globals.clone()));
         self.add_global("print", Value::Primitive(Primitive::Print, Arity::Fixed(1)));
         self.add_global(
@@ -96,10 +145,34 @@ impl Runtime {
             "_prim_div",
             Value::Primitive(Primitive::Div, Arity::Fixed(2)),
         );
+        self.add_global(
+            "_prim_gte",
+            Value::Primitive(Primitive::Gte, Arity::Fixed(2)),
+        );
+        self.add_global(
+            "_prim_gt",
+            Value::Primitive(Primitive::Gt, Arity::Fixed(2)),
+        );
+        self.add_global(
+            "_prim_lte",
+            Value::Primitive(Primitive::Lte, Arity::Fixed(2)),
+        );
+        self.add_global(
+            "_prim_lt",
+            Value::Primitive(Primitive::Lt, Arity::Fixed(2)),
+        );
+        self.add_global(
+            "_prim_eq",
+            Value::Primitive(Primitive::Eq, Arity::Fixed(2)),
+        );
+
+        Ok(())
     }
 
-    pub(super) fn register_type_tables(&mut self) {
-        self.add_global("nil", Value::new_table());
+    pub(super) fn register_type_tables(&mut self) -> Result<()> {
+        self.add_global("nil_type", Value::new_table());
+        let tname = self.make_string("nil")?;
+        self.add_name(&Name::name("nil_type.name"), &tname);
         self.add_global("bool", Value::new_table());
         self.add_global("int", Value::new_table());
         self.add_global("float", Value::new_table());
@@ -111,6 +184,7 @@ impl Runtime {
         self.add_global("array", Value::new_table());
         self.add_global("table", Value::new_table());
         self.add_global("function", Value::new_table());
+        Ok(())
     }
 }
 
@@ -132,7 +206,8 @@ pub enum Primitive {
     Lt,
     Lte,
     Eq,
-    NEq,
+
+
 }
 
 impl Runtime {
@@ -143,7 +218,8 @@ impl Runtime {
 
     fn type_query(&self, arg: &Value) -> Result<Value> {
         match arg {
-            Value::Nil => Ok(self.get_global("nil").unwrap()),
+            Value::Nil => Ok(self.get_global("nil_type").unwrap()),
+            Value::Undefined => Ok(Value::Nil),
             Value::Primitive(_, _) => Ok(self.get_global("prim").unwrap()),
             Value::Bool(_) => Ok(self.get_global("bool").unwrap()),
             Value::Integer(_) => Ok(self.get_global("int").unwrap()),
@@ -195,6 +271,8 @@ impl Runtime {
         let mut tab = args[0].clone();
         let mut slice = &args[1..];
         loop {
+            dbg!(&slice);
+            dbg!(&tab);
             match (tab, &slice[0]) {
                 (Value::Table(from), Value::Symbol(sym)) => {
                     let table_ref = from.borrow();

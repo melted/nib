@@ -85,11 +85,11 @@ impl DesugarState {
             });
         }
         self.metadata.last_id += 1;
-        Ok(vec![Binding {
-            id: ast_binding.id,
-            binder: Binder::Public(name),
-            body: Expression::Lambda(self.metadata.last_id, core_clauses),
-        }])
+        Ok(vec![Binding::binding(
+            ast_binding.id,
+            Binder::Public(name),
+            Expression::Lambda(self.metadata.last_id, core_clauses))
+        ])
     }
 
     fn desugar_opbinding(&mut self, ast_binding: ast::OpBinding) -> Result<Vec<Binding>> {
@@ -111,27 +111,27 @@ impl DesugarState {
             });
         }
         self.metadata.last_id += 1;
-        Ok(vec![Binding {
-            id: ast_binding.id,
-            binder: Binder::Public(name),
-            body: Expression::Lambda(self.metadata.last_id, core_clauses),
-        }])
+        Ok(vec![Binding::binding(
+           ast_binding.id,
+            Binder::Public(name),
+            Expression::Lambda(self.metadata.last_id, core_clauses),
+        )])
     }
 
     fn desugar_varbinding(&mut self, ast_binding: ast::VarBinding) -> Result<Vec<Binding>> {
         let pat = ast_binding.lhs;
         let rhs = self.desugar_expression(ast_binding.rhs)?;
         match pat.pattern {
-            ast::Pattern::Var(v) => Ok(vec![Binding {
-                id: ast_binding.id,
-                binder: Binder::Public(v),
-                body: rhs,
-            }]),
-            ast::Pattern::Wildcard => Ok(vec![Binding {
-                id: ast_binding.id,
-                binder: Binder::Unbound,
-                body: rhs,
-            }]),
+            ast::Pattern::Var(v) => Ok(vec![Binding::binding(
+                ast_binding.id,
+                Binder::Public(v),
+                rhs,
+            )]),
+            ast::Pattern::Wildcard => Ok(vec![Binding::binding(
+                ast_binding.id,
+                Binder::Unbound,
+                rhs,)
+            ]),
             _ => {
                 let mut visitor = UsedVars::new();
                 pat.visit(&mut visitor);
@@ -155,11 +155,10 @@ impl DesugarState {
                 );
                 let body = Expression::App(self.new_id(), vec![lam, rhs]);
                 let nam_arr = self.next_local();
-                let binding = Binding {
-                    id: ast_binding.id,
-                    binder: Binder::Local(nam_arr.clone()),
+                let binding = Binding::binding(                    ast_binding.id,
+                    Binder::Local(nam_arr.clone()),
                     body,
-                };
+                );
                 let mut bindings = vec![binding];
                 for (i, n) in names.into_iter().enumerate() {
                     let rhs = Expression::App(
@@ -170,11 +169,11 @@ impl DesugarState {
                             Expression::Literal(self.new_id(), ast::Literal::Integer(i as i64)),
                         ],
                     );
-                    let bind = Binding {
-                        id: self.new_id(),
-                        binder: Binder::Public(n),
-                        body: rhs,
-                    };
+                    let bind = Binding::binding(
+                        self.new_id(),
+                        Binder::Public(n),
+                        rhs,
+                    );
                     bindings.push(bind);
                 }
                 Ok(bindings)
@@ -366,7 +365,19 @@ impl Display for Module {
 pub struct Binding {
     pub id: Node,
     pub binder: Binder,
+    pub name: String,
     pub body: Expression,
+}
+
+impl Binding {
+    pub fn binding(id:Node, binder:Binder, body:Expression) -> Self {
+        let name = match &binder {
+            Binder::Public(name) => name.to_string(),
+            Binder::Local(s) => s.clone(),
+            Binder::Unbound => "".to_string(),
+        };
+        Binding { id, binder, name, body }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]

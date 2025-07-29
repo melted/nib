@@ -1,5 +1,5 @@
 use std::{
-    cell::RefCell, collections::HashMap, fmt::Display, fs::read_to_string, hash::Hash, rc::Rc,
+    cell::RefCell, collections::{HashMap, HashSet}, fmt::Display, fs::read_to_string, hash::Hash, rc::Rc,
 };
 
 use crate::{
@@ -21,6 +21,7 @@ pub struct Runtime {
     globals: Rc<RefCell<Table>>,
     named_symbols: HashMap<String, Symbol>,
     local_environment: Environment,
+    closures_to_check: HashMap<String, HashSet<String>>
 }
 
 impl Runtime {
@@ -30,6 +31,7 @@ impl Runtime {
             globals: new_ref(Table::new()),
             named_symbols: HashMap::new(),
             local_environment: Environment::new(),
+            closures_to_check: HashMap::new()
         };
         rt.register_primitives();
         rt.register_type_tables();
@@ -173,6 +175,12 @@ impl Runtime {
         }
         Ok(table)
     }
+
+    pub fn make_string(&mut self, s:&str) -> Result<Value> {
+        let mut b = Bytes::with(s.clone().as_bytes().to_vec());
+        b.type_table = self.get_module_path(&["string".to_owned()]);
+        Ok(Value::Bytes(new_ref(b)))
+    } 
 }
 
 fn new_ref<T>(val: T) -> Rc<RefCell<T>> {
@@ -182,6 +190,7 @@ fn new_ref<T>(val: T) -> Rc<RefCell<T>> {
 #[derive(Debug, Clone)]
 pub enum Value {
     Nil,
+    Undefined,
     Primitive(Primitive, Arity),
     Bool(bool),
     Integer(i64),
@@ -218,6 +227,7 @@ impl Display for Value {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Value::Nil => write!(f, "()"),
+            Value::Undefined => write!(f, "<undefined>"),
             Value::Primitive(primitive, arity) => {
                 write!(f, "¤<primitive:{:?}:{}>", primitive, arity)
             }
