@@ -2,6 +2,29 @@
 
 module global
 
+/// Add two numbers
+a + b = _prim_add a b
+
+/// Subtract b from a
+a - b = _prim_sub a b
+
+/// Multiply two numbers
+a * b = _prim_mul a b
+
+/// Divide a by b
+a / b = _prim_div a b
+
+a > b = _prim_gt a b
+a >= b = _prim_gte a b
+a < b = _prim_lt a b
+a <= b = _prim_lte a b
+
+a == b = _prim_eq a b
+a != b = not (a == b)
+
+not true = false
+not false = true
+
 // some arithmetic
 max x y = x > y => x; y
 min x y = x < y => x; y
@@ -20,8 +43,8 @@ const a b = a
 // =====================
 // apply
 // +, -, *, / (at least type specific ones, maybe can do generic as lib)
-// <, >, <=, >=, !=, == 
-// sim, cos, tan, asin, acos, atan
+// <, >, <=, >=, == 
+// sin, cos, tan, asin, acos, atan
 // and, or, xor, lsh, rsh, rot, bswap (bit logic)
 // type, set_type 
 // array (ref, set, new, size, fill, copy, slice)
@@ -34,13 +57,3 @@ const a b = a
 // Debug
 //
 
-/// Add two numbers
-a + b = _prim_add a b
-
-/// Subtract b from a
-a - b = _prim_sub a b
-
-/// Multiply two numbers
-a * b = _prim_mul a b
-
-a / d = _prim_div a b
