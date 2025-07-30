@@ -31,6 +31,12 @@ pub fn desugar(module: ast::Module) -> Result<Module> {
     })
 }
 
+pub fn desugar_expression(expr : ast::ExpressionNode) -> Result<Expression> {
+    let meta = Metadata::new(None);
+    let mut state = DesugarState::new(meta);
+    state.desugar_expression(expr)
+}
+
 struct DesugarState {
     module_name: Option<Name>,
     bindings: Vec<Binding>,

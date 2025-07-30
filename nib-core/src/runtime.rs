@@ -4,8 +4,8 @@ use std::{
 
 use crate::{
     common::{Error, Metadata, Name, Result},
-    core::{Arity, FunClause, desugar},
-    parser::parse_declarations,
+    core::{desugar, desugar_expression, Arity, FunClause},
+    parser::{parse_declarations, parse_expression},
     runtime::{evaluate::Environment, prims::Primitive},
 };
 
@@ -51,6 +51,12 @@ impl Runtime {
             .insert(name.to_owned(), module.metadata.clone());
         let mut env = Environment::new();
         self.evaluate(&mut module, &mut env)
+    }
+
+    pub fn run_expression(&mut self, code:&str) -> Result<Value> {
+        let ast_expr = parse_expression(code)?;
+        let expr = desugar_expression(ast_expr)?;
+        self.evaluate_expression("", &expr, &mut Environment::new())
     }
 
     pub fn error<T>(&self, msg: &str) -> Result<T> {
