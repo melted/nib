@@ -122,7 +122,7 @@ impl Runtime {
     }
 
     pub(super) fn register_primitives(&mut self) -> Result<()> {
-//        self.add_global("global", Value::Table(self.globals.clone()));
+        self.add_global("global", Value::Table(self.globals.clone()));
         self.add_global("print", Value::Primitive(Primitive::Print, Arity::Fixed(1)));
         self.add_global(
             "project",
@@ -172,7 +172,7 @@ impl Runtime {
     pub(super) fn register_type_tables(&mut self) -> Result<()> {
         self.add_global("nil_type", Value::new_table());
         let tname = self.make_string("nil")?;
-        self.add_name(&Name::name("nil_type.name"), &tname);
+        self.add_name(&Name::name("nil_type.name"), &tname)?;
         self.add_global("bool", Value::new_table());
         self.add_global("int", Value::new_table());
         self.add_global("float", Value::new_table());
@@ -188,7 +188,7 @@ impl Runtime {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, PartialOrd, Hash)]
 pub enum Primitive {
     Print,
     Project,

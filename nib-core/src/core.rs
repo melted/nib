@@ -483,7 +483,7 @@ pub enum Pattern {
     Alias(Box<Pattern>, Name),
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, PartialOrd, Hash)]
 pub enum Arity {
     Fixed(usize),
     VarArg(usize),

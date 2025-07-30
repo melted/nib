@@ -1,5 +1,5 @@
 use std::{
-    cell::RefCell, collections::{HashMap, HashSet}, fmt::Display, fs::read_to_string, hash::Hash, rc::Rc,
+    arch::x86_64, cell::RefCell, collections::{BTreeSet, HashMap, HashSet}, fmt::{Debug, Display}, fs::read_to_string, hash::Hash, mem::Discriminant, rc::Rc
 };
 
 use crate::{
@@ -33,8 +33,8 @@ impl Runtime {
             local_environment: Environment::new(),
             closures_to_check: HashMap::new()
         };
-        rt.register_primitives();
-        rt.register_type_tables();
+        rt.register_primitives().unwrap();
+        rt.register_type_tables().unwrap();
         rt
     }
 
@@ -50,7 +50,9 @@ impl Runtime {
             .metadata
             .insert(name.to_owned(), module.metadata.clone());
         let mut env = Environment::new();
-        self.evaluate(&mut module, &mut env)
+        self.evaluate(&mut module, &mut env)?;
+        dbg!(&self.globals);
+        Ok(())
     }
 
     pub fn run_expression(&mut self, code:&str) -> Result<Value> {
@@ -229,6 +231,33 @@ impl PartialEq for Value {
     }
 }
 
+impl PartialOrd for Value {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        match (self, other) {
+            (Value::Primitive(a, x), Value::Primitive(b, y)) => a.partial_cmp(b),
+            (Value::Bool(a), Value::Bool(b)) => a.partial_cmp(b),
+            (Value::Integer(a), Value::Integer(b)) => a.partial_cmp(b),
+            (Value::Real(a), Value::Real(b)) => a.partial_cmp(b),
+            (Value::Char(a), Value::Char(b)) => a.partial_cmp(b),
+            (Value::Pointer(a), Value::Pointer(b)) => a.partial_cmp(b),
+            (Value::Symbol(a), Value::Symbol(b)) => a.partial_cmp(b),
+            (Value::Bytes(a), Value::Bytes(b)) => a.as_ptr().partial_cmp(&b.as_ptr()),
+            (Value::Array(a), Value::Array(b)) => a.as_ptr().partial_cmp(&b.as_ptr()),
+            (Value::Table(a), Value::Table(b)) => a.as_ptr().partial_cmp(&b.as_ptr()),
+            (Value::Closure(a), Value::Closure(b)) => a.as_ptr().partial_cmp(&b.as_ptr()),
+            (x, y) => x.number().partial_cmp(&y.number())
+        }
+    }
+}
+
+impl Eq for Value {}
+
+impl Ord for Value {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.partial_cmp(other).unwrap()
+    }
+}
+
 impl Display for Value {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -262,6 +291,31 @@ impl Value {
 
     pub fn new_array(vals: &[Value]) -> Self {
         Value::Array(new_ref(Array::with(vals)))
+    }
+
+    pub fn is_complex(&self) -> bool {
+        match self {
+            Value::Array(_) | Value::Table(_) | Value::Closure(_) => true,
+            _ => false
+        }
+    }
+
+    pub fn number(&self) -> usize {
+        match self {
+            Value::Nil => 0,
+            Value::Undefined => 1,
+            Value::Primitive(primitive, arity) => 2,
+            Value::Bool(_) => 3,
+            Value::Integer(_) => 4,
+            Value::Real(_) => 5,
+            Value::Char(_) => 6,
+            Value::Pointer(_) => 7,
+            Value::Symbol(symbol) => 8,
+            Value::Bytes(ref_cell) => 9,
+            Value::Array(ref_cell) => 10,
+            Value::Table(ref_cell) => 11,
+            Value::Closure(ref_cell) => 12,
+        }
     }
 }
 
@@ -299,6 +353,12 @@ impl PartialEq for Symbol {
     }
 }
 
+impl PartialOrd for Symbol {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        self.symbol_info.as_ptr().partial_cmp(&other.symbol_info.as_ptr())
+    }
+}
+
 impl Eq for Symbol {}
 
 #[derive(Debug, Clone, PartialEq)]
@@ -319,7 +379,7 @@ impl Symbol {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Clone, PartialEq)]
 pub struct Table {
     type_table: Option<Rc<RefCell<Table>>>,
     table: HashMap<Symbol, Value>,
@@ -332,19 +392,33 @@ impl Table {
             table: HashMap::new(),
         }
     }
+
+    fn pretty_print(&self, f: &mut std::fmt::Formatter<'_>, done : &mut BTreeSet<Value>) -> std::fmt::Result {
+        write!(f, "Table {{ ")?;
+        for (k, v) in &self.table {
+            write!(f, "{}: ", k)?;
+            if done.contains(v) {
+                write!(f, "<recurse>")?;
+            } else if let Value::Table(inner) = v {
+                done.insert(v.clone());
+                inner.borrow().pretty_print(f, done)?;
+            } else {
+                write!(f, "{}, ", v)?;
+            }
+        }
+        write!(f, "}}")
+    }
 }
 
 impl Display for Table {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let mut it = self.table.iter();
-        write!(f, "#t{{")?;
-        if let Some(b) = it.next() {
-            write!(f, "{}: {}", b.0, b.1)?;
-            for v in it {
-                write!(f, " ,{}: {}", b.0, b.1)?;
-            }
-        }
-        write!(f, "}}")
+        self.pretty_print(f, &mut BTreeSet::new())
+    }
+}
+
+impl Debug for Table {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.pretty_print(f, &mut BTreeSet::new())
     }
 }
 
@@ -433,7 +507,7 @@ impl Display for Closure {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "#<function:{:x}{}>",
+            "#<function:{:x}:{}>",
             self.code.as_ptr().addr(),
             self.arity
         )
