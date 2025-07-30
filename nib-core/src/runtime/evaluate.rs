@@ -1,5 +1,6 @@
 use std::{
-    cmp::max, collections::{HashMap, HashSet}
+    cmp::max,
+    collections::{HashMap, HashSet},
 };
 
 use log::info;
@@ -7,8 +8,8 @@ use log::info;
 use crate::{
     ast::Literal,
     common::{Name, Result},
-    core::{free_vars, Arity, Binder, Binding, Expression, FunClause, Module, Pattern},
-    runtime::{evaluate, new_ref, Bytes, Closure, Runtime, Value},
+    core::{Arity, Binder, Binding, Expression, FunClause, Module, Pattern, free_vars},
+    runtime::{Bytes, Closure, Runtime, Value, evaluate, new_ref},
 };
 
 impl Runtime {
@@ -40,9 +41,9 @@ impl Runtime {
         match &binding.binder {
             Binder::Public(name) if local => {
                 match name {
-                    Name::Plain(s) => { 
+                    Name::Plain(s) => {
                         env.add(s, &val);
-                    },
+                    }
                     Name::Qualified(_, _) => {
                         return self.error(&format!("Qualified name {} in where clause", name));
                     }
@@ -138,7 +139,7 @@ impl Runtime {
         }
         let mut vals = Vec::new();
         for e in exps {
-            vals.push(self.evaluate_expression(binding_name,e, env)?);
+            vals.push(self.evaluate_expression(binding_name, e, env)?);
         }
         self.apply_values(binding_name, &vals)
     }
@@ -156,14 +157,14 @@ impl Runtime {
                 self.call_primitive_vararg(prim, &vals[1..])
             }
             Value::Closure(closure_rc) => {
-                let mut env:Environment;
-                let (mut  args, clauses, arity) = {
+                let mut env: Environment;
+                let (mut args, clauses, arity) = {
                     let mut args = Vec::new();
                     let mut closure = closure_rc.borrow_mut();
 
                     args.append(&mut closure.args);
                     args.append(&mut vals[1..].to_vec());
-                    
+
                     if args.len() < closure.arity.min_arity() {
                         return Ok(Value::Closure(new_ref(closure.with_args(&args))));
                     }
@@ -173,23 +174,24 @@ impl Runtime {
 
                 let mut remaining = match arity {
                     Arity::Fixed(n) => args.split_off(n),
-                    Arity::VarArg(_) => Vec::new()
+                    Arity::VarArg(_) => Vec::new(),
                 };
 
                 for clause in clauses.borrow().iter() {
                     if let Some(binds) = self.match_patterns(&args, &clause.args, &env)? {
                         env.push_env(binds);
                         if let Some(guard) = &clause.guard {
-                            let v = self.evaluate_expression(binding_name,guard, &mut env)?;
+                            let v = self.evaluate_expression(binding_name, guard, &mut env)?;
                             if v == Value::Bool(false) {
                                 env.pop();
                                 continue;
                             }
                         }
-                        let mut v = self.evaluate_expression(binding_name,&clause.rhs, &mut env)?;
+                        let mut v =
+                            self.evaluate_expression(binding_name, &clause.rhs, &mut env)?;
                         if remaining.len() > 0 {
                             remaining.insert(0, v);
-                            v = self.apply_values(binding_name,             &remaining)?;
+                            v = self.apply_values(binding_name, &remaining)?;
                         }
                         env.pop();
                         return Ok(v);
@@ -197,9 +199,7 @@ impl Runtime {
                 }
                 self.error(&format!("No matching pattern for closure"))
             }
-            _ => {
-                self.error(&format!("Not a callable type in application {}", vals[0]))
-            },
+            _ => self.error(&format!("Not a callable type in application {}", vals[0])),
         }
     }
 
@@ -216,7 +216,10 @@ impl Runtime {
         for v in free.iter() {
             let val = self.lookup(env, v).unwrap_or(Value::Undefined);
             if val == Value::Undefined {
-                let c = self.closures_to_check.entry(v.to_owned()).or_insert_with(||HashSet::new());
+                let c = self
+                    .closures_to_check
+                    .entry(v.to_owned())
+                    .or_insert_with(|| HashSet::new());
                 c.insert(binding_name.to_owned());
             }
             lexical_env.add(&v, &val);
@@ -249,7 +252,7 @@ impl Runtime {
         patterns: &[Pattern],
         env: &Environment,
     ) -> Result<Option<HashMap<String, Value>>> {
-        let mut current_arg:usize = 0;
+        let mut current_arg: usize = 0;
         let mut out = HashMap::new();
         for (i, p) in patterns.iter().enumerate() {
             if current_arg == args.len() {
@@ -257,7 +260,7 @@ impl Runtime {
             }
             let res = if let Pattern::Ellipsis(_) = p {
                 let trailing = patterns.len() - i - 1;
-                let ellipsis = Value::new_array(&args[current_arg..args.len()-trailing]);
+                let ellipsis = Value::new_array(&args[current_arg..args.len() - trailing]);
                 let r = self.match_pattern(&ellipsis, p, env)?;
                 current_arg = args.len() - trailing;
                 r
@@ -267,7 +270,9 @@ impl Runtime {
                 r
             };
             if let Some(vars) = res {
-                vars.into_iter().for_each(|(k, v)| { out.insert(k, v); });
+                vars.into_iter().for_each(|(k, v)| {
+                    out.insert(k, v);
+                });
             } else {
                 return Ok(None);
             }
@@ -350,9 +355,17 @@ impl Runtime {
         env.get(id).or_else(|| self.get_global(id))
     }
 
-    pub fn replace_undefined(&mut self, env : &mut Environment, new_env : &Environment) {
-        let udef:Vec<_> = {
-            env.envs.iter().map(|hm| hm.iter().filter(|&(k, v)| v == &Value::Undefined).map(|(k, v)| k.to_owned())).flatten().collect()
+    pub fn replace_undefined(&mut self, env: &mut Environment, new_env: &Environment) {
+        let udef: Vec<_> = {
+            env.envs
+                .iter()
+                .map(|hm| {
+                    hm.iter()
+                        .filter(|&(k, v)| v == &Value::Undefined)
+                        .map(|(k, v)| k.to_owned())
+                })
+                .flatten()
+                .collect()
         };
         for k in udef {
             if let Some(v) = self.lookup(new_env, &k) {

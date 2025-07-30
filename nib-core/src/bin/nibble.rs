@@ -1,13 +1,13 @@
 use std::env::args;
-use std::io::{self, stdin, Read};
+use std::io::{self, Read, stdin};
 
 use nibble::runtime::Runtime;
 
 /// Simple runner of Nib code. Anything more elaborate goes into
 /// another crate, where it can pull in dependencies and go wild
-/// in general. 
+/// in general.
 fn main() -> io::Result<()> {
-    let args : Vec<_> = args().collect();
+    let args: Vec<_> = args().collect();
     let mut rt = Runtime::new();
     if args.len() < 2 {
         let mut buffer = String::new();

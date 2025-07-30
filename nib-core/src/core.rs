@@ -1,7 +1,4 @@
-use std::{
-    collections::HashSet,
-    fmt::Display,
-};
+use std::{collections::HashSet, fmt::Display};
 
 use crate::{
     ast::{self},
@@ -31,7 +28,7 @@ pub fn desugar(module: ast::Module) -> Result<Module> {
     })
 }
 
-pub fn desugar_expression(expr : ast::ExpressionNode) -> Result<Expression> {
+pub fn desugar_expression(expr: ast::ExpressionNode) -> Result<Expression> {
     let meta = Metadata::new(None);
     let mut state = DesugarState::new(meta);
     state.desugar_expression(expr)
@@ -94,8 +91,8 @@ impl DesugarState {
         Ok(vec![Binding::binding(
             ast_binding.id,
             Binder::Public(name),
-            Expression::Lambda(self.metadata.last_id, core_clauses))
-        ])
+            Expression::Lambda(self.metadata.last_id, core_clauses),
+        )])
     }
 
     fn desugar_opbinding(&mut self, ast_binding: ast::OpBinding) -> Result<Vec<Binding>> {
@@ -118,7 +115,7 @@ impl DesugarState {
         }
         self.metadata.last_id += 1;
         Ok(vec![Binding::binding(
-           ast_binding.id,
+            ast_binding.id,
             Binder::Public(name),
             Expression::Lambda(self.metadata.last_id, core_clauses),
         )])
@@ -133,11 +130,9 @@ impl DesugarState {
                 Binder::Public(v),
                 rhs,
             )]),
-            ast::Pattern::Wildcard => Ok(vec![Binding::binding(
-                ast_binding.id,
-                Binder::Unbound,
-                rhs,)
-            ]),
+            ast::Pattern::Wildcard => {
+                Ok(vec![Binding::binding(ast_binding.id, Binder::Unbound, rhs)])
+            }
             _ => {
                 let mut visitor = UsedVars::new();
                 pat.visit(&mut visitor);
@@ -161,10 +156,8 @@ impl DesugarState {
                 );
                 let body = Expression::App(self.new_id(), vec![lam, rhs]);
                 let nam_arr = self.next_local();
-                let binding = Binding::binding(                    ast_binding.id,
-                    Binder::Local(nam_arr.clone()),
-                    body,
-                );
+                let binding =
+                    Binding::binding(ast_binding.id, Binder::Local(nam_arr.clone()), body);
                 let mut bindings = vec![binding];
                 for (i, n) in names.into_iter().enumerate() {
                     let rhs = Expression::App(
@@ -175,11 +168,7 @@ impl DesugarState {
                             Expression::Literal(self.new_id(), ast::Literal::Integer(i as i64)),
                         ],
                     );
-                    let bind = Binding::binding(
-                        self.new_id(),
-                        Binder::Public(n),
-                        rhs,
-                    );
+                    let bind = Binding::binding(self.new_id(), Binder::Public(n), rhs);
                     bindings.push(bind);
                 }
                 Ok(bindings)
@@ -346,7 +335,7 @@ impl DesugarState {
     fn error<T>(&self, msg: &str) -> Result<T> {
         Err(Error::Desugar {
             msg: msg.to_owned(),
-            loc: None
+            loc: None,
         })
     }
 }
@@ -376,13 +365,18 @@ pub struct Binding {
 }
 
 impl Binding {
-    pub fn binding(id:Node, binder:Binder, body:Expression) -> Self {
+    pub fn binding(id: Node, binder: Binder, body: Expression) -> Self {
         let name = match &binder {
             Binder::Public(name) => name.to_string(),
             Binder::Local(s) => s.clone(),
             Binder::Unbound => "".to_string(),
         };
-        Binding { id, binder, name, body }
+        Binding {
+            id,
+            binder,
+            name,
+            body,
+        }
     }
 }
 
@@ -501,7 +495,7 @@ impl Display for Arity {
 impl Arity {
     pub fn min_arity(&self) -> usize {
         match self {
-            Arity::Fixed(n) | Arity::VarArg(n) => *n
+            Arity::Fixed(n) | Arity::VarArg(n) => *n,
         }
     }
 }

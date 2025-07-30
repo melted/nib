@@ -1,10 +1,17 @@
 use std::{
-    arch::x86_64, cell::RefCell, collections::{BTreeSet, HashMap, HashSet}, fmt::{Debug, Display}, fs::read_to_string, hash::Hash, mem::Discriminant, rc::Rc
+    arch::x86_64,
+    cell::RefCell,
+    collections::{BTreeSet, HashMap, HashSet},
+    fmt::{Debug, Display},
+    fs::read_to_string,
+    hash::Hash,
+    mem::Discriminant,
+    rc::Rc,
 };
 
 use crate::{
     common::{Error, Metadata, Name, Result},
-    core::{desugar, desugar_expression, Arity, FunClause},
+    core::{Arity, FunClause, desugar, desugar_expression},
     parser::{parse_declarations, parse_expression},
     runtime::{evaluate::Environment, prims::Primitive},
 };
@@ -21,7 +28,7 @@ pub struct Runtime {
     globals: Rc<RefCell<Table>>,
     named_symbols: HashMap<String, Symbol>,
     local_environment: Environment,
-    closures_to_check: HashMap<String, HashSet<String>>
+    closures_to_check: HashMap<String, HashSet<String>>,
 }
 
 impl Runtime {
@@ -31,7 +38,7 @@ impl Runtime {
             globals: new_ref(Table::new()),
             named_symbols: HashMap::new(),
             local_environment: Environment::new(),
-            closures_to_check: HashMap::new()
+            closures_to_check: HashMap::new(),
         };
         rt.register_primitives().unwrap();
         rt.register_type_tables().unwrap();
@@ -55,7 +62,7 @@ impl Runtime {
         Ok(())
     }
 
-    pub fn run_expression(&mut self, code:&str) -> Result<Value> {
+    pub fn run_expression(&mut self, code: &str) -> Result<Value> {
         let ast_expr = parse_expression(code)?;
         let expr = desugar_expression(ast_expr)?;
         self.evaluate_expression("", &expr, &mut Environment::new())
@@ -184,11 +191,11 @@ impl Runtime {
         Ok(table)
     }
 
-    pub fn make_string(&mut self, s:&str) -> Result<Value> {
+    pub fn make_string(&mut self, s: &str) -> Result<Value> {
         let mut b = Bytes::with(s.clone().as_bytes().to_vec());
         b.type_table = self.get_module_path(&["string".to_owned()]);
         Ok(Value::Bytes(new_ref(b)))
-    } 
+    }
 }
 
 fn new_ref<T>(val: T) -> Rc<RefCell<T>> {
@@ -245,7 +252,7 @@ impl PartialOrd for Value {
             (Value::Array(a), Value::Array(b)) => a.as_ptr().partial_cmp(&b.as_ptr()),
             (Value::Table(a), Value::Table(b)) => a.as_ptr().partial_cmp(&b.as_ptr()),
             (Value::Closure(a), Value::Closure(b)) => a.as_ptr().partial_cmp(&b.as_ptr()),
-            (x, y) => x.number().partial_cmp(&y.number())
+            (x, y) => x.number().partial_cmp(&y.number()),
         }
     }
 }
@@ -296,7 +303,7 @@ impl Value {
     pub fn is_complex(&self) -> bool {
         match self {
             Value::Array(_) | Value::Table(_) | Value::Closure(_) => true,
-            _ => false
+            _ => false,
         }
     }
 
@@ -355,7 +362,9 @@ impl PartialEq for Symbol {
 
 impl PartialOrd for Symbol {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        self.symbol_info.as_ptr().partial_cmp(&other.symbol_info.as_ptr())
+        self.symbol_info
+            .as_ptr()
+            .partial_cmp(&other.symbol_info.as_ptr())
     }
 }
 
@@ -393,7 +402,11 @@ impl Table {
         }
     }
 
-    fn pretty_print(&self, f: &mut std::fmt::Formatter<'_>, done : &mut BTreeSet<Value>) -> std::fmt::Result {
+    fn pretty_print(
+        &self,
+        f: &mut std::fmt::Formatter<'_>,
+        done: &mut BTreeSet<Value>,
+    ) -> std::fmt::Result {
         write!(f, "Table {{ ")?;
         for (k, v) in &self.table {
             write!(f, "{}: ", k)?;

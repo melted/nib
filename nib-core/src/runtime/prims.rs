@@ -1,4 +1,3 @@
-
 use crate::common::{Name, Result};
 use crate::core::Arity;
 use crate::runtime::{Runtime, Value};
@@ -149,22 +148,13 @@ impl Runtime {
             "_prim_gte",
             Value::Primitive(Primitive::Gte, Arity::Fixed(2)),
         );
-        self.add_global(
-            "_prim_gt",
-            Value::Primitive(Primitive::Gt, Arity::Fixed(2)),
-        );
+        self.add_global("_prim_gt", Value::Primitive(Primitive::Gt, Arity::Fixed(2)));
         self.add_global(
             "_prim_lte",
             Value::Primitive(Primitive::Lte, Arity::Fixed(2)),
         );
-        self.add_global(
-            "_prim_lt",
-            Value::Primitive(Primitive::Lt, Arity::Fixed(2)),
-        );
-        self.add_global(
-            "_prim_eq",
-            Value::Primitive(Primitive::Eq, Arity::Fixed(2)),
-        );
+        self.add_global("_prim_lt", Value::Primitive(Primitive::Lt, Arity::Fixed(2)));
+        self.add_global("_prim_eq", Value::Primitive(Primitive::Eq, Arity::Fixed(2)));
 
         Ok(())
     }
@@ -206,8 +196,6 @@ pub enum Primitive {
     Lt,
     Lte,
     Eq,
-
-
 }
 
 impl Runtime {

@@ -1,9 +1,17 @@
 #![cfg(test)]
-use crate::{common::{Error, Name, Result}, core::Pattern, runtime::{evaluate::Environment, Runtime, Value}};
+use crate::{
+    common::{Error, Name, Result},
+    core::Pattern,
+    runtime::{Runtime, Value, evaluate::Environment},
+};
 
 #[test]
 fn simple_pattern_match() -> Result<()> {
-    let pats = vec![Pattern::Wildcard, Pattern::Ellipsis(Some(Name::name("xs"))), Pattern::Bind(Name::name("x"))];
+    let pats = vec![
+        Pattern::Wildcard,
+        Pattern::Ellipsis(Some(Name::name("xs"))),
+        Pattern::Bind(Name::name("x")),
+    ];
     let args = vec![Value::Integer(1), Value::Integer(2), Value::Integer(3)];
     let mut rt = Runtime::new();
     let env = Environment::new();
@@ -12,15 +20,22 @@ fn simple_pattern_match() -> Result<()> {
         Some(map) => {
             assert!(map["x"] == Value::Integer(3));
             assert!(matches!(map["xs"], Value::Array(_)));
-        },
-        _ => { assert!(false) }
+        }
+        _ => {
+            assert!(false)
+        }
     }
     Ok(())
 }
 
 #[test]
 fn pattern_arity_fail() -> Result<()> {
-    let pats = vec![Pattern::Wildcard, Pattern::Bind(Name::name("x")), Pattern::Wildcard, Pattern::Wildcard];
+    let pats = vec![
+        Pattern::Wildcard,
+        Pattern::Bind(Name::name("x")),
+        Pattern::Wildcard,
+        Pattern::Wildcard,
+    ];
     let args = vec![Value::Integer(1), Value::Integer(2), Value::Integer(3)];
     let mut rt = Runtime::new();
     let env = Environment::new();
@@ -31,8 +46,8 @@ fn pattern_arity_fail() -> Result<()> {
 
 #[test]
 fn equality_of_values() -> Result<()> {
-    let a = Value::new_bytes(vec![1,2,3]);
-    let b = Value::new_bytes(vec![1,2,3]);
+    let a = Value::new_bytes(vec![1, 2, 3]);
+    let b = Value::new_bytes(vec![1, 2, 3]);
     let c = a.clone();
     assert_eq!(a, c);
     assert_ne!(a, b);

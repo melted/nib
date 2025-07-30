@@ -62,7 +62,6 @@ impl Display for Location {
     }
 }
 
-
 #[derive(Error, Debug)]
 pub enum Error {
     #[error("Syntax error: {} at {}", msg, loc)]
@@ -70,7 +69,7 @@ pub enum Error {
     #[error("Error: {}", err)]
     General { err: anyhow::Error },
     #[error("Runtime error: {}", msg)]
-    Runtime { msg: String,  loc: Option<Location> },
+    Runtime { msg: String, loc: Option<Location> },
     #[error("Desugaring error: {}", msg)]
     Desugar { msg: String, loc: Option<Location> },
 }
@@ -85,7 +84,9 @@ impl From<anyhow::Error> for Error {
 
 impl From<io::Error> for Error {
     fn from(value: io::Error) -> Self {
-        Error::General { err: anyhow!(value) }
+        Error::General {
+            err: anyhow!(value),
+        }
     }
 }
 
