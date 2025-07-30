@@ -13,6 +13,11 @@ impl Runtime {
         match prim {
             Primitive::Print => self.printer(arg),
             Primitive::Type => self.type_query(arg),
+            Primitive::ArrayCreate => self.array_create(arg),
+            Primitive::ArraySize => match arg {
+                Value::Array(arr) => Ok(Value::Integer(arr.borrow().array.len() as i64)),
+                _ => self.error(&format!("The argument to _prim_array_size must be an array, got {}", arg))
+            }
             _ => self.error("Boom!"),
         }
     }
@@ -29,28 +34,28 @@ impl Runtime {
                 (Value::Real(a), Value::Real(b)) => Ok(Value::Real(a + b)),
                 (Value::Integer(a), Value::Real(b)) => Ok(Value::Real(*a as f64 + b)),
                 (Value::Real(a), Value::Integer(b)) => Ok(Value::Real(a + *b as f64)),
-                _ => self.error(&format!("Can't add {:?} and {:?}", arg, arg2)),
+                _ => self.error(&format!("Can't add {} and {}", arg, arg2)),
             },
             Primitive::Sub => match (arg, arg2) {
                 (Value::Integer(a), Value::Integer(b)) => Ok(Value::Integer(a - b)),
                 (Value::Real(a), Value::Real(b)) => Ok(Value::Real(a - b)),
                 (Value::Integer(a), Value::Real(b)) => Ok(Value::Real(*a as f64 - b)),
                 (Value::Real(a), Value::Integer(b)) => Ok(Value::Real(a - *b as f64)),
-                _ => self.error(&format!("Can't subtract {:?} from {:?}", arg2, arg)),
+                _ => self.error(&format!("Can't subtract {} from {}", arg2, arg)),
             },
             Primitive::Mul => match (arg, arg2) {
                 (Value::Integer(a), Value::Integer(b)) => Ok(Value::Integer(a * b)),
                 (Value::Real(a), Value::Real(b)) => Ok(Value::Real(a * b)),
                 (Value::Integer(a), Value::Real(b)) => Ok(Value::Real(*a as f64 * b)),
                 (Value::Real(a), Value::Integer(b)) => Ok(Value::Real(a * *b as f64)),
-                _ => self.error(&format!("Can't multiply {:?} and {:?}", arg, arg2)),
+                _ => self.error(&format!("Can't multiply {} and {}", arg, arg2)),
             },
             Primitive::Div => match (arg, arg2) {
                 (Value::Integer(a), Value::Integer(b)) => Ok(Value::Integer(a / b)),
                 (Value::Real(a), Value::Real(b)) => Ok(Value::Real(a / b)),
                 (Value::Integer(a), Value::Real(b)) => Ok(Value::Real(*a as f64 / b)),
                 (Value::Real(a), Value::Integer(b)) => Ok(Value::Real(a / *b as f64)),
-                _ => self.error(&format!("Can't divide {:?} by {:?}", arg, arg2)),
+                _ => self.error(&format!("Can't divide {} by {}", arg, arg2)),
             },
             Primitive::Gte => match (arg, arg2) {
                 (Value::Integer(a), Value::Integer(b)) => Ok(Value::Bool(a >= b)),
@@ -58,7 +63,7 @@ impl Runtime {
                 (Value::Integer(a), Value::Real(b)) => Ok(Value::Bool(*a as f64 >= *b)),
                 (Value::Real(a), Value::Integer(b)) => Ok(Value::Bool(*a >= *b as f64)),
                 (Value::Char(a), Value::Char(b)) => Ok(Value::Bool(a >= b)),
-                _ => self.error(&format!("Can't compare {:?} with {:?}", arg, arg2)),
+                _ => self.error(&format!("Can't compare {} with {}", arg, arg2)),
             },
             Primitive::Gt => match (arg, arg2) {
                 (Value::Integer(a), Value::Integer(b)) => Ok(Value::Bool(a > b)),
@@ -66,7 +71,7 @@ impl Runtime {
                 (Value::Integer(a), Value::Real(b)) => Ok(Value::Bool(*a as f64 > *b)),
                 (Value::Real(a), Value::Integer(b)) => Ok(Value::Bool(*a > *b as f64)),
                 (Value::Char(a), Value::Char(b)) => Ok(Value::Bool(a > b)),
-                _ => self.error(&format!("Can't compare {:?} with {:?}", arg, arg2)),
+                _ => self.error(&format!("Can't compare {} with {}", arg, arg2)),
             },
             Primitive::Lte => match (arg, arg2) {
                 (Value::Integer(a), Value::Integer(b)) => Ok(Value::Bool(a <= b)),
@@ -74,7 +79,7 @@ impl Runtime {
                 (Value::Integer(a), Value::Real(b)) => Ok(Value::Bool(*a as f64 <= *b)),
                 (Value::Real(a), Value::Integer(b)) => Ok(Value::Bool(*a <= *b as f64)),
                 (Value::Char(a), Value::Char(b)) => Ok(Value::Bool(a <= b)),
-                _ => self.error(&format!("Can't compare {:?} with {:?}", arg, arg2)),
+                _ => self.error(&format!("Can't compare {} with {}", arg, arg2)),
             },
             Primitive::Lt => match (arg, arg2) {
                 (Value::Integer(a), Value::Integer(b)) => Ok(Value::Bool(a < b)),
@@ -82,17 +87,21 @@ impl Runtime {
                 (Value::Integer(a), Value::Real(b)) => Ok(Value::Bool((*a as f64) < *b)),
                 (Value::Real(a), Value::Integer(b)) => Ok(Value::Bool(*a < *b as f64)),
                 (Value::Char(a), Value::Char(b)) => Ok(Value::Bool(a < b)),
-                _ => self.error(&format!("Can't compare {:?} with {:?}", arg, arg2)),
+                _ => self.error(&format!("Can't compare {} with {}", arg, arg2)),
             },
             Primitive::Eq => match (arg, arg2) {
+                (x, y) if std::mem::discriminant(x) == std::mem::discriminant(y) => Ok(Value::Bool(x == y)),
                 (Value::Integer(a), Value::Integer(b)) => Ok(Value::Bool(a == b)),
                 (Value::Real(a), Value::Real(b)) => Ok(Value::Bool(a == b)),
-                (Value::Integer(a), Value::Real(b)) => Ok(Value::Bool(*a as f64 == *b)),
-                (Value::Real(a), Value::Integer(b)) => Ok(Value::Bool(*a == *b as f64)),
-                (Value::Char(a), Value::Char(b)) => Ok(Value::Bool(a == b)),
-                (Value::Bool(a), Value::Bool(b)) => Ok(Value::Bool(a == b)),
-                _ => self.error(&format!("Can't compare {:?} with {:?}", arg, arg2)),
+                _ => self.error(&format!("Can't compare {} with {}", arg, arg2)),
             },
+            Primitive::ArrayRef => match (arg, arg2) {
+                (Value::Array(arr), Value::Integer(n)) => {
+                    let array = arr.borrow();
+                    Ok(array.array[*n as usize].clone())
+                },
+                (x, y) => self.error(&format!("The arguments to _prim_array_ref should be an array and an integer, got {} and {}", x, y))
+            }
             _ => self.error("Boom!"),
         }
     }
@@ -105,6 +114,17 @@ impl Runtime {
         arg3: &Value,
     ) -> Result<Value> {
         match prim {
+            Primitive::ArraySet => {
+                let Value::Array(arr) = arg else {
+                    return self.error("First argument to _prim_array_set must be an array");
+                };
+                let Value::Integer(n) = arg2 else {
+                    return self.error("Second argument to _prim_array_set must be an integer");
+                };
+                let mut array = arr.borrow_mut();
+                array.array[*n as usize] = arg3.clone();
+                Ok(Value::Nil)
+            },
             _ => self.error("Boom!"),
         }
     }
@@ -116,6 +136,7 @@ impl Runtime {
     ) -> Result<Value> {
         match prim {
             Primitive::Project => self.project(args),
+            Primitive::ArrayMk => Ok(Value::new_array(args)),
             _ => self.error("Boom!"),
         }
     }
@@ -124,8 +145,12 @@ impl Runtime {
         self.add_global("global", Value::Table(self.globals.clone()));
         self.add_global("print", Value::Primitive(Primitive::Print, Arity::Fixed(1)));
         self.add_global(
-            "project",
+            "_prim_project",
             Value::Primitive(Primitive::Project, Arity::VarArg(2)),
+        );
+        self.add_global(
+            "_prim_array_make",
+            Value::Primitive(Primitive::ArrayMk, Arity::VarArg(1)),
         );
         self.add_global("type", Value::Primitive(Primitive::Type, Arity::Fixed(1)));
         self.add_global(
@@ -155,6 +180,22 @@ impl Runtime {
         );
         self.add_global("_prim_lt", Value::Primitive(Primitive::Lt, Arity::Fixed(2)));
         self.add_global("_prim_eq", Value::Primitive(Primitive::Eq, Arity::Fixed(2)));
+        self.add_global(
+            "_prim_array_ref",
+            Value::Primitive(Primitive::ArrayRef, Arity::Fixed(2)),
+        );
+        self.add_global(
+            "_prim_array_set",
+            Value::Primitive(Primitive::ArraySet, Arity::Fixed(3)),
+        );
+        self.add_global(
+            "_prim_array_create",
+            Value::Primitive(Primitive::ArrayCreate, Arity::Fixed(1)),
+        );
+        self.add_global(
+            "_prim_array_size",
+            Value::Primitive(Primitive::ArraySize, Arity::Fixed(1)),
+        );
 
         Ok(())
     }
@@ -196,12 +237,29 @@ pub enum Primitive {
     Lt,
     Lte,
     Eq,
+
+    // Array
+    ArrayMk,
+    ArrayRef,
+    ArraySet,
+    ArrayCreate,
+    ArraySize
 }
 
 impl Runtime {
     fn printer(&self, arg: &Value) -> Result<Value> {
-        print!("{:?}", arg);
+        print!("{}\n", arg);
         Ok(Value::Nil)
+    }
+
+    fn array_create(&self, arg: &Value) -> Result<Value> {
+        let size = match arg {
+            Value::Integer(n) => *n as usize,
+            _ => return self.error(&format!("The argument to _prim_array_create should be an integer, got {}", arg))
+        };
+        let mut v = Vec::with_capacity(size);
+        v.resize(size, Value::Nil);
+        Ok(Value::new_array(v.as_slice()))
     }
 
     fn type_query(&self, arg: &Value) -> Result<Value> {

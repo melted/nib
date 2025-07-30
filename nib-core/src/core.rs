@@ -218,7 +218,7 @@ impl DesugarState {
             }
             ast::Expression::Array(v) => {
                 let mut args = Vec::new();
-                args.push(self.named_var("array"));
+                args.push(self.named_var("_prim_array_make"));
                 for a in v {
                     args.push(self.desugar_expression(a)?);
                 }
@@ -276,7 +276,7 @@ impl DesugarState {
             ast::Expression::Literal(lit) => Ok(Expression::Literal(expression.id, lit)),
             ast::Expression::Projection(projs) => {
                 let mut args = Vec::new();
-                args.push(self.named_var("project"));
+                args.push(self.named_var("_prim_project"));
                 for a in projs {
                     args.push(self.desugar_expression(a)?);
                 }

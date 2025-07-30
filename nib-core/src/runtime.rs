@@ -448,7 +448,7 @@ impl Display for Array {
         if let Some(b) = it.next() {
             write!(f, "{}", b)?;
             for v in it {
-                write!(f, " ,{}", b)?;
+                write!(f, ", {}", v)?;
             }
         }
         write!(f, "]")
@@ -484,7 +484,7 @@ impl Display for Bytes {
         if let Some(b) = it.next() {
             write!(f, "{}", b)?;
             for b in it {
-                write!(f, " ,{}", b)?;
+                write!(f, ", {}", b)?;
             }
         }
         write!(f, "]")

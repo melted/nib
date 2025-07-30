@@ -43,3 +43,17 @@ fib n = go 1 1 n
                 go a b n = go b (a+b) (n-1)
 
 _ = print (fib 5)
+
+// Arrays
+arr = [1,2,3,4,5]
+x = _prim_array_ref arr 2
+_ = _prim_array_set arr 2 (x+19)
+_ = print arr
+
+array.set = _prim_array_set
+array.ref = _prim_array_ref
+
+
+// Bytearrays
+
+// Tables
