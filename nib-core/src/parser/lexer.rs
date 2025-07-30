@@ -456,6 +456,7 @@ fn forbidden_operator_char(ch: char) -> bool {
         || ch == ','
         || ch == ';'
         || ch == '`'
+        || ch == '_'
 }
 
 fn operator_char(ch: char) -> bool {

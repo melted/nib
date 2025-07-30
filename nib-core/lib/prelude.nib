@@ -47,13 +47,13 @@ const a b = a
 // sin, cos, tan, asin, acos, atan
 // and, or, xor, lsh, rsh, rot, bswap (bit logic)
 // type, set_type 
-// array (ref, set, new, size, fill, copy, slice)
+// array (ref, set, new, size, copy(full or part))
 // bytearray (ref, set, new, fill, size, copy, slice, 8-64bit ops signed unsigned) 
 // symbol (new, new_well_known)
-// table (ref, set, clear, size)
+// table (ref, set, size, copy)
 // char (ord, chr)
 // ptr (peek, poke, offset)
-// IO  
+// IO (print, put_char, get_char. stdin. stderr, stdout, filehandling(file_open, file_close)) 
 // Debug
 //
 

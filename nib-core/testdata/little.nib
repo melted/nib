@@ -53,7 +53,13 @@ _ = print arr
 array.set = _prim_array_set
 array.ref = _prim_array_ref
 
+arr2 = _prim_array_create 100
+_ = print (_prim_array_size arr2)
 
 // Bytearrays
 
 // Tables
+
+// Lambdas 
+
+// Guards
