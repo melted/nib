@@ -31,3 +31,15 @@ fac 0 = 1
 fac x = x * fac (x - 1)
 
 _ = print (fac 4)
+
+// Where
+i = a + b where a=12;b=13
+
+_ = print i
+
+fib n = go 1 1 n
+            where
+                go _ b 0 = b
+                go a b n = go b (a+b) (n-1)
+
+_ = print (fib 5)

@@ -7,6 +7,7 @@ use nibble::runtime::Runtime;
 /// another crate, where it can pull in dependencies and go wild
 /// in general.
 fn main() -> io::Result<()> {
+    env_logger::init();
     let args: Vec<_> = args().collect();
     let mut rt = Runtime::new();
     if args.len() < 2 {

@@ -566,7 +566,7 @@ pub fn free_vars(expr: &Expression, vars: &mut HashSet<String>) {
             let mut used = HashSet::new();
             let mut bound = HashSet::new();
             for b in bindings {
-                free_vars(expr, &mut used);
+                free_vars(&b.body, &mut used);
                 match &b.binder {
                     Binder::Local(n) => {
                         bound.insert(n.to_owned());

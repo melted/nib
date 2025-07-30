@@ -210,9 +210,9 @@ impl Runtime {
         free: &HashSet<String>,
         env: &mut Environment,
     ) -> Result<Value> {
+        info!("Evaluating lambda");
         let mut lexical_env = Environment::new();
         lexical_env.push();
-
         for v in free.iter() {
             let val = self.lookup(env, v).unwrap_or(Value::Undefined);
             if val == Value::Undefined {

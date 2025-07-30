@@ -259,8 +259,6 @@ impl Runtime {
         let mut tab = args[0].clone();
         let mut slice = &args[1..];
         loop {
-            dbg!(&slice);
-            dbg!(&tab);
             match (tab, &slice[0]) {
                 (Value::Table(from), Value::Symbol(sym)) => {
                     let table_ref = from.borrow();
