@@ -23,8 +23,10 @@ ft = 2.9 + 1.0
 _ = print ft
 _ = print (inc 4)
 
+//Projection
 _ = print (nil_type.name)
 
+// Recursion
 fac 0 = 1
 fac x = x * fac (x - 1)
 

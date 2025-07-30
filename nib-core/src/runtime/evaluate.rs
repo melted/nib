@@ -156,7 +156,8 @@ impl Runtime {
                 self.call_primitive_vararg(prim, &vals[1..])
             }
             Value::Closure(closure_rc) => {
-                let mut  args = {
+                let mut env:Environment;
+                let (mut  args, clauses, arity) = {
                     let mut args = Vec::new();
                     let mut closure = closure_rc.borrow_mut();
 
@@ -166,16 +167,16 @@ impl Runtime {
                     if args.len() < closure.arity.min_arity() {
                         return Ok(Value::Closure(new_ref(closure.with_args(&args))));
                     }
-                    args
+                    env = closure.env.clone();
+                    (args, closure.code.clone(), closure.arity.clone())
                 };
-                let closure = closure_rc.borrow();
-                let mut env = closure.env.clone();
-                let mut remaining = match closure.arity {
+
+                let mut remaining = match arity {
                     Arity::Fixed(n) => args.split_off(n),
                     Arity::VarArg(_) => Vec::new()
                 };
-                let clauses = closure.code.borrow();
-                for clause in clauses.iter() {
+
+                for clause in clauses.borrow().iter() {
                     if let Some(binds) = self.match_patterns(&args, &clause.args, &env)? {
                         env.push_env(binds);
                         if let Some(guard) = &clause.guard {
