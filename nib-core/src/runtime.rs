@@ -89,8 +89,10 @@ impl Runtime {
         table.borrow_mut().table.insert(sym, value.clone());
     }
 
-    pub fn get_from_table(&mut self, table: Rc<RefCell<Table>>, name: &str) -> Option<Value> {
-        let sym = self.get_or_add_named_symbol(name);
+    pub fn get_from_table(&self, table: Rc<RefCell<Table>>, name: &str) -> Option<Value> {
+        let Some(sym) = self.get_named_symbol(name) else {
+            return None;
+        };
         table.borrow().table.get(&sym).cloned()
     }
 
@@ -99,6 +101,10 @@ impl Runtime {
             .entry(name.to_owned())
             .or_insert_with(|| Symbol::named(name))
             .clone()
+    }
+
+    pub fn get_named_symbol(&self, name: &str) -> Option<Symbol> {
+        self.named_symbols.get(name).cloned()
     }
 
     pub fn get_global(&self, name: &str) -> Option<Value> {
@@ -121,7 +127,7 @@ impl Runtime {
         Ok(())
     }
 
-    pub fn get_name(&mut self, name: &Name) -> Option<Value> {
+    pub fn get_name(&self, name: &Name) -> Option<Value> {
         match name {
             Name::Qualified(path, name) => {
                 if let Some(t) = self.get_module_path(path) {
@@ -134,11 +140,13 @@ impl Runtime {
         }
     }
 
-    pub fn get_module_path(&mut self, path: &[String]) -> Option<Rc<RefCell<Table>>> {
+    pub fn get_module_path(&self, path: &[String]) -> Option<Rc<RefCell<Table>>> {
         let mut rest = path;
         let mut table = self.globals.clone();
         while !rest.is_empty() {
-            let sym = self.get_or_add_named_symbol(&rest[0]);
+            let Some(sym) = self.get_named_symbol(&rest[0]) else {
+                return None;
+            };
             table = {
                 let t = &mut table.borrow_mut().table;
                 let v = t.get(&sym).clone();
