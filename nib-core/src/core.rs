@@ -68,7 +68,7 @@ impl DesugarState {
     }
 
     fn desugar_funbinding(&mut self, ast_binding: ast::FunBinding) -> Result<Vec<Binding>> {
-        let name = ast_binding.name;
+        let name = self.desugar_binding_name(&ast_binding.name)?;
         let mut core_clauses = Vec::new();
         for clause in ast_binding.clauses {
             let exp = self.desugar_expression(clause.body)?;
@@ -96,7 +96,8 @@ impl DesugarState {
     }
 
     fn desugar_opbinding(&mut self, ast_binding: ast::OpBinding) -> Result<Vec<Binding>> {
-        let name = ast_binding.op.to_name();
+        let name = ast_binding.op.to_name(); // No desugar. Operators can't be used qualified,
+                                                   // making them always global is pretty ugly though 
         let mut core_clauses = Vec::new();
         for clause in ast_binding.clauses {
             let exp = self.desugar_expression(clause.body)?;
@@ -127,7 +128,7 @@ impl DesugarState {
         match pat.pattern {
             ast::Pattern::Var(v) => Ok(vec![Binding::binding(
                 ast_binding.id,
-                Binder::Public(v),
+                Binder::Public(self.desugar_binding_name(&v)?),
                 rhs,
             )]),
             ast::Pattern::Wildcard => {
@@ -168,11 +169,19 @@ impl DesugarState {
                             Expression::Literal(self.new_id(), ast::Literal::Integer(i as i64)),
                         ],
                     );
-                    let bind = Binding::binding(self.new_id(), Binder::Public(n), rhs);
+                    let dn = self.desugar_binding_name(&n)?;
+                    let bind = Binding::binding(self.new_id(), Binder::Public(dn), rhs);
                     bindings.push(bind);
                 }
                 Ok(bindings)
             }
+        }
+    }
+
+    fn desugar_binding_name(&mut self, name:&Name) -> Result<Name> {
+        match (&self.module_name, name) {
+            (None, _) | (_, Name::Qualified(_, _)) => Ok(name.clone()),
+            (Some(mod_name), Name::Plain(_))  => Ok(Name::append(mod_name, name)?)
         }
     }
 

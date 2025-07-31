@@ -56,9 +56,6 @@ array.ref = _prim_array_ref
 arr2 = _prim_array_create 100
 _ = print (_prim_array_size arr2)
 
-global.test.a = 1
-test.b = 3
-
 
 // Type
 _ = print string.type_id
@@ -75,3 +72,20 @@ _ = _prim_string_print (_prim_to_string 1.3)
 // Lambdas 
 
 // Guards
+
+// module
+
+module mod
+abba = "hello"
+baab = "world"
+
+module global
+z = 9876
+_ = _prim_string_print mod.abba
+
+res = _prim_load "nib-core/testdata/littler.nib"
+
+_ = print res
+_ = print thing
+
+// Custom Pattern

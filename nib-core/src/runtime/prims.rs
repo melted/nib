@@ -16,6 +16,7 @@ impl Runtime {
             Primitive::ToString => self.to_string(arg),
             Primitive::Type => self.type_query(arg),
             Primitive::ArrayCreate => self.array_create(arg),
+            Primitive::Load => self.load_prim(arg),
             Primitive::ArraySize => match arg {
                 Value::Array(arr) => Ok(Value::Integer(arr.borrow().array.len() as i64)),
                 _ => self.error(&format!(
@@ -208,6 +209,10 @@ impl Runtime {
         self.add_global(
             "_prim_to_string",
             Value::Primitive(Primitive::ToString, Arity::Fixed(1)),
+        );
+        self.add_global(
+            "_prim_load",
+            Value::Primitive(Primitive::Load, Arity::Fixed(1)),
         );
         Ok(())
     }
@@ -443,6 +448,20 @@ impl Runtime {
                 }
                 _ => return self.error("invalid values in projection, must be tables and symbols"),
             }
+        }
+    }
+
+    fn load_prim(&mut self, arg: &Value) -> Result<Value> {
+        match arg {
+            Value::Bytes(b) => {
+                let name = &b.borrow().bytes;
+                let file = str::from_utf8(name).map_err(|_| Error::runtime_error("Invalid utf8 string"))?;
+                match self.load(file) {
+                    Ok(_) => Ok(Value::Bool(true)),
+                    Err(_) => Ok(Value::Bool(false)) 
+                }
+            },
+            _ => self.error(&format!("_prim_load expects a string, got {}", arg)) 
         }
     }
 }
