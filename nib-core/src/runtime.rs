@@ -234,20 +234,7 @@ impl PartialEq for Value {
 
 impl PartialOrd for Value {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        match (self, other) {
-            (Value::Primitive(a, x), Value::Primitive(b, y)) => a.partial_cmp(b),
-            (Value::Bool(a), Value::Bool(b)) => a.partial_cmp(b),
-            (Value::Integer(a), Value::Integer(b)) => a.partial_cmp(b),
-            (Value::Real(a), Value::Real(b)) => a.partial_cmp(b),
-            (Value::Char(a), Value::Char(b)) => a.partial_cmp(b),
-            (Value::Pointer(a), Value::Pointer(b)) => a.partial_cmp(b),
-            (Value::Symbol(a), Value::Symbol(b)) => a.partial_cmp(b),
-            (Value::Bytes(a), Value::Bytes(b)) => a.as_ptr().partial_cmp(&b.as_ptr()),
-            (Value::Array(a), Value::Array(b)) => a.as_ptr().partial_cmp(&b.as_ptr()),
-            (Value::Table(a), Value::Table(b)) => a.as_ptr().partial_cmp(&b.as_ptr()),
-            (Value::Closure(a), Value::Closure(b)) => a.as_ptr().partial_cmp(&b.as_ptr()),
-            (x, y) => x.number().partial_cmp(&y.number()),
-        }
+        Some(self.cmp(other))
     }
 }
 
@@ -255,7 +242,20 @@ impl Eq for Value {}
 
 impl Ord for Value {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.partial_cmp(other).unwrap()
+  match (self, other) {
+            (Value::Primitive(a, x), Value::Primitive(b, y)) => a.cmp(b),
+            (Value::Bool(a), Value::Bool(b)) => a.cmp(b),
+            (Value::Integer(a), Value::Integer(b)) => a.cmp(b),
+            (Value::Real(a), Value::Real(b)) => a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Less),
+            (Value::Char(a), Value::Char(b)) => a.cmp(b),
+            (Value::Pointer(a), Value::Pointer(b)) => a.cmp(b),
+            (Value::Symbol(a), Value::Symbol(b)) => a.cmp(b),
+            (Value::Bytes(a), Value::Bytes(b)) => a.as_ptr().cmp(&b.as_ptr()),
+            (Value::Array(a), Value::Array(b)) => a.as_ptr().cmp(&b.as_ptr()),
+            (Value::Table(a), Value::Table(b)) => a.as_ptr().cmp(&b.as_ptr()),
+            (Value::Closure(a), Value::Closure(b)) => a.as_ptr().cmp(&b.as_ptr()),
+            (x, y) => x.number().cmp(&y.number()),
+        }
     }
 }
 
@@ -356,9 +356,15 @@ impl PartialEq for Symbol {
 
 impl PartialOrd for Symbol {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for Symbol {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         self.symbol_info
             .as_ptr()
-            .partial_cmp(&other.symbol_info.as_ptr())
+            .cmp(&other.symbol_info.as_ptr())
     }
 }
 

@@ -382,9 +382,9 @@ impl Display for Expression {
             Expression::App(args) => {
                 write!(f, "(")?;
                 for arg in args {
-                    write!(f, "{} ", arg);
+                    write!(f, "{} ", arg)?;
                 }
-                write!(f, ")");
+                write!(f, ")")?;
             }
             Expression::Array(arr) => {
                 write!(f, "[")?;

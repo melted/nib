@@ -233,7 +233,7 @@ impl Runtime {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, PartialOrd, Hash)]
+#[derive(Debug, Clone, PartialEq, PartialOrd, Ord, Eq, Hash)]
 pub enum Primitive {
     Print,
     Project,
