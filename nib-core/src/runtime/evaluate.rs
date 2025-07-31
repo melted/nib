@@ -294,7 +294,7 @@ impl Runtime {
                 if &v == arg { Some(out) } else { None }
             }
             Pattern::Ellipsis(Some(name)) | Pattern::Bind(name) => {
-                out.insert(name.to_string(), arg.clone());
+                out.insert(name.string(), arg.clone());
                 Some(out)
             }
             Pattern::Ellipsis(None) => Some(out),
@@ -325,7 +325,7 @@ impl Runtime {
                     }
                 };
                 let call = vec![fun, arg.clone()];
-                let res = self.apply_values(&name.to_string(), &call)?;
+                let res = self.apply_values(&name.string(), &call)?;
                 match res {
                     Value::Array(array) => {
                         let vals = &array.borrow().array;
@@ -335,7 +335,7 @@ impl Runtime {
                     _ => {
                         return self.error(&format!(
                             "Custom pattern handler {} didn't return an array or false",
-                            name.to_string()
+                            name.string()
                         ));
                     }
                 }
@@ -343,7 +343,7 @@ impl Runtime {
             Pattern::Alias(pattern, name) => {
                 let res = self.match_pattern(arg, pattern, env)?;
                 res.map(|mut vars| {
-                    vars.insert(name.to_string(), arg.clone());
+                    vars.insert(name.string(), arg.clone());
                     vars
                 })
             }

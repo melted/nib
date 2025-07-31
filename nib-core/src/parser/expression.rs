@@ -393,7 +393,7 @@ impl AstVisitor for UsedImplicits {
     fn on_expression(&mut self, expr: &ExpressionNode) -> bool {
         match &expr.expr {
             Expression::Var(name) => {
-                let v = name.to_string();
+                let v = name.string();
                 if v == "a" || v == "b" || v == "c" || v == "d" {
                     self.vars.insert(name.clone());
                 }

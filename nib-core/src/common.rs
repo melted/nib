@@ -1,7 +1,7 @@
 use std::{
     collections::{HashMap, HashSet},
     fmt::Display,
-    io,
+    io, path,
 };
 
 use anyhow::anyhow;
@@ -112,7 +112,7 @@ pub enum Name {
 }
 
 impl Name {
-    pub fn to_string(&self) -> String {
+    pub fn string(&self) -> String {
         match self {
             Name::Qualified(path, name) => {
                 let mut str = String::new();
@@ -148,14 +148,24 @@ impl Name {
             (Name::Plain(parent), Name::Plain(b)) => {
                 Ok(Name::Qualified(vec![parent.clone()], b.clone()))
             }
-            _ => panic!("Can't call append on two qualified names"),
+            (Name::Qualified(leader, end_leader), Name::Qualified(path, name)) => {
+                let mut p = leader.clone();
+                p.push(end_leader.clone());
+                p.append(&mut path.clone());
+                Ok(Name::Qualified(p, name.clone()))
+            }
+            (Name::Plain(a), Name::Qualified(path, b)) => {
+                let mut np = vec![a.clone()];
+                np.append(&mut path.clone());
+                Ok(Name::Qualified(np, b.clone()))
+            }
         }
     }
 }
 
 impl Display for Name {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.to_string())?;
+        write!(f, "{}", self.string())?;
         Ok(())
     }
 }

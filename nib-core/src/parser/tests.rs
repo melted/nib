@@ -111,7 +111,7 @@ fn parse_custom_pattern() -> Result<()> {
     let pat = state.parse_pattern()?;
     match &pat.pattern {
         Pattern::Custom(name, fields) => {
-            assert_eq!(name.to_string(), "pair");
+            assert_eq!(name.string(), "pair");
             assert_eq!(fields[0].pattern, Pattern::Var(Name::name("a")));
             assert_eq!(fields[1].pattern, Pattern::Var(Name::name("b")));
         }

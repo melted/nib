@@ -329,7 +329,7 @@ impl DesugarState {
     }
 
     fn var(&mut self, name: Name) -> Expression {
-        Expression::Var(self.new_id(), name.to_string())
+        Expression::Var(self.new_id(), name.string())
     }
 
     fn error<T>(&self, msg: &str) -> Result<T> {
@@ -367,7 +367,7 @@ pub struct Binding {
 impl Binding {
     pub fn binding(id: Node, binder: Binder, body: Expression) -> Self {
         let name = match &binder {
-            Binder::Public(name) => name.to_string(),
+            Binder::Public(name) => name.string(),
             Binder::Local(s) => s.clone(),
             Binder::Unbound => "".to_string(),
         };
@@ -572,7 +572,7 @@ pub fn free_vars(expr: &Expression, vars: &mut HashSet<String>) {
                         bound.insert(n.to_owned());
                     }
                     Binder::Public(n) => {
-                        bound.insert(n.to_string());
+                        bound.insert(n.string());
                     }
                     _ => {}
                 };
@@ -588,7 +588,7 @@ pub fn free_vars(expr: &Expression, vars: &mut HashSet<String>) {
 pub fn bound_vars(pat: &Pattern, vars: &mut HashSet<String>) {
     match pat {
         Pattern::Ellipsis(Some(name)) | Pattern::Bind(name) => {
-            vars.insert(name.to_string());
+            vars.insert(name.string());
         }
         Pattern::Custom(name, patterns) => {
             for p in patterns {
@@ -597,7 +597,7 @@ pub fn bound_vars(pat: &Pattern, vars: &mut HashSet<String>) {
         }
         Pattern::Alias(pattern, name) => {
             bound_vars(&pattern, vars);
-            vars.insert(name.to_string());
+            vars.insert(name.string());
         }
         _ => {}
     }

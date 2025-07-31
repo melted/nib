@@ -280,7 +280,7 @@ impl Display for Pattern {
             Pattern::Ellipsis(name) => write!(
                 f,
                 "...{}",
-                name.clone().map_or(String::new(), |n| n.to_string())
+                name.clone().map_or(String::new(), |n| n.string())
             ),
             Pattern::Literal(lit) => write!(f, "{}", lit),
             Pattern::Var(var) => write!(f, "{}", var),
