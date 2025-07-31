@@ -1,11 +1,9 @@
 use std::{
-    arch::x86_64,
     cell::RefCell,
     collections::{BTreeSet, HashMap, HashSet},
     fmt::{Debug, Display},
     fs::read_to_string,
     hash::Hash,
-    mem::Discriminant,
     rc::Rc,
 };
 
@@ -188,7 +186,7 @@ impl Runtime {
     }
 
     pub fn make_string(&self, s: &str) -> Result<Value> {
-        let mut b = Bytes::with(s.clone().as_bytes().to_vec());
+        let mut b = Bytes::with(s.as_bytes().to_vec());
         b.type_table = self.get_module_path(&["string".to_owned()]);
         Ok(Value::Bytes(new_ref(b)))
     }
