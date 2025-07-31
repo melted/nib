@@ -49,7 +49,7 @@ impl Runtime {
     }
 
     pub fn add_code(&mut self, name: &str, code: &str) -> Result<()> {
-        let mut ast_module = parse_declarations(Some(name.to_owned()), code)?;
+        let ast_module = parse_declarations(Some(name.to_owned()), code)?;
         let mut module = desugar(ast_module)?;
         let v = self
             .metadata

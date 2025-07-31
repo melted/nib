@@ -1,6 +1,6 @@
 #![cfg(test)]
 use crate::{
-    common::{Error, Name, Result},
+    common::{Name, Result},
     core::Pattern,
     runtime::{Runtime, Value, evaluate::Environment},
 };

@@ -9,7 +9,7 @@ use crate::{
     ast::Literal,
     common::{Name, Result},
     core::{Arity, Binder, Binding, Expression, FunClause, Module, Pattern, free_vars},
-    runtime::{Bytes, Closure, Runtime, Value, evaluate, new_ref},
+    runtime::{Bytes, Closure, Runtime, Value, new_ref},
 };
 
 impl Runtime {
