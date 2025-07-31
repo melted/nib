@@ -51,15 +51,15 @@ impl<'a> ParserState<'a> {
             let result = match tok.value {
                 TokenValue::Where if min_pred < 2 => self.parse_where_expression(lhs),
                 TokenValue::Operator(op) if min_pred < 6 => {
-                        self.get_next_token()?;
-                        self.parse_binop_expression(lhs, Operator::Plain(op))
-                },
-                TokenValue::FatRightArrow  if min_pred < 4 => self.parse_cond_expression(lhs),
+                    self.get_next_token()?;
+                    self.parse_binop_expression(lhs, Operator::Plain(op))
+                }
+                TokenValue::FatRightArrow if min_pred < 4 => self.parse_cond_expression(lhs),
                 TokenValue::Period => self.parse_projection_expression(lhs),
-                TokenValue::Identifier(_) if min_pred < 9 =>  {
-                        let rhs = self.parse_inner_expression(9)?;
-                        Ok(self.app_expression(lhs, rhs))
-                },
+                TokenValue::Identifier(_) if min_pred < 9 => {
+                    let rhs = self.parse_inner_expression(9)?;
+                    Ok(self.app_expression(lhs, rhs))
+                }
                 TokenValue::Eof => break,
                 TokenValue::LeftBrace | TokenValue::LeftParen | TokenValue::LeftBracket
                     if min_pred < 9 =>

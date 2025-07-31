@@ -18,8 +18,11 @@ impl Runtime {
             Primitive::ArrayCreate => self.array_create(arg),
             Primitive::ArraySize => match arg {
                 Value::Array(arr) => Ok(Value::Integer(arr.borrow().array.len() as i64)),
-                _ => self.error(&format!("The argument to _prim_array_size must be an array, got {}", arg))
-            }
+                _ => self.error(&format!(
+                    "The argument to _prim_array_size must be an array, got {}",
+                    arg
+                )),
+            },
             _ => self.error("Boom!"),
         }
     }
@@ -126,7 +129,7 @@ impl Runtime {
                 let mut array = arr.borrow_mut();
                 array.array[*n as usize] = arg3.clone();
                 Ok(Value::Nil)
-            },
+            }
             _ => self.error("Boom!"),
         }
     }
@@ -226,10 +229,11 @@ impl Runtime {
         self.register_type("function", "function");
     }
 
-    fn register_type(&mut self, table_name:&str, type_name:&str) {
+    fn register_type(&mut self, table_name: &str, type_name: &str) {
         self.add_global(table_name, Value::new_table());
         let tname = self.make_string(type_name).unwrap();
-        self.add_name(&Name::name(&format!("{}.type_id", table_name)), &tname).unwrap();
+        self.add_name(&Name::name(&format!("{}.type_id", table_name)), &tname)
+            .unwrap();
     }
 }
 
@@ -308,8 +312,7 @@ pub enum Primitive {
 
     // System
     Load,
-    Extern
-
+    Extern,
 }
 
 impl Runtime {
@@ -327,24 +330,34 @@ impl Runtime {
         match arg {
             Value::Bytes(bytes) => {
                 let b = &bytes.borrow().bytes;
-                print!("{}", str::from_utf8(&b).map_err(|_| Error::runtime_error("Invalid string in _prim_string_print"))?);
+                print!(
+                    "{}",
+                    str::from_utf8(&b).map_err(|_| Error::runtime_error(
+                        "Invalid string in _prim_string_print"
+                    ))?
+                );
                 Ok(Value::Integer(b.len() as i64))
-            },
-            _ => self.error(&format!("_prim_string_print takes a string, got {}", arg))
+            }
+            _ => self.error(&format!("_prim_string_print takes a string, got {}", arg)),
         }
     }
 
     fn array_create(&self, arg: &Value) -> Result<Value> {
         let size = match arg {
             Value::Integer(n) => *n as usize,
-            _ => return self.error(&format!("The argument to _prim_array_create should be an integer, got {}", arg))
+            _ => {
+                return self.error(&format!(
+                    "The argument to _prim_array_create should be an integer, got {}",
+                    arg
+                ));
+            }
         };
         let mut v = Vec::with_capacity(size);
         v.resize(size, Value::Nil);
         Ok(Value::new_array(v.as_slice()))
     }
 
-    fn is_type(&self, arg: &Value, t:&str) -> bool {
+    fn is_type(&self, arg: &Value, t: &str) -> bool {
         match self.type_query(arg) {
             Ok(Value::Table(type_table)) => {
                 let table = &type_table.borrow().table;
@@ -353,8 +366,8 @@ impl Runtime {
                 };
                 let val = self.make_string(t).unwrap();
                 table.get(&tid).map_or(false, |id| val == id.clone())
-            },
-            _ => false
+            }
+            _ => false,
         }
     }
 
