@@ -39,6 +39,9 @@ id x = x
 a & b = b // sequencing
 const a b = a
 
+// types
+type_name v = (type v).type_id
+
 // Stuff that need prims
 // =====================
 // apply

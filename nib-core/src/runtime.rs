@@ -137,12 +137,6 @@ impl Runtime {
     pub fn get_module_path(&mut self, path: &[String]) -> Option<Rc<RefCell<Table>>> {
         let mut rest = path;
         let mut table = self.globals.clone();
-        match path.get(0) {
-            Some(s) if s == "global" => {
-                rest = &rest[1..];
-            }
-            _ => {}
-        };
         while !rest.is_empty() {
             let sym = self.get_or_add_named_symbol(&rest[0]);
             table = {
@@ -163,12 +157,6 @@ impl Runtime {
     pub fn get_or_create_module_path(&mut self, path: &[String]) -> Result<Rc<RefCell<Table>>> {
         let mut rest = path;
         let mut table = self.globals.clone();
-        match path.get(0) {
-            Some(s) if s == "global" => {
-                rest = &rest[1..];
-            }
-            _ => {}
-        };
         while !rest.is_empty() {
             let sym = self.get_or_add_named_symbol(&rest[0]);
             table = {
