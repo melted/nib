@@ -64,11 +64,11 @@ impl<'a> ParserState<'a> {
                 TokenValue::LeftBrace | TokenValue::LeftParen | TokenValue::LeftBracket
                     if min_pred < 9 =>
                 {
-                    let expr = self.parse_left_expression()?;
+                    let expr = self.parse_inner_expression(10)?;
                     Ok(self.app_expression(lhs, expr))
                 }
                 _ if tok.value.is_literal() && min_pred < 9 => {
-                    let expr = self.parse_left_expression()?;
+                    let expr = self.parse_inner_expression(10)?;
                     Ok(self.app_expression(lhs, expr))
                 }
                 _ => {

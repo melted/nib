@@ -56,11 +56,14 @@ array.ref = _prim_array_ref
 arr2 = _prim_array_create 100
 _ = print (_prim_array_size arr2)
 
+global.test.a = 1
+test.b = 3
+
 
 // Type
 _ = print string.type_id
 
-_ = print ((type "hello").type_id)
+_ = print (type "hello").type_id
 
 
 // Bytearrays
