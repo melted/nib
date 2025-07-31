@@ -187,7 +187,7 @@ impl Runtime {
         Ok(table)
     }
 
-    pub fn make_string(&mut self, s: &str) -> Result<Value> {
+    pub fn make_string(&self, s: &str) -> Result<Value> {
         let mut b = Bytes::with(s.clone().as_bytes().to_vec());
         b.type_table = self.get_module_path(&["string".to_owned()]);
         Ok(Value::Bytes(new_ref(b)))

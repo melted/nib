@@ -1,4 +1,4 @@
-use crate::common::{Name, Result};
+use crate::common::{Error, Name, Result};
 use crate::core::Arity;
 use crate::runtime::{Runtime, Value};
 
@@ -11,7 +11,9 @@ impl Runtime {
 
     pub(super) fn call_primitive1(&mut self, prim: &Primitive, arg: &Value) -> Result<Value> {
         match prim {
-            Primitive::Print => self.printer(arg),
+            Primitive::Print => self.value_printer(arg),
+            Primitive::StringPrint => self.print_string(arg),
+            Primitive::ToString => self.to_string(arg),
             Primitive::Type => self.type_query(arg),
             Primitive::ArrayCreate => self.array_create(arg),
             Primitive::ArraySize => match arg {
@@ -196,7 +198,14 @@ impl Runtime {
             "_prim_array_size",
             Value::Primitive(Primitive::ArraySize, Arity::Fixed(1)),
         );
-
+        self.add_global(
+            "_prim_string_print",
+            Value::Primitive(Primitive::StringPrint, Arity::Fixed(1)),
+        );
+        self.add_global(
+            "_prim_to_string",
+            Value::Primitive(Primitive::ToString, Arity::Fixed(1)),
+        );
         Ok(())
     }
 
@@ -229,6 +238,7 @@ pub enum Primitive {
     Print,
     Project,
     Type,
+    TypeSet,
 
     // Arítmethic
     Add,
@@ -248,23 +258,80 @@ pub enum Primitive {
     ArrayRef,
     ArraySet,
     ArrayCreate,
-    ArraySize
+    ArraySize,
+
+    // Conversion to string
+    ToString,
 
     // Bytes
+    BytesSet,
+    BytesRef,
+    BytesSize,
+    BytesMake,
+    BytesCreate,
+
+    // String
+    StringPrint,
 
     // Tables
+    TableCreate,
+    TableGet,
+    TableSet,
+    TableSize,
 
     // Float Math
+    Ceiling,
+    Floor,
+    Round,
+    Sin,
+    Cos,
+    Tan,
+    Asin,
+    Acos,
+    Atan,
+    Log,
+    Exp,
+
+    // BitOps
+    BitAnd,
+    BitOr,
+    BitXor,
+    BitNot,
+    BitShift,
+    BitPop,
 
     // Symbols
+    SymbolNamed,
+    SymbolNew,
 
+    // IO
+
+    // System
+    Load,
+    Extern
 
 }
 
 impl Runtime {
-    fn printer(&self, arg: &Value) -> Result<Value> {
+    fn value_printer(&self, arg: &Value) -> Result<Value> {
         print!("{}\n", arg);
         Ok(Value::Nil)
+    }
+
+    fn to_string(&self, arg: &Value) -> Result<Value> {
+        let str = format!("{}", arg);
+        self.make_string(&str)
+    }
+
+    fn print_string(&self, arg: &Value) -> Result<Value> {
+        match arg {
+            Value::Bytes(bytes) => {
+                let b = &bytes.borrow().bytes;
+                print!("{}", str::from_utf8(&b).map_err(|_| Error::runtime_error("Invalid string in _prim_string_print"))?);
+                Ok(Value::Integer(b.len() as i64))
+            },
+            _ => self.error(&format!("_prim_string_print takes a string, got {}", arg))
+        }
     }
 
     fn array_create(&self, arg: &Value) -> Result<Value> {
@@ -275,6 +342,20 @@ impl Runtime {
         let mut v = Vec::with_capacity(size);
         v.resize(size, Value::Nil);
         Ok(Value::new_array(v.as_slice()))
+    }
+
+    fn is_type(&self, arg: &Value, t:&str) -> bool {
+        match self.type_query(arg) {
+            Ok(Value::Table(type_table)) => {
+                let table = &type_table.borrow().table;
+                let Some(tid) = self.named_symbols.get("type_id").cloned() else {
+                    return false;
+                };
+                let val = self.make_string(t).unwrap();
+                table.get(&tid).map_or(false, |id| val == id.clone())
+            },
+            _ => false
+        }
     }
 
     fn type_query(&self, arg: &Value) -> Result<Value> {

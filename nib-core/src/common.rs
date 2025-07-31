@@ -76,6 +76,15 @@ pub enum Error {
 
 pub type Result<T> = std::result::Result<T, Error>;
 
+impl Error {
+    pub fn runtime_error(msg: &str) -> Error {
+        Error::Runtime {
+            msg: msg.to_owned(),
+            loc: None,
+        }
+    }
+}
+
 impl From<anyhow::Error> for Error {
     fn from(value: anyhow::Error) -> Self {
         Error::General { err: value }
