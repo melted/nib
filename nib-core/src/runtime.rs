@@ -41,7 +41,7 @@ impl Runtime {
             closures_to_check: HashMap::new(),
         };
         rt.register_primitives().unwrap();
-        rt.register_type_tables().unwrap();
+        rt.register_type_tables();
         rt
     }
 

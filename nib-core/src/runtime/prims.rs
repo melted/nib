@@ -200,22 +200,27 @@ impl Runtime {
         Ok(())
     }
 
-    pub(super) fn register_type_tables(&mut self) -> Result<()> {
-        self.add_global("nil_type", Value::new_table());
-        let tname = self.make_string("nil")?;
-        self.add_name(&Name::name("nil_type.name"), &tname)?;
-        self.add_global("bool", Value::new_table());
-        self.add_global("int", Value::new_table());
-        self.add_global("float", Value::new_table());
-        self.add_global("char", Value::new_table());
-        self.add_global("pointer", Value::new_table());
-        self.add_global("symbol", Value::new_table());
-        self.add_global("bytes", Value::new_table());
-        self.add_global("string", Value::new_table());
-        self.add_global("array", Value::new_table());
-        self.add_global("table", Value::new_table());
-        self.add_global("function", Value::new_table());
-        Ok(())
+    pub(super) fn register_type_tables(&mut self) {
+        // Since strings created without the string table present will
+        // not have the string type, create that first.
+        self.register_type("string", "string");
+        self.register_type("nil_type", "nil");
+        self.register_type("bool", "bool");
+        self.register_type("int", "int");
+        self.register_type("float", "float");
+        self.register_type("char", "char");
+        self.register_type("pointer", "pointer");
+        self.register_type("symbol", "symbol");
+        self.register_type("bytes", "bytes");
+        self.register_type("array", "array");
+        self.register_type("table", "table");
+        self.register_type("function", "function");
+    }
+
+    fn register_type(&mut self, table_name:&str, type_name:&str) {
+        self.add_global(table_name, Value::new_table());
+        let tname = self.make_string(type_name).unwrap();
+        self.add_name(&Name::name(&format!("{}.type_id", table_name)), &tname).unwrap();
     }
 }
 
@@ -244,6 +249,16 @@ pub enum Primitive {
     ArraySet,
     ArrayCreate,
     ArraySize
+
+    // Bytes
+
+    // Tables
+
+    // Float Math
+
+    // Symbols
+
+
 }
 
 impl Runtime {
