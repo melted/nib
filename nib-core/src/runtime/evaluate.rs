@@ -145,6 +145,7 @@ impl Runtime {
     }
 
     pub(super) fn apply_values(&mut self, binding_name: &str, vals: &[Value]) -> Result<Value> {
+        info!("Applying {} to {} arguments", &vals[0], &vals[1..].len());
         match &vals[0] {
             Value::Primitive(prim, Arity::Fixed(1)) => self.call_primitive1(prim, &vals[1]),
             Value::Primitive(prim, Arity::Fixed(2)) => {
@@ -199,7 +200,9 @@ impl Runtime {
                 }
                 self.error(&format!("No matching pattern for closure"))
             }
-            _ => self.error(&format!("Not a callable type in application {}", vals[0])),
+            _ => {
+                self.error(&format!("Not a callable type in application {}", vals[0]))
+            },
         }
     }
 
