@@ -106,3 +106,5 @@ _ = print res
 _ = print thing
 
 // Custom Pattern
+
+_ = print "end"

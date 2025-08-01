@@ -69,7 +69,6 @@ impl Runtime {
         info!("Evaluating expression {}", expression);
         let val = match expression {
             Expression::Var(n, id) => {
-                // TODO: fix declaration order
                 let Some(v) = self.lookup(env, id) else {
                     return self.error(&format!("couldn't find variable {} in environment", id));
                 };
@@ -302,18 +301,8 @@ impl Runtime {
             }
             Pattern::Ellipsis(None) => Some(out),
             Pattern::Custom(name, patterns) => {
-                let handler = match name {
-                    Name::Qualified(_, _) => {
-                        // get qualified name
-                        todo!()
-                    }
-                    Name::Plain(str) => {
-                        let Some(v) = self.lookup(env, str) else {
-                            return self
-                                .error(&format!("Failed to find custom pattern handler {}", str));
-                        };
-                        v
-                    }
+                let Some(handler) = self.lookup_name(env, name) else {
+                    return self.error(&format!("Failed to find custom pattern handler {}", name));
                 };
                 let fun = match handler {
                     Value::Closure(_) => handler,
@@ -354,8 +343,15 @@ impl Runtime {
         Ok(val)
     }
 
-    pub(super) fn lookup(&mut self, env: &Environment, id: &str) -> Option<Value> {
+    pub(super) fn lookup(&self, env: &Environment, id: &str) -> Option<Value> {
         env.get(id).or_else(|| self.get_global(id))
+    }
+
+    pub(super) fn lookup_name(&self, env: &Environment, id: &Name) -> Option<Value> {
+        if let Name::Plain(s) = id {
+            return self.lookup(env, s);
+        }
+        self.get_name(id)
     }
 
     pub fn replace_undefined(&mut self, env: &mut Environment, new_env: &Environment) {
