@@ -1,3 +1,7 @@
+a & b = b
+
+print a = _prim_string_print (_prim_to_string a) & _prim_string_print "\n"
+
 _ = print 1
 _ = print true
 c = _prim_add 1 2

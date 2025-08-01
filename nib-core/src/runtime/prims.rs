@@ -11,7 +11,7 @@ impl Runtime {
 
     pub(super) fn call_primitive1(&mut self, prim: &Primitive, arg: &Value) -> Result<Value> {
         match prim {
-            Primitive::Print => self.value_printer(arg),
+            Primitive::RepPrint => self.value_printer(arg),
             Primitive::StringPrint => self.print_string(arg),
             Primitive::ToString => self.to_string(arg),
             Primitive::Type => self.type_query(arg),
@@ -149,7 +149,7 @@ impl Runtime {
 
     pub(super) fn register_primitives(&mut self) -> Result<()> {
         self.add_global("global", Value::Table(self.globals.clone()));
-        self.add_global("print", Value::Primitive(Primitive::Print, Arity::Fixed(1)));
+        self.add_global("_prim_print_representation", Value::Primitive(Primitive::RepPrint, Arity::Fixed(1)));
         self.add_global(
             "_prim_project",
             Value::Primitive(Primitive::Project, Arity::VarArg(2)),
@@ -244,7 +244,7 @@ impl Runtime {
 
 #[derive(Debug, Clone, PartialEq, PartialOrd, Ord, Eq, Hash)]
 pub enum Primitive {
-    Print,
+    RepPrint,
     Project,
     Type,
     TypeSet,
@@ -327,6 +327,9 @@ impl Runtime {
     }
 
     fn to_string(&self, arg: &Value) -> Result<Value> {
+        if self.is_type(arg, "string") {
+            return Ok(arg.clone());
+        }
         let str = format!("{}", arg);
         self.make_string(&str)
     }
@@ -369,8 +372,11 @@ impl Runtime {
                 let Some(tid) = self.named_symbols.get("type_id").cloned() else {
                     return false;
                 };
-                let val = self.make_string(t).unwrap();
-                table.get(&tid).map_or(false, |id| val == id.clone())
+                if let Some(Value::Bytes(b)) = table.get(&tid) {
+                    str::from_utf8(&b.borrow().bytes).unwrap_or_default() == t
+                } else {
+                    false
+                }
             }
             _ => false,
         }
