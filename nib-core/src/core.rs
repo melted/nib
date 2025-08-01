@@ -543,7 +543,7 @@ impl Display for Pattern {
     }
 }
 
-pub fn free_vars(expr: &Expression, vars: &mut HashSet<String>) {
+pub fn free_vars(expr: &Expression, vars: &mut HashSet<String>) -> Result<()> {
     match expr {
         Expression::Literal(_, literal) => {}
         Expression::Var(_, var) => {
@@ -554,11 +554,11 @@ pub fn free_vars(expr: &Expression, vars: &mut HashSet<String>) {
                 let mut used = HashSet::new();
                 let mut bound = HashSet::new();
                 if let Some(g) = &c.guard {
-                    free_vars(g, &mut used);
+                    free_vars(g, &mut used)?;
                 }
-                free_vars(&c.rhs, &mut used);
+                free_vars(&c.rhs, &mut used)?;
                 for p in &c.args {
-                    bound_vars(p, &mut bound);
+                    bound_vars(p, &mut bound)?;
                 }
 
                 for v in used.difference(&bound) {
@@ -568,14 +568,14 @@ pub fn free_vars(expr: &Expression, vars: &mut HashSet<String>) {
         }
         Expression::App(_, expressions) => {
             for e in expressions {
-                free_vars(e, vars);
+                free_vars(e, vars)?;
             }
         }
         Expression::Where(_, expression, bindings) => {
             let mut used = HashSet::new();
             let mut bound = HashSet::new();
             for b in bindings {
-                free_vars(&b.body, &mut used);
+                free_vars(&b.body, &mut used)?;
                 match &b.binder {
                     Binder::Local(n) => {
                         bound.insert(n.to_owned());
@@ -586,30 +586,40 @@ pub fn free_vars(expr: &Expression, vars: &mut HashSet<String>) {
                     _ => {}
                 };
             }
-            free_vars(&expression, &mut used);
+            free_vars(&expression, &mut used)?;
             for v in used.difference(&bound) {
                 vars.insert(v.to_owned());
             }
         }
     }
+    Ok(())
 }
 
-pub fn bound_vars(pat: &Pattern, vars: &mut HashSet<String>) {
+pub fn bound_vars(pat: &Pattern, vars: &mut HashSet<String>) -> Result<()> {
     match pat {
         Pattern::Ellipsis(Some(name)) | Pattern::Bind(name) => {
+            let n = name.string();
+            if vars.contains(&n) {
+                return Err(Error::runtime_error(&format!("Multiple bindings of {} in pattern", n)));
+            }
             vars.insert(name.string());
         }
         Pattern::Custom(name, patterns) => {
             for p in patterns {
-                bound_vars(p, vars);
+                bound_vars(p, vars)?;
             }
         }
         Pattern::Alias(pattern, name) => {
-            bound_vars(&pattern, vars);
+            bound_vars(&pattern, vars)?;
+            let n = name.string();
+            if vars.contains(&n) {
+                return Err(Error::runtime_error(&format!("Multiple bindings of {} in pattern", n)));
+            }
             vars.insert(name.string());
         }
         _ => {}
     }
+    Ok(())
 }
 
 #[derive(Debug)]

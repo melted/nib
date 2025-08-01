@@ -79,7 +79,7 @@ impl Runtime {
             Expression::Literal(n, lit) => self.evaluate_literal(lit)?,
             Expression::Lambda(n, clauses) => {
                 let mut free = HashSet::new();
-                free_vars(expression, &mut free);
+                free_vars(expression, &mut free)?;
                 self.evaluate_lambda(binding_name, clauses, &free, env)?
             }
             Expression::Where(n, exp, bindings) => {
