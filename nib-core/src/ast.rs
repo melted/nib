@@ -1,4 +1,4 @@
-use crate::common::{Metadata, Name, Node};
+use crate::{common::{Metadata, Name, Node}, parser::lexer};
 use std::{collections::HashSet, fmt::Display};
 
 #[derive(Debug, Clone, PartialEq)]
@@ -494,9 +494,17 @@ pub enum Operator {
 impl Operator {
     pub fn to_name(&self) -> Name {
         match self {
-            Operator::Qualified(path, op) => Name::Qualified(path.clone(), format!("({})", op)),
-            Operator::Plain(op) => Name::Plain(format!("({})", op)),
+            Operator::Qualified(path, op) => Name::Qualified(path.clone(), operator_id(op)),
+            Operator::Plain(op) => Name::Plain(operator_id(op)),
         }
+    }
+}
+
+fn operator_id(op : &str) -> String {
+    if lexer::identifier_initial_char(op.chars().next().unwrap()) {
+        op.to_owned()
+    } else {
+        format!("({})", op)
     }
 }
 

@@ -63,6 +63,10 @@ impl Runtime {
                 (Value::Real(a), Value::Integer(b)) => Ok(Value::Real(a / *b as f64)),
                 _ => self.error(&format!("Can't divide {} by {}", arg, arg2)),
             },
+            Primitive::Mod => match (arg, arg2) {
+                (Value::Integer(a), Value::Integer(b)) => Ok(Value::Integer(a % b)),
+                _ => self.error("`mod` requires two integers as arguments")
+            }
             Primitive::Gte => match (arg, arg2) {
                 (Value::Integer(a), Value::Integer(b)) => Ok(Value::Bool(a >= b)),
                 (Value::Real(a), Value::Real(b)) => Ok(Value::Bool(a >= b)),
@@ -176,6 +180,10 @@ impl Runtime {
             Value::Primitive(Primitive::Div, Arity::Fixed(2)),
         );
         self.add_global(
+            "_prim_mod",
+            Value::Primitive(Primitive::Mod, Arity::Fixed(2)),
+        );
+        self.add_global(
             "_prim_gte",
             Value::Primitive(Primitive::Gte, Arity::Fixed(2)),
         );
@@ -254,6 +262,7 @@ pub enum Primitive {
     Sub,
     Mul,
     Div,
+    Mod,
 
     // Comparison
     Gt,
@@ -307,7 +316,6 @@ pub enum Primitive {
     BitXor,
     BitNot,
     BitShift,
-    BitPop,
 
     // Symbols
     SymbolNamed,

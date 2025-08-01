@@ -437,7 +437,7 @@ impl<'a> super::ParserState<'a> {
     }
 }
 
-fn identifier_initial_char(ch: char) -> bool {
+pub fn identifier_initial_char(ch: char) -> bool {
     ch.is_alphabetic() || ch == '_'
 }
 

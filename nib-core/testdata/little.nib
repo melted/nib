@@ -18,6 +18,11 @@ a * b = _prim_mul a b
 a - b = _prim_sub a b
 a / b = _prim_div a b
 
+mod a b = _prim_mod a b
+
+// using an identifier as operator
+_ = print (7 `mod` 3)
+
 // Function
 inc x = x + 1
 

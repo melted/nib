@@ -1,7 +1,7 @@
 use std::{
     collections::{HashMap, HashSet},
     fmt::Display,
-    io, path,
+    io
 };
 
 use anyhow::anyhow;

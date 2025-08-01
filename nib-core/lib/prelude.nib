@@ -13,6 +13,7 @@ a * b = _prim_mul a b
 
 /// Divide a by b
 a / b = _prim_div a b
+mod a b = _prim_mod a b
 
 a > b = _prim_gt a b
 a >= b = _prim_gte a b
@@ -49,18 +50,22 @@ println a =  print a & print "\n"
 // Stuff that need prims
 // =====================
 // apply
-// +, -, *, / (at least type specific ones, maybe can do generic as lib)
-// <, >, <=, >=, == 
+// +, -, *, /, mod (at least type specific ones, maybe can do generic as lib)
+// <, >, <=, >=, == - check
 // sin, cos, tan, asin, acos, atan
-// and, or, xor, lsh, rsh, rot, bswap (bit logic)
-// type, set_type 
-// array (ref, set, new, size, copy(full or part))
-// bytearray (ref, set, new, fill, size, copy, slice, 8-64bit ops signed unsigned) 
+// and, or, xor, lsh, rsh, (bit logic)
+// type, set_type
+// array (ref, set, new, size) - check
+// bytearray (ref, set, new, size, 8-64bit ops signed unsigned) 
 // symbol (new, new_well_known)
-// table (ref, set, size, copy)
-// char (ord, chr)
-// ptr (peek, poke, offset)
-// IO (print, put_char, get_char. stdin. stderr, stdout, filehandling(file_open, file_close)) 
+// table (create, ref, set, size)
+// char (ord, chr, char array from/to bytes)
+// ptr (peek, poke, offset) -- can wait
+// IO (print, println, put_char, get_char. stdin. stderr, stdout, filehandling(file_open, file_close)) 
 // Debug
 //
-
+// Stuff that doesn't need primitives
+// ==================================
+//
+//
+//
