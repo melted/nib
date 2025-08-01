@@ -8,6 +8,9 @@ c = _prim_add 1 2
 _ = print c
 b = print "hello"
 
+ch = 'a'
+_ = print ch
+
 // Ok, let's be systematic
 // Operators
 a + b = _prim_add a b
@@ -85,7 +88,7 @@ size x | x < 15 = "M"
 size x | x < 20 = "L"
 size x = "XL"
 
-_ = _prim_string_print (size 11)
+_ = print (size 11)
 
 // module
 
@@ -95,7 +98,7 @@ baab = "world"
 
 module global
 z = 9876
-_ = _prim_string_print mod.abba
+_ = print mod.abba
 
 res = _prim_load "nib-core/testdata/littler.nib"
 

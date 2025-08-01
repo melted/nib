@@ -42,6 +42,10 @@ const a b = a
 // types
 type_name v = (type v).type_id
 
+// IO
+print a = _prim_string_print (_prim_to_string a)
+println a =  print a & print "\n"
+
 // Stuff that need prims
 // =====================
 // apply
