@@ -1,3 +1,4 @@
+use core::error;
 use std::ops::{Not, Shl, Shr};
 
 use crate::common::{Error, Name, Result};
@@ -145,6 +146,7 @@ impl Runtime {
                 },
                 _ => self.error(&format!("The arguments to _prim_bitshift should be int or ptr and an int, got {} and {}", arg, arg2))
             },
+            Primitive::TypeSet => self.set_type(arg, arg2),
             _ => self.error("Boom!"),
         }
     }
@@ -195,7 +197,8 @@ impl Runtime {
             "_prim_array_make",
             Value::Primitive(Primitive::ArrayMk, Arity::VarArg(1)),
         );
-        self.add_global("type", Value::Primitive(Primitive::Type, Arity::Fixed(1)));
+        self.add_global("_prim_type", Value::Primitive(Primitive::Type, Arity::Fixed(1)));
+        self.add_global("_prim_type_set", Value::Primitive(Primitive::TypeSet, Arity::Fixed(1)));
         self.add_global(
             "_prim_add",
             Value::Primitive(Primitive::Add, Arity::Fixed(2)),
@@ -489,6 +492,34 @@ impl Runtime {
                 }
             }
         }
+    }
+
+    fn set_type(&mut self, arg:&Value, arg1:&Value) -> Result<Value> {
+        match arg1 {
+            Value::Table(t) => {
+                match arg {
+                    Value::Array(arr) => {
+                        let mut array = arr.borrow_mut();
+                        array.type_table = Some(t.clone());
+                    }
+                    Value::Bytes(b) => {
+                        let mut bytes = b.borrow_mut();
+                        bytes.type_table = Some(t.clone());
+                    }
+                    Value::Symbol(symb) => {
+                        let mut sym_info = symb.symbol_info.borrow_mut();
+                        sym_info.type_table = Some(t.clone());
+                    }
+                    Value::Table(table) =>  {
+                        let mut table = table.borrow_mut();
+                        table.type_table = Some(t.clone());
+                    },
+                    _ => return self.error(&format!("The first argument to _prime_type_set must be an array, bytes, symbol or table"))
+                }
+            },
+            _ => return self.error(&format!("The second argument to _prime_type_set must be a table"))
+        }
+        Ok(Value::Nil)
     }
 
     fn project(&self, args: &[Value]) -> Result<Value> {
