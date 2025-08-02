@@ -26,6 +26,13 @@ a != b = not (a == b)
 not true = false
 not false = true
 
+// bitops
+bit_and = _prim_bitand
+bit_or = _prim_bitor
+bit_xor = _prim_bitxor
+bit_not = _prim_bitnot
+bit_shift = _prim_bitshift
+
 // some arithmetic
 max x y = x > y => x; y
 min x y = x < y => x; y
@@ -39,9 +46,13 @@ on x f = f x
 id x = x
 a & b = b // sequencing
 const a b = a
+apply = _prim_apply
 
 // types
+type = _prim_type
 type_name v = (type v).type_id
+set_type = _prim_type_set
+
 
 // IO
 print a = _prim_string_print (_prim_to_string a)

@@ -56,7 +56,6 @@ impl Runtime {
             .insert(name.to_owned(), module.metadata.clone());
         let mut env = Environment::new();
         self.evaluate(&mut module, &mut env)?;
-        dbg!(&self.globals);
         Ok(())
     }
 

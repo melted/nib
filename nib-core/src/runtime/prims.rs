@@ -32,6 +32,24 @@ impl Runtime {
                     arg
                 )),
             },
+            Primitive::BytesSize => match arg {
+                Value::Bytes(bytes) => Ok(Value::Integer(bytes.borrow().bytes.len() as i64)),
+                _ => self.error(&format!(
+                    "The argument to _prim_bytes_size must be an array, got {}",
+                    arg
+                )),
+            },
+            Primitive::SymbolName => match arg {
+                Value::Symbol(sym) => {
+                    let name = &sym.symbol_info.borrow().symbol;
+                    if !name.is_empty() {
+                        Ok(self.make_string(name)?)
+                    } else {
+                        Ok(Value::Bool(false))
+                    }
+                },
+                _ => self.error("The argument to _prim_symbol_name must be a symbol")
+            }
             _ => self.error("Boom!"),
         }
     }
@@ -146,7 +164,29 @@ impl Runtime {
                 },
                 _ => self.error(&format!("The arguments to _prim_bitshift should be int or ptr and an int, got {} and {}", arg, arg2))
             },
+            Primitive::BytesRef => match(arg, arg2) {
+                (Value::Bytes(b), Value::Integer(n)) => {
+                    let bytes = &b.borrow().bytes;
+                    Ok(Value::Integer(bytes[*n as usize] as i64))
+                },
+                _ => self.error(&format!("The arguments to _prim_bytes_ref should be a bytes object and an int, got {} and {}", arg, arg2))
+            },
+            Primitive::BytesCreate => match (arg, arg2) {
+                (Value::Integer(n), Value::Integer(v)) => {
+                    if *v < 0 || *v > 255 {
+                        return self.error("The second argument to _prim_bytes_create must be an integer between 0-255");
+                    }
+                    let mut b = Vec::with_capacity(*n as usize);
+                    b.resize(*n as usize, *v as u8);
+                    Ok(Value::new_bytes(b))
+                },
+                _ => self.error(&format!(
+                    "The argument to _prim_bytes_create must be an integer, got {}",
+                    arg
+                ))
+            }
             Primitive::TypeSet => self.set_type(arg, arg2),
+            Primitive::Apply => self.prim_apply(arg, arg2),
             _ => self.error("Boom!"),
         }
     }
@@ -169,7 +209,18 @@ impl Runtime {
                 let mut array = arr.borrow_mut();
                 array.array[*n as usize] = arg3.clone();
                 Ok(Value::Nil)
-            }
+            },
+            Primitive::BytesRef => match(arg, arg2, arg3) {
+                (Value::Bytes(b), Value::Integer(n), Value::Integer(v)) => {
+                    if *v < 0 || *v > 255 {
+                        return self.error("_prim_bytes_set, value to set is outside 0-255");
+                    }
+                    let bytes = &mut b.borrow_mut().bytes;
+                    bytes[*n as usize] = *v as u8;
+                    Ok(Value::Nil)
+                },
+                _ => self.error(&format!("The arguments to _prim_bytes_ref should be a bytes object, an int and an int, got {}, {} and {}", arg, arg2, arg3))
+            },
             _ => self.error("Boom!"),
         }
     }
@@ -182,6 +233,18 @@ impl Runtime {
         match prim {
             Primitive::Project => self.project(args),
             Primitive::ArrayMk => Ok(Value::new_array(args)),
+            Primitive::BytesMake => {
+                let mut b = Vec::new();
+                for a in args {
+                    match a {
+                        Value::Integer(v) if *v >= 0 && *v < 256 => {
+                            b.push(*v as u8);
+                        },
+                        _ => return self.error("The arguments to _prim_bytes_make must be ints between 0-255")
+                    }
+                }
+                Ok(Value::new_bytes(b))
+            }
             _ => self.error("Boom!"),
         }
     }
@@ -198,7 +261,7 @@ impl Runtime {
             Value::Primitive(Primitive::ArrayMk, Arity::VarArg(1)),
         );
         self.add_global("_prim_type", Value::Primitive(Primitive::Type, Arity::Fixed(1)));
-        self.add_global("_prim_type_set", Value::Primitive(Primitive::TypeSet, Arity::Fixed(1)));
+        self.add_global("_prim_type_set", Value::Primitive(Primitive::TypeSet, Arity::Fixed(2)));
         self.add_global(
             "_prim_add",
             Value::Primitive(Primitive::Add, Arity::Fixed(2)),
@@ -278,6 +341,34 @@ impl Runtime {
             "_prim_load",
             Value::Primitive(Primitive::Load, Arity::Fixed(1)),
         );
+        self.add_global(
+            "_prim_symbol_name",
+            Value::Primitive(Primitive::SymbolName, Arity::Fixed(1)),
+        );
+        self.add_global(
+            "_prim_apply",
+            Value::Primitive(Primitive::Apply, Arity::Fixed(2)),
+        );
+        self.add_global(
+            "_prim_bytes_ref",
+            Value::Primitive(Primitive::BytesRef, Arity::Fixed(2)),
+        );
+        self.add_global(
+            "_prim_bytes_set",
+            Value::Primitive(Primitive::BytesSet, Arity::Fixed(3)),
+        );
+        self.add_global(
+            "_prim_bytes_make",
+            Value::Primitive(Primitive::BytesMake, Arity::VarArg(2)),
+        );
+        self.add_global(
+            "_prim_bytes_create",
+            Value::Primitive(Primitive::BytesCreate, Arity::Fixed(3)),
+        );
+        self.add_global(
+            "_prim_bytes_size",
+            Value::Primitive(Primitive::BytesSize, Arity::Fixed(1)),
+        );
         Ok(())
     }
 
@@ -310,6 +401,7 @@ impl Runtime {
 pub enum Primitive {
     RepPrint,
     Project,
+    Apply,
     Type,
     TypeSet,
 
@@ -376,12 +468,15 @@ pub enum Primitive {
     // Symbols
     SymbolNamed,
     SymbolNew,
+    SymbolName,
 
     // IO
 
     // System
     Load,
     Extern,
+    Exit,
+    Panic,
 }
 
 impl Runtime {
@@ -561,5 +656,16 @@ impl Runtime {
             },
             _ => self.error(&format!("_prim_load expects a string, got {}", arg)) 
         }
+    }
+
+    fn prim_apply(&mut self, fun:&Value, args:&Value) -> Result<Value> {
+        let Value::Array(arr) = args else {
+            return self.error("The second argument to _prim_apply must be an array");
+        };
+        let mut vals = vec![fun.clone()];
+        for v in &arr.borrow().array {
+            vals.push(v.clone());
+        }
+        self.apply_values("", &vals)
     }
 }
