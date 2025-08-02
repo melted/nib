@@ -1,3 +1,5 @@
+use std::ops::{Not, Shl, Shr};
+
 use crate::common::{Error, Name, Result};
 use crate::core::Arity;
 use crate::runtime::{Runtime, Value};
@@ -17,6 +19,11 @@ impl Runtime {
             Primitive::Type => self.type_query(arg),
             Primitive::ArrayCreate => self.array_create(arg),
             Primitive::Load => self.load_prim(arg),
+            Primitive::BitNot => match arg {
+                Value::Integer(a) => Ok(Value::Integer(!a)),
+                Value::Pointer(a) => Ok(Value::Pointer(!a)),
+                _ => self.error("The argument to _prim_bitnot must be an integer or pointer")
+            }
             Primitive::ArraySize => match arg {
                 Value::Array(arr) => Ok(Value::Integer(arr.borrow().array.len() as i64)),
                 _ => self.error(&format!(
@@ -111,7 +118,33 @@ impl Runtime {
                     Ok(array.array[*n as usize].clone())
                 },
                 (x, y) => self.error(&format!("The arguments to _prim_array_ref should be an array and an integer, got {} and {}", x, y))
-            }
+            },
+            Primitive::BitAnd => match (arg, arg2) {
+                (Value::Integer(a), Value::Integer(b)) => Ok(Value::Integer(a & b)),
+                (Value::Pointer(a), Value::Pointer(b)) => Ok(Value::Pointer(a & b)),
+                _ => self.error(&format!("The arguments to _prim_bitand should be int or ptr, got {} and {}", arg, arg2))
+            },
+            Primitive::BitOr => match (arg, arg2) {
+                (Value::Integer(a), Value::Integer(b)) => Ok(Value::Integer(a | b)),
+                (Value::Pointer(a), Value::Pointer(b)) => Ok(Value::Pointer(a | b)),
+                _ => self.error(&format!("The arguments to _prim_bitor should be int or ptr, got {} and {}", arg, arg2))
+            },
+            Primitive::BitXor => match (arg, arg2) {
+                (Value::Integer(a), Value::Integer(b)) => Ok(Value::Integer(a ^ b)),
+                (Value::Pointer(a), Value::Pointer(b)) => Ok(Value::Pointer(a ^ b)),
+                _ => self.error(&format!("The arguments to _prim_bitxor should be int or ptr, got {} and {}", arg, arg2))
+            },
+            Primitive::BitShift => match (arg, arg2) {
+                (Value::Integer(a), Value::Integer(b)) => {
+                    let val = if *b < 0 { a.shl(b.abs())} else { a.shr(b) };    
+                    Ok(Value::Integer(val))
+                },
+                (Value::Pointer(a), Value::Integer(b)) => {
+                    let val = if *b < 0 { a.shl(b.abs())} else { a.shr(b) };    
+                    Ok(Value::Pointer(val))
+                },
+                _ => self.error(&format!("The arguments to _prim_bitshift should be int or ptr and an int, got {} and {}", arg, arg2))
+            },
             _ => self.error("Boom!"),
         }
     }
@@ -182,6 +215,26 @@ impl Runtime {
         self.add_global(
             "_prim_mod",
             Value::Primitive(Primitive::Mod, Arity::Fixed(2)),
+        );
+        self.add_global(
+            "_prim_bitand",
+            Value::Primitive(Primitive::BitAnd, Arity::Fixed(2)),
+        );        
+        self.add_global(
+            "_prim_bitor",
+            Value::Primitive(Primitive::BitOr, Arity::Fixed(2)),
+        );
+        self.add_global(
+            "_prim_bitxor",
+            Value::Primitive(Primitive::BitXor, Arity::Fixed(2)),
+        );
+        self.add_global(
+            "_prim_bitnot",
+            Value::Primitive(Primitive::BitNot, Arity::Fixed(1)),
+        );
+        self.add_global(
+            "_prim_bitshift",
+            Value::Primitive(Primitive::BitShift, Arity::Fixed(2)),
         );
         self.add_global(
             "_prim_gte",
