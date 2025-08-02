@@ -97,13 +97,13 @@ _ = print (size 11)
 
 // module
 
-module mod
+module mmmm
 abba = "hello"
 baab = "world"
 
 module global
 z = 9876
-_ = print mod.abba
+_ = print mmmm.abba
 
 res = _prim_load "nib-core/testdata/littler.nib"
 

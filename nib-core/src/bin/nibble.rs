@@ -9,12 +9,15 @@ use nibble::runtime::Runtime;
 fn main() -> io::Result<()> {
     let args: Vec<_> = args().collect();
     let mut rt = Runtime::new();
-    if args.len() < 2 {
+    let res = if args.len() < 2 {
         let mut buffer = String::new();
         let read = stdin().read_to_string(&mut buffer)?;
-        rt.add_code("stdin", &buffer)?;
+        rt.add_code("stdin", &buffer)
     } else {
-        rt.load(&args[1])?;
+        rt.load(&args[1])
+    };
+    if let Err(err) = res {
+        println!("{}", err);
     }
     Ok(())
 }
