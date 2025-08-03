@@ -1,6 +1,8 @@
 use std::env::args;
-use std::io::{self, Read, stdin};
+use std::io::{self, stderr, stdin, Read, Write};
+use std::process::exit;
 
+use nibble::common::Error;
 use nibble::runtime::Runtime;
 
 /// Simple runner of Nib code. Anything more elaborate goes into
@@ -28,7 +30,14 @@ fn main() -> io::Result<()> {
         res
     };
     if let Err(err) = res {
-        println!("{}", err);
+        match err {
+            Error::NibExit{ exit_code } => {
+                exit(exit_code);
+            }
+            _ => {
+                stderr().write(&format!("{}", err).as_bytes())?;
+            }
+        }
     }
     Ok(())
 }

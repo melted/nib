@@ -19,6 +19,8 @@ impl Runtime {
             Primitive::ToString => self.to_string(arg),
             Primitive::Type => self.type_query(arg),
             Primitive::ArrayCreate => self.array_create(arg),
+            Primitive::Exit => self.nib_exit(arg),
+            Primitive::Panic => self.nib_panic(arg),
             Primitive::Load => self.load_prim(arg),
             Primitive::BitNot => match arg {
                 Value::Integer(a) => Ok(Value::Integer(!a)),
@@ -369,6 +371,14 @@ impl Runtime {
             "_prim_bytes_size",
             Value::Primitive(Primitive::BytesSize, Arity::Fixed(1)),
         );
+        self.add_global(
+            "_prim_exit",
+            Value::Primitive(Primitive::Exit, Arity::Fixed(1)),
+        );
+        self.add_global(
+            "_prim_panic",
+            Value::Primitive(Primitive::Panic, Arity::Fixed(1)),
+        );
         Ok(())
     }
 
@@ -491,6 +501,18 @@ impl Runtime {
         }
         let str = format!("{}", arg);
         self.make_string(&str)
+    }
+
+    fn format_string(&self, arg: &Value) -> Result<String> {
+        let str = match arg {
+            Value::Bytes(b) if self.is_type(arg, "string") => {
+                str::from_utf8(&b.borrow().bytes).map_err(|_| Error::runtime_error(
+                    "Invalid string in _prim_string_print"
+                ))?.to_owned()
+            },
+            _ => format!("{}", arg)
+        };
+        Ok(str)
     }
 
     fn print_string(&self, arg: &Value) -> Result<Value> {
@@ -667,5 +689,17 @@ impl Runtime {
             vals.push(v.clone());
         }
         self.apply_values("", &vals)
+    }
+
+    fn nib_panic(&mut self, msg:&Value) -> Result<Value> {
+        let str = self.format_string(msg)?;
+        Err(Error::NibPanic { msg: str })
+    }
+
+    fn nib_exit(&mut self, arg:&Value) -> Result<Value> {
+        match arg {
+            Value::Integer(n) => Err(Error::NibExit { exit_code: *n as i32 }),
+            _ => self.error("Argument to _prim_exit must be an int")
+        }
     }
 }

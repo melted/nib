@@ -2,6 +2,9 @@
 
 module global
 
+panic = _prim_panic
+exit = _prim_exit
+
 /// Add two numbers
 a + b = _prim_add a b
 

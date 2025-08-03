@@ -66,12 +66,16 @@ impl Display for Location {
 pub enum Error {
     #[error("Syntax error: {} at {}", msg, loc)]
     Syntax { msg: String, loc: Location },
-    #[error("Error: {}", err)]
+    #[error(transparent)]
     General { err: anyhow::Error },
     #[error("Runtime error: {}", msg)]
     Runtime { msg: String, loc: Option<Location> },
     #[error("Desugaring error: {}", msg)]
     Desugar { msg: String, loc: Option<Location> },
+    #[error("Error: {}", msg)]
+    NibPanic { msg: String },
+    #[error("Exit {}", exit_code)]
+    NibExit { exit_code: i32 }
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
