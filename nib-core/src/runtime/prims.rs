@@ -50,7 +50,7 @@ impl Runtime {
                 },
                 _ => self.error("The argument to _prim_symbol_name must be a symbol")
             }
-            _ => self.error("Boom!"),
+            _ => self.error(&format!("Primitive {:?} is not implemented", prim)),
         }
     }
 
@@ -187,7 +187,7 @@ impl Runtime {
             }
             Primitive::TypeSet => self.set_type(arg, arg2),
             Primitive::Apply => self.prim_apply(arg, arg2),
-            _ => self.error("Boom!"),
+            _ => self.error(&format!("Primitive {:?} is not implemented", prim)),
         }
     }
 
@@ -221,7 +221,7 @@ impl Runtime {
                 },
                 _ => self.error(&format!("The arguments to _prim_bytes_ref should be a bytes object, an int and an int, got {}, {} and {}", arg, arg2, arg3))
             },
-            _ => self.error("Boom!"),
+            _ => self.error(&format!("Primitive {:?} is not implemented", prim)),
         }
     }
 
@@ -245,7 +245,7 @@ impl Runtime {
                 }
                 Ok(Value::new_bytes(b))
             }
-            _ => self.error("Boom!"),
+            _ => self.error(&format!("Primitive {:?} is not implemented", prim)),
         }
     }
 
