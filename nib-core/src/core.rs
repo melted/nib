@@ -248,7 +248,7 @@ impl DesugarState {
                     let rhs = Box::new(self.desugar_expression(*next.on_true)?);
                     let clause = FunClause {
                         id: self.new_id(),
-                        args: vec![],
+                        args: vec![Pattern::Wildcard],
                         guard: Some(guard),
                         rhs,
                     };

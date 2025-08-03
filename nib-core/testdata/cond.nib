@@ -1,0 +1,5 @@
+
+a x = x < 6 => "Small"; "Big"
+
+_ = print (a 5)
+_ = print (a 10)
