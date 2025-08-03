@@ -22,6 +22,16 @@ impl Runtime {
             Primitive::Exit => self.nib_exit(arg),
             Primitive::Panic => self.nib_panic(arg),
             Primitive::Load => self.load_prim(arg),
+            Primitive::TableKeys => self.table_keys(arg),
+            Primitive::TableCreate => {
+                Ok(Value::new_table())
+            },
+            Primitive::TableSize => match arg {
+                Value::Table(t) => {
+                    Ok(Value::Integer(t.borrow().table.len() as i64))
+                }
+                _ => self.error("The argument to _prim_table_size must be a table")
+            }
             Primitive::BitNot => match arg {
                 Value::Integer(a) => Ok(Value::Integer(!a)),
                 Value::Pointer(a) => Ok(Value::Pointer(!a)),
@@ -186,7 +196,15 @@ impl Runtime {
                     "The argument to _prim_bytes_create must be an integer, got {}",
                     arg
                 ))
-            }
+            },
+            Primitive::TableDelete => match(arg, arg2) {
+                (Value::Table(tab), Value::Symbol(sym)) => {
+                    let table = &mut tab.borrow_mut().table;
+                    let res = table.remove(sym).is_some();
+                    Ok(Value::Bool(res))
+                },
+                _ => self.error(&format!("The arguments to _prim_table_delete should be a table object and a symbol, got {} and {}", arg, arg2))
+            },
             Primitive::TypeSet => self.set_type(arg, arg2),
             Primitive::Apply => self.prim_apply(arg, arg2),
             _ => self.error(&format!("Primitive {:?} is not implemented", prim)),
@@ -212,7 +230,7 @@ impl Runtime {
                 array.array[*n as usize] = arg3.clone();
                 Ok(Value::Nil)
             },
-            Primitive::BytesRef => match(arg, arg2, arg3) {
+            Primitive::BytesSet => match(arg, arg2, arg3) {
                 (Value::Bytes(b), Value::Integer(n), Value::Integer(v)) => {
                     if *v < 0 || *v > 255 {
                         return self.error("_prim_bytes_set, value to set is outside 0-255");
@@ -222,6 +240,17 @@ impl Runtime {
                     Ok(Value::Nil)
                 },
                 _ => self.error(&format!("The arguments to _prim_bytes_ref should be a bytes object, an int and an int, got {}, {} and {}", arg, arg2, arg3))
+            },
+            Primitive::TableSet => {
+                let Value::Table(tab) = arg else {
+                    return self.error("First argument to _prim_table_set must be a table");
+                };
+                let Value::Symbol(sym) = arg2 else {
+                    return self.error("Second argument to _prim_table_set must be a symbol");
+                };
+                let table = &mut tab.borrow_mut().table;
+                table.insert(sym.clone(), arg3.clone());
+                Ok(Value::Nil)
             },
             _ => self.error(&format!("Primitive {:?} is not implemented", prim)),
         }
@@ -361,15 +390,35 @@ impl Runtime {
         );
         self.add_global(
             "_prim_bytes_make",
-            Value::Primitive(Primitive::BytesMake, Arity::VarArg(2)),
+            Value::Primitive(Primitive::BytesMake, Arity::VarArg(1)),
         );
         self.add_global(
             "_prim_bytes_create",
-            Value::Primitive(Primitive::BytesCreate, Arity::Fixed(3)),
+            Value::Primitive(Primitive::BytesCreate, Arity::Fixed(2)),
         );
         self.add_global(
             "_prim_bytes_size",
             Value::Primitive(Primitive::BytesSize, Arity::Fixed(1)),
+        );
+        self.add_global(
+            "_prim_table_create",
+            Value::Primitive(Primitive::TableCreate, Arity::Fixed(1)),
+        );
+        self.add_global(
+            "_prim_table_set",
+            Value::Primitive(Primitive::TableSet, Arity::Fixed(3)),
+        );
+        self.add_global(
+            "_prim_table_size",
+            Value::Primitive(Primitive::TableSize, Arity::Fixed(1)),
+        );
+        self.add_global(
+            "_prim_table_keys",
+            Value::Primitive(Primitive::TableKeys, Arity::Fixed(1)),
+        );
+        self.add_global(
+            "_prim_table_delete",
+            Value::Primitive(Primitive::TableDelete, Arity::Fixed(2)),
         );
         self.add_global(
             "_prim_exit",
@@ -451,9 +500,10 @@ pub enum Primitive {
 
     // Tables
     TableCreate,
-    TableGet,
+    TableKeys,
     TableSet,
     TableSize,
+    TableDelete,
 
     // Float Math
     Ceiling,
@@ -689,6 +739,21 @@ impl Runtime {
             vals.push(v.clone());
         }
         self.apply_values("", &vals)
+    }
+
+    fn table_keys(&self, arg:&Value) -> Result<Value> {
+        match arg {
+            Value::Table(tab) => {
+                let mut keys = Vec::new();
+                let table = &tab.borrow().table;
+                for k in table.keys() {
+                    keys.push(Value::Symbol(k.clone()));
+                }
+                // TODO: sort the keys?
+                Ok(Value::new_array(&keys))
+            },
+            _ => self.error("The argument to _prim_table_keys must be a table")
+        }
     }
 
     fn nib_panic(&mut self, msg:&Value) -> Result<Value> {

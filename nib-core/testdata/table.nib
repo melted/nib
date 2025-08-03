@@ -1,0 +1,8 @@
+test.a = "a"
+test.b = "b"
+
+_ = print (_prim_table_keys test)
+
+_ = _prim_table_delete test #a
+
+_ = print (_prim_table_keys test)
