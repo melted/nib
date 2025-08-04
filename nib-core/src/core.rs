@@ -17,7 +17,7 @@ pub fn desugar(module: ast::Module) -> Result<Module> {
                 state.module_name = Some(md.name);
             }
             ast::Declaration::Binding(bind) => {
-                let mut b = state.desugar_binding(bind)?;
+                let mut b = state.desugar_binding(bind, false)?;
                 state.bindings.append(&mut b);
             }
         }
@@ -59,16 +59,24 @@ impl DesugarState {
 }
 
 impl DesugarState {
-    fn desugar_binding(&mut self, binding: ast::Binding) -> Result<Vec<Binding>> {
+    fn desugar_binding(&mut self, binding: ast::Binding, is_local: bool) -> Result<Vec<Binding>> {
         match binding {
-            ast::Binding::FunBinding(fb) => self.desugar_funbinding(fb),
-            ast::Binding::OpBinding(ob) => self.desugar_opbinding(ob),
-            ast::Binding::VarBinding(vb) => self.desugar_varbinding(vb),
+            ast::Binding::FunBinding(fb) => self.desugar_funbinding(fb, is_local),
+            ast::Binding::OpBinding(ob) => self.desugar_opbinding(ob, is_local),
+            ast::Binding::VarBinding(vb) => self.desugar_varbinding(vb, is_local),
         }
     }
 
-    fn desugar_funbinding(&mut self, ast_binding: ast::FunBinding) -> Result<Vec<Binding>> {
-        let name = self.desugar_binding_name(&ast_binding.name)?;
+    fn desugar_funbinding(
+        &mut self,
+        ast_binding: ast::FunBinding,
+        is_local: bool,
+    ) -> Result<Vec<Binding>> {
+        let binder = if is_local {
+            Binder::Local(ast_binding.name.string())
+        } else {
+            Binder::Public(self.desugar_binding_name(&ast_binding.name)?)
+        };
         let mut core_clauses = Vec::new();
         for clause in ast_binding.clauses {
             let exp = self.desugar_expression(clause.body)?;
@@ -90,14 +98,18 @@ impl DesugarState {
         self.metadata.last_id += 1;
         Ok(vec![Binding::binding(
             ast_binding.id,
-            Binder::Public(name),
+            binder,
             Expression::Lambda(self.metadata.last_id, core_clauses),
         )])
     }
 
-    fn desugar_opbinding(&mut self, ast_binding: ast::OpBinding) -> Result<Vec<Binding>> {
+    fn desugar_opbinding(
+        &mut self,
+        ast_binding: ast::OpBinding,
+        is_local: bool,
+    ) -> Result<Vec<Binding>> {
         let name = ast_binding.op.to_name(); // No desugar. Operators can't be used qualified,
-                                                   // making them always global is pretty ugly though 
+        // making them always global is pretty ugly though
         let mut core_clauses = Vec::new();
         for clause in ast_binding.clauses {
             let exp = self.desugar_expression(clause.body)?;
@@ -117,20 +129,31 @@ impl DesugarState {
         self.metadata.last_id += 1;
         Ok(vec![Binding::binding(
             ast_binding.id,
-            Binder::Public(name),
+            if is_local {
+                Binder::Local(name.string())
+            } else {
+                Binder::Public(name)
+            },
             Expression::Lambda(self.metadata.last_id, core_clauses),
         )])
     }
 
-    fn desugar_varbinding(&mut self, ast_binding: ast::VarBinding) -> Result<Vec<Binding>> {
+    fn desugar_varbinding(
+        &mut self,
+        ast_binding: ast::VarBinding,
+        is_local: bool,
+    ) -> Result<Vec<Binding>> {
         let pat = ast_binding.lhs;
         let rhs = self.desugar_expression(ast_binding.rhs)?;
         match pat.pattern {
-            ast::Pattern::Var(v) => Ok(vec![Binding::binding(
-                ast_binding.id,
-                Binder::Public(self.desugar_binding_name(&v)?),
-                rhs,
-            )]),
+            ast::Pattern::Var(v) => {
+                let binder = if is_local {
+                    Binder::Local(v.string())
+                } else {
+                    Binder::Public(self.desugar_binding_name(&v)?)
+                };
+                Ok(vec![Binding::binding(ast_binding.id, binder, rhs)])
+            }
             ast::Pattern::Wildcard => {
                 Ok(vec![Binding::binding(ast_binding.id, Binder::Unbound, rhs)])
             }
@@ -169,8 +192,12 @@ impl DesugarState {
                             Expression::Literal(self.new_id(), ast::Literal::Integer(i as i64)),
                         ],
                     );
-                    let dn = self.desugar_binding_name(&n)?;
-                    let bind = Binding::binding(self.new_id(), Binder::Public(dn), rhs);
+                    let binder = if is_local {
+                        Binder::Local(n.string())
+                    } else {
+                        Binder::Public(self.desugar_binding_name(&n)?)
+                    };
+                    let bind = Binding::binding(self.new_id(), binder, rhs);
                     bindings.push(bind);
                 }
                 Ok(bindings)
@@ -178,10 +205,10 @@ impl DesugarState {
         }
     }
 
-    fn desugar_binding_name(&mut self, name:&Name) -> Result<Name> {
+    fn desugar_binding_name(&mut self, name: &Name) -> Result<Name> {
         match (&self.module_name, name) {
             (None, _) | (_, Name::Qualified(_, _)) => Ok(name.clone()),
-            (Some(mod_name), Name::Plain(_))  => Ok(Name::append(mod_name, name)?)
+            (Some(mod_name), Name::Plain(_)) => Ok(Name::append(mod_name, name)?),
         }
     }
 
@@ -296,7 +323,7 @@ impl DesugarState {
                 let lhs = self.desugar_expression(*exp)?;
                 let mut binds = Vec::new();
                 for binding in ast_bindings {
-                    let mut b = self.desugar_binding(binding)?;
+                    let mut b = self.desugar_binding(binding, true)?;
                     binds.append(&mut b);
                 }
                 Ok(Expression::Where(expression.id, Box::new(lhs), binds))
@@ -600,7 +627,10 @@ pub fn bound_vars(pat: &Pattern, vars: &mut HashSet<String>) -> Result<()> {
         Pattern::Ellipsis(Some(name)) | Pattern::Bind(name) => {
             let n = name.string();
             if vars.contains(&n) {
-                return Err(Error::runtime_error(&format!("Multiple bindings of {} in pattern", n)));
+                return Err(Error::runtime_error(&format!(
+                    "Multiple bindings of {} in pattern",
+                    n
+                )));
             }
             vars.insert(name.string());
         }
@@ -613,7 +643,10 @@ pub fn bound_vars(pat: &Pattern, vars: &mut HashSet<String>) -> Result<()> {
             bound_vars(&pattern, vars)?;
             let n = name.string();
             if vars.contains(&n) {
-                return Err(Error::runtime_error(&format!("Multiple bindings of {} in pattern", n)));
+                return Err(Error::runtime_error(&format!(
+                    "Multiple bindings of {} in pattern",
+                    n
+                )));
             }
             vars.insert(name.string());
         }

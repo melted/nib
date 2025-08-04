@@ -14,7 +14,7 @@ _ = print (fac 10)
 ```
 The first thing we see is that line comments in Nib uses the familiar `//` line comments, there is no block comment syntax.
 
-A Nib program consists of a series of bindings, with `=` binding names and patterns on the left hand side to an expression on the right hand side. We see here that the same function can be spread over several bindings, which one is used for a particular call is decided by pattern matching against them in order.
+A Nib program consists of a series of bindings, with `=` binding names and patterns on the left hand side to an expression on the right hand side. We see here that the same function can be spread over several bindings, which one is used for a particular call is decided by pattern matching the arguments against them in order. All the bindings must have the same arity.
 
 Functions are specified using a `<name> <pattern>+` left hand side. Variables can be bound with a left hand side containing a single pattern.
 

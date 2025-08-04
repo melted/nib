@@ -2,7 +2,11 @@
 
 module global
 
+/// Abort immediately with an error value. The value will be converted to a string.
 panic = _prim_panic
+
+/// Exit with an exit code, the argument must be an integer. Only the lower 32 bits of the
+/// argument will be used.
 exit = _prim_exit
 
 /// Add two numbers
@@ -47,7 +51,10 @@ x && y = x => y (); false
 // convenience
 on x f = f x
 id x = x
-a & b = b // sequencing
+
+/// Sequencing operator. The arguments are evaluated in order and the right argument
+/// is returned.
+a & b = b
 const a b = a
 apply = _prim_apply
 
@@ -83,3 +90,20 @@ println a =  print a & print "\n"
 //
 //
 //
+
+// Array functions
+array.ref = _prim_array_ref  
+array.set = _prim_array_set
+array.size = _prim_array_size
+array.create = _prim_array_create
+array.for_each f arr = iter 0 where
+                            len = array.size arr
+                            iter n | n == len = ()
+                            iter n = f n (array.ref arr n) & iter (n+1)
+
+array.map f arr = out where
+                        len = array.size arr
+                        out = array.create len
+                        go n | n == len = ()
+                        go n = array.set out n (f (array.ref arr n)) & go (n+1)
+                        _ = go 0
