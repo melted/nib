@@ -9,6 +9,7 @@ use nibble::runtime::Runtime;
 /// another crate, where it can pull in dependencies and go wild
 /// in general.
 fn main() -> io::Result<()> {
+    simple_logger::init().unwrap();
     let opts = parse_options();
     let mut rt = Runtime::new();
     let prelude_code = include_str!("../../lib/prelude.nib");

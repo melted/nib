@@ -107,3 +107,13 @@ array.map f arr = out where
                         go n | n == len = ()
                         go n = array.set out n (f (array.ref arr n)) & go (n+1)
                         _ = go 0
+
+array.concat x y = c where
+                        xs = array.size x
+                        ys = array.size y
+                        cs = xs + ys
+                        c = array.create cs
+                        go n | n == cs = ()
+                        go n | n < xs = array.set c n (array.ref x n) & go (n + 1)
+                        go n = array.set c n (array.ref y (n - xs)) & go (n + 1)
+                        _ = go 0
