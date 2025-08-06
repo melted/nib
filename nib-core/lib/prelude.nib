@@ -59,10 +59,18 @@ const a b = a
 apply = _prim_apply
 
 // types
+generic_matcher t v | (type v == t) = [v]
+generic_matcher _ _ = false
+
+make_type type_sym name = new where
+                                new = table.create
+                                _ = table.set global type_sym new
+                                _ = table.set new #type_id name
+                                _ = table.set new #match (generic_matcher type_sym)
+
 type = _prim_type
 type_name v = (type v).type_id
 set_type = _prim_type_set
-
 
 // IO
 print a = _prim_string_print (_prim_to_string a)
@@ -117,3 +125,38 @@ array.concat x y = merged where
                         go n | n < xs = array.set merged n (array.ref x n) & go (n + 1)
                         go n = array.set merged n (array.ref y (n - xs)) & go (n + 1)
                         _ = go 0
+
+
+
+a ++ b = (type a).concat a b
+
+// Type matchers for type patterns
+array.match v | (type v == array) = [v]
+array.match _ = false
+
+int.match v | (type v == int) = [v]
+int.match _ = false
+
+// TODO: this doesn't work, figure out why
+//int.match v = generic_matcher int v
+
+float.match v | (type v == float) = [v]
+float.match _ = false
+
+char.match v | (type v == char) = [v]
+char.match _ = false
+
+bool.match v | (type v == bool) = [v]
+bool.match _ = false
+
+table.match v | (type v == table) = [v]
+table.match _ = false
+
+bytes.match v | (type v == bytes) = [v]
+bytes.match _ = false
+
+symbol.match v | (type v == symbol) = [v]
+symbol.match _ = false
+
+function.match v | (type v == function) = [v]
+function.match _ = false

@@ -1,0 +1,4 @@
+test a:int = "!!!"
+test _ = "nope"
+
+_ = print (test 2)

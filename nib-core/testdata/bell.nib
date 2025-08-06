@@ -1,6 +1,6 @@
 // Rosetta code task: https://rosettacode.org/wiki/Bell_numbers
 
-a ++ b = array.concat a b
+
 
 bell 0 = [1]
 bell n = out where
@@ -13,3 +13,8 @@ bell n = out where
                 _ = go 0 first
 
 _ = print (bell 14)
+
+test a:int = "!!!"
+test _ = "nope"
+
+_ = print (test 2)

@@ -1,3 +1,4 @@
+use core::panic;
 use std::{
     cmp::max,
     collections::{HashMap, HashSet},
@@ -200,6 +201,7 @@ impl Runtime {
                 self.error(&format!("No matching pattern for closure"))
             }
             _ => {
+                panic!("sss");
                 self.error(&format!("Not a callable type in application {}", vals[0]))
             },
         }
