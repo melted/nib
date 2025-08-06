@@ -108,12 +108,12 @@ array.map f arr = out where
                         go n = array.set out n (f (array.ref arr n)) & go (n+1)
                         _ = go 0
 
-array.concat x y = c where
+array.concat x y = merged where
                         xs = array.size x
                         ys = array.size y
                         cs = xs + ys
-                        c = array.create cs
+                        merged = array.create cs
                         go n | n == cs = ()
-                        go n | n < xs = array.set c n (array.ref x n) & go (n + 1)
-                        go n = array.set c n (array.ref y (n - xs)) & go (n + 1)
+                        go n | n < xs = array.set merged n (array.ref x n) & go (n + 1)
+                        go n = array.set merged n (array.ref y (n - xs)) & go (n + 1)
                         _ = go 0
