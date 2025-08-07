@@ -1,0 +1,12 @@
+// Can run with --no-prelude
+
+
+a == b = _prim_eq a b 
+
+generic_matcher t v | (_prim_type v) == t = [v]
+generic_matcher _ _ = false
+
+int_matcher = generic_matcher int
+
+res = int_matcher 12
+_ = _prim_string_print (_prim_to_string res)

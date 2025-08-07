@@ -59,6 +59,7 @@ const a b = a
 apply = _prim_apply
 
 // types
+type = _prim_type
 generic_matcher t v | (type v == t) = [v]
 generic_matcher _ _ = false
 
@@ -68,7 +69,6 @@ make_type type_sym name = new where
                                 _ = table.set new #type_id name
                                 _ = table.set new #match (generic_matcher type_sym)
 
-type = _prim_type
 type_name v = (type v).type_id
 set_type = _prim_type_set
 
