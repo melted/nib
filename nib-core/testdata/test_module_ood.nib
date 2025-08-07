@@ -1,0 +1,9 @@
+// Can be run with --no-prelude
+
+module testy
+
+test a = next a
+
+next a = 12
+
+_ = _prim_string_print (test 1)

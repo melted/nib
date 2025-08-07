@@ -1,4 +1,3 @@
-use core::error;
 use std::ops::{Not, Shl, Shr};
 
 use crate::common::{Error, Name, Result};
@@ -109,8 +108,40 @@ impl Runtime {
             Primitive::ToInt => match arg {
                 Value::Real(f) => Ok(Value::Integer(*f as i64)),
                 Value::Bool(b) => Ok(Value::Integer(if *b {1} else {0})),
+                Value::Char(c) => Ok(Value::Integer(*c as i64)),
                 _ => self.error("The argument to _prim_to_int must be a float or bool")
             },
+            Primitive::ToChar => match arg {
+                Value::Integer(n) => if let Some(c) = char::from_u32(
+                    *n as u32) {
+                        Ok(Value::Char(c))
+                    } else {
+                        Ok(Value::Bool(false))
+                    },
+                _ => self.error("The argument to _prim_to_char must be an integer between 0 and 1048576")
+            },
+            Primitive::StringUnpack => match arg {
+                Value::Bytes(b) if self.is_type(arg, "string") => {
+                    let str = self.format_string(&arg)?;
+                    let vals:Vec<Value> = str.chars().map(|c| Value::Char(c)).collect();
+                    Ok(Value::new_array(&vals))
+                },
+                _ => self.error("The argument to _prim_string_unpack must be a string")
+            },
+            Primitive::StringPack => match arg {
+                Value::Array(a) => {
+                    let mut chars = Vec::new();
+                    for v in &a.borrow().array {
+                        match v {
+                            Value::Char(c) => chars.push(*c),
+                            _ => return self.error("The argument to _prim_string_pack must be an array of chars")
+                        }
+                    }
+                    let str = String::from_iter(chars.iter());
+                    self.make_string(&str)
+                },
+                _ => self.error("The argument to _prim_string_pack must be an array of chars") 
+            }
             _ => self.error(&format!("Primitive {:?} is not implemented", prim)),
         }
     }
@@ -301,6 +332,16 @@ impl Runtime {
                 table.insert(sym.clone(), arg3.clone());
                 Ok(Value::Nil)
             },
+            Primitive::StringSub => match (arg, arg2, arg3) {
+                (Value::Bytes(b), Value::Integer(start), Value::Integer(stop)) => {
+                    let str = self.format_string(arg)?;
+                    let iter = str.chars();
+                    let it = iter.skip(*start as usize).take((stop-start) as usize);
+                    let subs = String::from_iter(it);
+                    self.make_string(&subs)
+                },
+                _ => self.error("_prim_string_substring takes a string, an integer and an integer as argument")
+            }
             _ => self.error(&format!("Primitive {:?} is not implemented", prim)),
         }
     }
@@ -490,12 +531,8 @@ impl Runtime {
             Value::Primitive(Primitive::StringSub, Arity::Fixed(3)),
         );
         self.add_global(
-            "_prim_char_ord",
-            Value::Primitive(Primitive::CharOrd, Arity::Fixed(1)),
-        );
-        self.add_global(
-            "_prim_char_chr",
-            Value::Primitive(Primitive::CharChr, Arity::Fixed(1)),
+            "_prim_to_char",
+            Value::Primitive(Primitive::ToChar, Arity::Fixed(1)),
         );
         self.add_global(
             "_prim_ceiling",
@@ -613,6 +650,7 @@ pub enum Primitive {
     // Conversion to string
     ToString,
     ToInt,
+    ToChar,
 
     // Bytes
     BytesSet,
@@ -626,10 +664,6 @@ pub enum Primitive {
     StringPack,
     StringUnpack,
     StringSub,
-
-    // Char
-    CharOrd,
-    CharChr,
 
     // Tables
     TableCreate,
