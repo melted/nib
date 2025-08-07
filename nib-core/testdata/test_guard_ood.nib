@@ -1,0 +1,10 @@
+// This can be run with --no-prelude
+
+a == b = _prim_eq a b
+
+test a | next a == true = "Yay!"
+test _ = "Nay!"
+
+next a = true
+
+_ = _prim_string_print (test 12)

@@ -61,7 +61,56 @@ impl Runtime {
                     }
                 },
                 _ => self.error("The argument to _prim_symbol_name must be a symbol")
-            }
+            },
+            Primitive::Ceiling => match arg {
+                Value::Real(f) => Ok(Value::Real(f.ceil())),
+                _ => self.error("The argument to _prim_ceiling must be a float")
+            },
+            Primitive::Floor => match arg {
+                Value::Real(f) => Ok(Value::Real(f.floor())),
+                _ => self.error("The argument to _prim_floor must be a float")
+            },
+            Primitive::Round => match arg {
+                Value::Real(f) => Ok(Value::Real(f.round())),
+                _ => self.error("The argument to _prim_round must be a float")
+            },
+            Primitive::Sin => match arg {
+                Value::Real(f) => Ok(Value::Real(f.sin())),
+                _ => self.error("The argument to _prim_sin must be a float")
+            },
+            Primitive::Cos => match arg {
+                Value::Real(f) => Ok(Value::Real(f.cos())),
+                _ => self.error("The argument to _prim_cos must be a float")
+            },
+            Primitive::Tan => match arg {
+                Value::Real(f) => Ok(Value::Real(f.tan())),
+                _ => self.error("The argument to _prim_tan must be a float")
+            },
+            Primitive::Atan => match arg {
+                Value::Real(f) => Ok(Value::Real(f.atan())),
+                _ => self.error("The argument to _prim_atan must be a float")
+            },
+            Primitive::Acos => match arg {
+                Value::Real(f) => Ok(Value::Real(f.acos())),
+                _ => self.error("The argument to _prim_acos must be a float")
+            },
+            Primitive::Asin => match arg {
+                Value::Real(f) => Ok(Value::Real(f.asin())),
+                _ => self.error("The argument to _prim_asin must be a float")
+            },
+            Primitive::Log => match arg {
+                Value::Real(f) => Ok(Value::Real(f.round())),
+                _ => self.error("The argument to _prim_log must be a float")
+            },
+            Primitive::Exp => match arg {
+                Value::Real(f) => Ok(Value::Real(f.exp())),
+                _ => self.error("The argument to _prim_exp must be a float")
+            },
+            Primitive::ToInt => match arg {
+                Value::Real(f) => Ok(Value::Integer(*f as i64)),
+                Value::Bool(b) => Ok(Value::Integer(if *b {1} else {0})),
+                _ => self.error("The argument to _prim_to_int must be a float or bool")
+            },
             _ => self.error(&format!("Primitive {:?} is not implemented", prim)),
         }
     }
@@ -428,6 +477,82 @@ impl Runtime {
             "_prim_panic",
             Value::Primitive(Primitive::Panic, Arity::Fixed(1)),
         );
+        self.add_global(
+            "_prim_string_pack",
+            Value::Primitive(Primitive::StringPack, Arity::Fixed(1)),
+        );
+        self.add_global(
+            "_prim_string_unpack",
+            Value::Primitive(Primitive::StringUnpack, Arity::Fixed(1)),
+        );
+        self.add_global(
+            "_prim_string_substring",
+            Value::Primitive(Primitive::StringSub, Arity::Fixed(3)),
+        );
+        self.add_global(
+            "_prim_char_ord",
+            Value::Primitive(Primitive::CharOrd, Arity::Fixed(1)),
+        );
+        self.add_global(
+            "_prim_char_chr",
+            Value::Primitive(Primitive::CharChr, Arity::Fixed(1)),
+        );
+        self.add_global(
+            "_prim_ceiling",
+            Value::Primitive(Primitive::Ceiling, Arity::Fixed(1)),
+        );
+        self.add_global(
+            "_prim_floor",
+            Value::Primitive(Primitive::Floor, Arity::Fixed(1)),
+        );
+        self.add_global(
+            "_prim_round",
+            Value::Primitive(Primitive::Round, Arity::Fixed(1)),
+        );
+        self.add_global(
+            "_prim_sin",
+            Value::Primitive(Primitive::Sin, Arity::Fixed(1)),
+        );
+        self.add_global(
+            "_prim_cos",
+            Value::Primitive(Primitive::Cos, Arity::Fixed(1)),
+        );
+        self.add_global(
+            "_prim_tan",
+            Value::Primitive(Primitive::Tan, Arity::Fixed(1)),
+        );
+        self.add_global(
+            "_prim_asin",
+            Value::Primitive(Primitive::Asin, Arity::Fixed(1)),
+        );
+        self.add_global(
+            "_prim_acos",
+            Value::Primitive(Primitive::Acos, Arity::Fixed(1)),
+        );
+        self.add_global(
+            "_prim_atan",
+            Value::Primitive(Primitive::Atan, Arity::Fixed(1)),
+        );
+        self.add_global(
+            "_prim_log",
+            Value::Primitive(Primitive::Log, Arity::Fixed(1)),
+        );
+        self.add_global(
+            "_prim_exp",
+            Value::Primitive(Primitive::Exp, Arity::Fixed(1)),
+        );
+        self.add_global(
+            "_prim_to_int",
+            Value::Primitive(Primitive::ToInt, Arity::Fixed(1)),
+        );
+        self.add_global(
+            "_prim_foreign_import",
+            Value::Primitive(Primitive::ForeignImport, Arity::VarArg(1)),
+        );
+        self.add_global(
+            "_prim_foreign_export",
+            Value::Primitive(Primitive::ForeignExport, Arity::VarArg(1)),
+        );
         Ok(())
     }
 
@@ -487,6 +612,7 @@ pub enum Primitive {
 
     // Conversion to string
     ToString,
+    ToInt,
 
     // Bytes
     BytesSet,
@@ -497,6 +623,13 @@ pub enum Primitive {
 
     // String
     StringPrint,
+    StringPack,
+    StringUnpack,
+    StringSub,
+
+    // Char
+    CharOrd,
+    CharChr,
 
     // Tables
     TableCreate,
@@ -530,11 +663,12 @@ pub enum Primitive {
     SymbolNew,
     SymbolName,
 
-    // IO
+    // FFI
+    ForeignImport,
+    ForeignExport,
 
     // System
     Load,
-    Extern,
     Exit,
     Panic,
 }

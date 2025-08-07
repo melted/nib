@@ -1,11 +1,11 @@
 // Can run with --no-prelude
 
-
 a == b = _prim_eq a b 
 
-generic_matcher t v | (_prim_type v) == t = [v]
+generic_matcher t v | (type v) == t = [v]
 generic_matcher _ _ = false
 
+type = _prim_type
 int_matcher = generic_matcher int
 
 res = int_matcher 12

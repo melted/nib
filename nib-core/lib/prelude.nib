@@ -1,7 +1,5 @@
 // The default library for Nib
 
-module global
-
 /// Abort immediately with an error value. The value will be converted to a string.
 panic = _prim_panic
 
@@ -59,9 +57,11 @@ const a b = a
 apply = _prim_apply
 
 // types
-type = _prim_type
+
 generic_matcher t v | (type v == t) = [v]
 generic_matcher _ _ = false
+
+type = _prim_type
 
 make_type type_sym name = new where
                                 new = table.create
@@ -134,11 +134,11 @@ a ++ b = (type a).concat a b
 array.match v | (type v == array) = [v]
 array.match _ = false
 
-int.match v | (type v == int) = [v]
-int.match _ = false
+//int.match v | (type v == int) = [v]
+//int.match _ = false
 
 // TODO: this doesn't work, figure out why
-//int.match v = generic_matcher int v
+int.match v = generic_matcher int v
 
 float.match v | (type v == float) = [v]
 float.match _ = false

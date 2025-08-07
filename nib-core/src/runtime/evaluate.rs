@@ -17,6 +17,7 @@ impl Runtime {
     pub(super) fn evaluate(&mut self, code: &mut Module, env: &mut Environment) -> Result<()> {
         for b in code.bindings.iter_mut() {
             self.evaluate_binding(b, env, false)?;
+            dbg!(&self.closures_to_check);
             if let Some(hs) = self.closures_to_check.get(&b.name) {
                 for c in hs.clone() {
                     if let Some(Value::Closure(closure)) = self.lookup(env, &c) {
@@ -368,6 +369,7 @@ impl Runtime {
                 .flatten()
                 .collect()
         };
+        dbg!(&udef);
         for k in udef {
             if let Some(v) = self.lookup(new_env, &k) {
                 env.add(&k, &v);

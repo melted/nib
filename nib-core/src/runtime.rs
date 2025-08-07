@@ -25,7 +25,7 @@ pub struct Runtime {
     metadata: HashMap<String, Metadata>,
     globals: Rc<RefCell<Table>>,
     named_symbols: HashMap<String, Symbol>,
-    local_environment: Environment,
+    local_module: Option<Rc<RefCell<Table>>>,
     closures_to_check: HashMap<String, HashSet<String>>,
 }
 
@@ -35,7 +35,7 @@ impl Runtime {
             metadata: HashMap::new(),
             globals: new_ref(Table::new()),
             named_symbols: HashMap::new(),
-            local_environment: Environment::new(),
+            local_module: None,
             closures_to_check: HashMap::new(),
         };
         rt.register_primitives().unwrap();
