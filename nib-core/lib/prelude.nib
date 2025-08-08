@@ -16,6 +16,9 @@ a - b = _prim_sub a b
 /// Multiply two numbers
 a * b = _prim_mul a b
 
+/// Subtract n from zero
+negate n = _prim_negate n
+
 /// Divide a by b
 a / b = _prim_div a b
 mod a b = _prim_mod a b

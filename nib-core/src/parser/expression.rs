@@ -109,8 +109,9 @@ impl<'a> ParserState<'a> {
                 Ok(self.var_expression(name))
             }
             TokenValue::Operator(op) if op == "-" => {
-                // Special rule for prefix -, it's sugar for negate.
-                Ok(self.var_expression(Name::name("negate")))
+                self.get_next_token()?;
+                // Special rule for prefix -, it's sugar for _prim_negate.
+                Ok(self.var_expression(Name::name("_prim_negate")))
             }
             _ => self.error(&format!("Illegal token in left expression {tok:?}")),
         }

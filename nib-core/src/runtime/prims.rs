@@ -105,6 +105,11 @@ impl Runtime {
                 Value::Real(f) => Ok(Value::Real(f.exp())),
                 _ => self.error("The argument to _prim_exp must be a float")
             },
+            Primitive::Negate => match arg {
+                Value::Integer(n) => Ok(Value::Integer(-n)),
+                Value::Real(f) => Ok(Value::Real(-f)),
+                _ => self.error("The argument to _prim_negate must be an int or a float")
+            },
             Primitive::ToInt => match arg {
                 Value::Real(f) => Ok(Value::Integer(*f as i64)),
                 Value::Bool(b) => Ok(Value::Integer(if *b {1} else {0})),
@@ -404,6 +409,10 @@ impl Runtime {
             Value::Primitive(Primitive::Mod, Arity::Fixed(2)),
         );
         self.add_global(
+            "_prim_negate",
+            Value::Primitive(Primitive::Negate, Arity::Fixed(1)),
+        );
+        self.add_global(
             "_prim_bitand",
             Value::Primitive(Primitive::BitAnd, Arity::Fixed(2)),
         );        
@@ -632,6 +641,7 @@ pub enum Primitive {
     Mul,
     Div,
     Mod,
+    Negate,
 
     // Comparison
     Gt,

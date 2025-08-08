@@ -1,0 +1,96 @@
+warning: unused import: `path`
+ --> nib-core\src\common.rs:4:9
+  |
+4 |     io, path,
+  |         ^^^^
+  |
+  = note: `#[warn(unused_imports)]` on by default
+
+warning: error finalizing incremental compilation session directory `\\?\F:\Niklas\laquer\nibble\target\debug\incremental\nibble-2t597qyo2fi8z\s-h9rr6ks067-11zygvk-working`: Åtkomst nekad. (os error 5)
+
+warning: `nibble` (lib) generated 2 warnings (run `cargo fix --lib -p nibble` to apply 1 suggestion)
+warning: unused variable: `read`
+  --> nib-core\src\bin\nibble.rs:15:13
+   |
+15 |         let read = stdin().read_to_string(&mut buffer)?;
+   |             ^^^^ help: if this is intentional, prefix it with an underscore: `_read`
+   |
+   = note: `#[warn(unused_variables)]` on by default
+
+warning: `nibble` (bin "nibble") generated 1 warning
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.06s
+     Running `target\debug\nibble.exe .\nib-core\lib\prelude.nib`
+[2025-08-01T21:39:43Z INFO  nibble::runtime::evaluate] Evaluating binding (define (+)  { a b -> (_prim_add a b ); })
+[2025-08-01T21:39:43Z INFO  nibble::runtime::evaluate] Evaluating expression { a b -> (_prim_add a b ); }
+[2025-08-01T21:39:43Z INFO  nibble::runtime::evaluate] Evaluating lambda
+[2025-08-01T21:39:43Z INFO  nibble::runtime::evaluate] Evaluating binding (define (-)  { a b -> (_prim_sub a b ); })
+[2025-08-01T21:39:43Z INFO  nibble::runtime::evaluate] Evaluating expression { a b -> (_prim_sub a b ); }
+[2025-08-01T21:39:43Z INFO  nibble::runtime::evaluate] Evaluating lambda
+[2025-08-01T21:39:43Z INFO  nibble::runtime::evaluate] Evaluating binding (define (*)  { a b -> (_prim_mul a b ); })
+[2025-08-01T21:39:43Z INFO  nibble::runtime::evaluate] Evaluating expression { a b -> (_prim_mul a b ); }
+[2025-08-01T21:39:43Z INFO  nibble::runtime::evaluate] Evaluating lambda
+[2025-08-01T21:39:43Z INFO  nibble::runtime::evaluate] Evaluating binding (define (/)  { a b -> (_prim_div a b ); })
+[2025-08-01T21:39:43Z INFO  nibble::runtime::evaluate] Evaluating expression { a b -> (_prim_div a b ); }
+[2025-08-01T21:39:43Z INFO  nibble::runtime::evaluate] Evaluating lambda
+[2025-08-01T21:39:43Z INFO  nibble::runtime::evaluate] Evaluating binding (define global.mod  { a b -> (_prim_mod a b ); })
+[2025-08-01T21:39:43Z INFO  nibble::runtime::evaluate] Evaluating expression { a b -> (_prim_mod a b ); }
+[2025-08-01T21:39:43Z INFO  nibble::runtime::evaluate] Evaluating lambda
+[2025-08-01T21:39:43Z INFO  nibble::runtime::evaluate] Evaluating binding (define (>)  { a b -> (_prim_gt a b ); })
+[2025-08-01T21:39:43Z INFO  nibble::runtime::evaluate] Evaluating expression { a b -> (_prim_gt a b ); }
+[2025-08-01T21:39:43Z INFO  nibble::runtime::evaluate] Evaluating lambda
+[2025-08-01T21:39:43Z INFO  nibble::runtime::evaluate] Evaluating binding (define (>=)  { a b -> (_prim_gte a b ); })
+[2025-08-01T21:39:43Z INFO  nibble::runtime::evaluate] Evaluating expression { a b -> (_prim_gte a b ); }
+[2025-08-01T21:39:43Z INFO  nibble::runtime::evaluate] Evaluating lambda
+[2025-08-01T21:39:43Z INFO  nibble::runtime::evaluate] Evaluating binding (define (<)  { a b -> (_prim_lt a b ); })
+[2025-08-01T21:39:43Z INFO  nibble::runtime::evaluate] Evaluating expression { a b -> (_prim_lt a b ); }
+[2025-08-01T21:39:43Z INFO  nibble::runtime::evaluate] Evaluating lambda
+[2025-08-01T21:39:43Z INFO  nibble::runtime::evaluate] Evaluating binding (define (<=)  { a b -> (_prim_lte a b ); })
+[2025-08-01T21:39:43Z INFO  nibble::runtime::evaluate] Evaluating expression { a b -> (_prim_lte a b ); }
+[2025-08-01T21:39:43Z INFO  nibble::runtime::evaluate] Evaluating lambda
+[2025-08-01T21:39:43Z INFO  nibble::runtime::evaluate] Evaluating binding (define (==)  { a b -> (_prim_eq a b ); })
+[2025-08-01T21:39:43Z INFO  nibble::runtime::evaluate] Evaluating expression { a b -> (_prim_eq a b ); }
+[2025-08-01T21:39:43Z INFO  nibble::runtime::evaluate] Evaluating lambda
+[2025-08-01T21:39:43Z INFO  nibble::runtime::evaluate] Evaluating binding (define (!=)  { a b -> (not ((==) a b ) ); })
+[2025-08-01T21:39:43Z INFO  nibble::runtime::evaluate] Evaluating expression { a b -> (not ((==) a b ) ); }
+[2025-08-01T21:39:43Z INFO  nibble::runtime::evaluate] Evaluating lambda
+[2025-08-01T21:39:43Z INFO  nibble::runtime::evaluate] Evaluating binding (define global.not  { true -> false;false -> true; })
+[2025-08-01T21:39:43Z INFO  nibble::runtime::evaluate] Evaluating expression { true -> false;false -> true; }
+[2025-08-01T21:39:43Z INFO  nibble::runtime::evaluate] Evaluating lambda
+[2025-08-01T21:39:43Z INFO  nibble::runtime::evaluate] Evaluating binding (define global.max  { x y -> ({ | ((>) x y ) -> x;_ -> y; } () ); })
+[2025-08-01T21:39:43Z INFO  nibble::runtime::evaluate] Evaluating expression { x y -> ({ | ((>) x y ) -> x;_ -> y; } () ); }
+[2025-08-01T21:39:43Z INFO  nibble::runtime::evaluate] Evaluating lambda
+[2025-08-01T21:39:43Z INFO  nibble::runtime::evaluate] Evaluating binding (define global.min  { x y -> ({ | ((<) x y ) -> x;_ -> y; } () ); })
+[2025-08-01T21:39:43Z INFO  nibble::runtime::evaluate] Evaluating expression { x y -> ({ | ((<) x y ) -> x;_ -> y; } () ); }
+[2025-08-01T21:39:43Z INFO  nibble::runtime::evaluate] Evaluating lambda
+[2025-08-01T21:39:43Z INFO  nibble::runtime::evaluate] Evaluating binding (define (||)  { x y -> ({ | x -> x;_ -> (y () ); } () ); })
+[2025-08-01T21:39:43Z INFO  nibble::runtime::evaluate] Evaluating expression { x y -> ({ | x -> x;_ -> (y () ); } () ); }
+[2025-08-01T21:39:43Z INFO  nibble::runtime::evaluate] Evaluating lambda
+[2025-08-01T21:39:43Z INFO  nibble::runtime::evaluate] Evaluating binding (define (&&)  { x y -> ({ | x -> (y () );_ -> false; } () ); })
+[2025-08-01T21:39:43Z INFO  nibble::runtime::evaluate] Evaluating expression { x y -> ({ | x -> (y () );_ -> false; } () ); }
+[2025-08-01T21:39:43Z INFO  nibble::runtime::evaluate] Evaluating lambda
+[2025-08-01T21:39:43Z INFO  nibble::runtime::evaluate] Evaluating binding (define global.on  { x f -> (f x ); })
+[2025-08-01T21:39:43Z INFO  nibble::runtime::evaluate] Evaluating expression { x f -> (f x ); }
+[2025-08-01T21:39:43Z INFO  nibble::runtime::evaluate] Evaluating lambda
+[2025-08-01T21:39:43Z INFO  nibble::runtime::evaluate] Evaluating binding (define global.id  { x -> x; })
+[2025-08-01T21:39:43Z INFO  nibble::runtime::evaluate] Evaluating expression { x -> x; }
+[2025-08-01T21:39:43Z INFO  nibble::runtime::evaluate] Evaluating lambda
+[2025-08-01T21:39:43Z INFO  nibble::runtime::evaluate] Evaluating binding (define (&)  { a b -> b; })
+[2025-08-01T21:39:43Z INFO  nibble::runtime::evaluate] Evaluating expression { a b -> b; }
+[2025-08-01T21:39:43Z INFO  nibble::runtime::evaluate] Evaluating lambda
+[2025-08-01T21:39:43Z INFO  nibble::runtime::evaluate] Evaluating binding (define global.const  { a b -> a; })
+[2025-08-01T21:39:43Z INFO  nibble::runtime::evaluate] Evaluating expression { a b -> a; }
+[2025-08-01T21:39:43Z INFO  nibble::runtime::evaluate] Evaluating lambda
+[2025-08-01T21:39:43Z INFO  nibble::runtime::evaluate] Evaluating binding (define global.type_name  { v -> (_prim_project (type v ) #type_id ); })
+[2025-08-01T21:39:43Z INFO  nibble::runtime::evaluate] Evaluating expression { v -> (_prim_project (type v ) #type_id ); }
+[2025-08-01T21:39:43Z INFO  nibble::runtime::evaluate] Evaluating lambda
+[2025-08-01T21:39:43Z INFO  nibble::runtime::evaluate] Evaluating binding (define global.print  { a -> (_prim_string_print (_prim_to_string a ) ); })
+[2025-08-01T21:39:43Z INFO  nibble::runtime::evaluate] Evaluating expression { a -> (_prim_string_print (_prim_to_string a ) ); }
+[2025-08-01T21:39:43Z INFO  nibble::runtime::evaluate] Evaluating lambda
+[2025-08-01T21:39:43Z INFO  nibble::runtime::evaluate] Evaluating binding (define global.println  { a -> ((&) (print a ) (print "
+    " ) ); })
+[2025-08-01T21:39:43Z INFO  nibble::runtime::evaluate] Evaluating expression { a -> ((&) (print a ) (print "
+    " ) ); }
+[2025-08-01T21:39:43Z INFO  nibble::runtime::evaluate] Evaluating lambda
+[nib-core\src\runtime.rs:59:9] &self.globals = RefCell {
+    value: Table { #_prim_mod: ¤<primitive:Mod:2>, #mod: #<function:227973a20f8:2>, #(-): #<function:227973a2638:2>, #nil_type: Table { #type_id: #[110, 105, 108], }#_prim_print_representation: ¤<primitive:RepPrint:1>, #_prim_eq: ¤<primitive:Eq:2>, #symbol: Table { #type_id: #[115, 121, 109, 98, 111, 108], }#_prim_mul: ¤<primitive:Mul:2>, #(<): #<function:227973a1c38:2>, #_prim_div: ¤<primitive:Div:2>, #not: #<function:227973a1c78:1>, #type_name: #<function:227973a19b8:1>, #_prim_array_make: ¤<primitive:ArrayMk:1+>, #table: Table { #type_id: #[116, 97, 98, 108, 101], }#function: Table { #type_id: #[102, 117, 110, 99, 116, 105, 111, 110], }#_prim_add: ¤<primitive:Add:2>, #_prim_lt: ¤<primitive:Lt:2>, #_prim_sub: ¤<primitive:Sub:2>, #(<=): #<function:227973a1ff8:2>, #type: ¤<primitive:Type:1>, #id: #<function:227973a1d78:1>, #global: Table { #_prim_mod: ¤<primitive:Mod:2>, #mod: #<function:227973a20f8:2>, #(-): #<function:227973a2638:2>, #nil_type: <recurse>#_prim_print_representation: ¤<primitive:RepPrint:1>, #_prim_eq: ¤<primitive:Eq:2>, #symbol: <recurse>#_prim_mul: ¤<primitive:Mul:2>, #(<): #<function:227973a1c38:2>, #_prim_div: ¤<primitive:Div:2>, #not: #<function:227973a1c78:1>, #type_name: #<function:227973a19b8:1>, #_prim_array_make: ¤<primitive:ArrayMk:1+>, #table: <recurse>#function: <recurse>#_prim_add: ¤<primitive:Add:2>, #_prim_lt: ¤<primitive:Lt:2>, #_prim_sub: ¤<primitive:Sub:2>, #(<=): #<function:227973a1ff8:2>, #type: ¤<primitive:Type:1>, #id: #<function:227973a1d78:1>, #global: <recurse>#_prim_lte: ¤<primitive:Lte:2>, #_prim_gte: ¤<primitive:Gte:2>, #string: Table { #type_id: #[115, 116, 114, 105, 110, 103], }#const: #<function:227973a1db8:2>, #on: #<function:227973a1a78:2>, #(*): #<function:227973a1df8:2>, #(>=): #<function:227973a2078:2>, #array: Table { #type_id: #[97, 114, 114, 97, 121], }#(!=): #<function:227973a1bf8:2>, #char: Table { #type_id: #[99, 104, 97, 114], }#_prim_gt: ¤<primitive:Gt:2>, #_prim_array_create: ¤<primitive:ArrayCreate:1>, #_prim_string_print: ¤<primitive:StringPrint:1>, #pointer: Table { #type_id: #[112, 111, 105, 110, 116, 101, 114], }#(+): #<function:22797395a08:2>, #(>): #<function:227973a25f8:2>, #println: #<function:227973a27f8:1>, #_prim_array_ref: ¤<primitive:ArrayRef:2>, #(==): #<function:227973a2378:2>, #(&&): #<function:227973a1e78:2>, #max: #<function:227973a1cb8:2>, #float: Table { #type_id: #[102, 108, 111, 97, 116], }#bytes: Table { #type_id: #[98, 121, 116, 101, 115], }#_prim_load: ¤<primitive:Load:1>, #(||): #<function:227973a1cf8:2>, #_prim_project: ¤<primitive:Project:2+>, #_prim_array_set: ¤<primitive:ArraySet:3>, #bool: Table { #type_id: #[98, 111, 111, 108], }#print: #<function:227973a1fb8:1>, #(/): #<function:227973a2338:2>, #int: Table { #type_id: #[105, 110, 116], }#_prim_array_size: ¤<primitive:ArraySize:1>, #(&): #<function:227973a2778:2>, #_prim_to_string: ¤<primitive:ToString:1>, #min: #<function:227973a2578:2>, }#_prim_lte: ¤<primitive:Lte:2>, #_prim_gte: ¤<primitive:Gte:2>, #string: <recurse>#const: #<function:227973a1db8:2>, #on: #<function:227973a1a78:2>, #(*): #<function:227973a1df8:2>, #(>=): #<function:227973a2078:2>, #array: <recurse>#(!=): #<function:227973a1bf8:2>, #char: <recurse>#_prim_gt: ¤<primitive:Gt:2>, #_prim_array_create: ¤<primitive:ArrayCreate:1>, #_prim_string_print: ¤<primitive:StringPrint:1>, #pointer: <recurse>#(+): #<function:22797395a08:2>, #(>): #<function:227973a25f8:2>, #println: #<function:227973a27f8:1>, #_prim_array_ref: ¤<primitive:ArrayRef:2>, #(==): #<function:227973a2378:2>, #(&&): #<function:227973a1e78:2>, #max: #<function:227973a1cb8:2>, #float: <recurse>#bytes: <recurse>#_prim_load: ¤<primitive:Load:1>, #(||): #<function:227973a1cf8:2>, #_prim_project: ¤<primitive:Project:2+>, #_prim_array_set: ¤<primitive:ArraySet:3>, #bool: <recurse>#print: #<function:227973a1fb8:1>, #(/): #<function:227973a2338:2>, #int: <recurse>#_prim_array_size: ¤<primitive:ArraySize:1>, #(&): #<function:227973a2778:2>, #_prim_to_string: ¤<primitive:ToString:1>, #min: #<function:227973a2578:2>, },
+}

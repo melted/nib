@@ -2,8 +2,8 @@ use std::env::args;
 use std::io::{self, stderr, stdin, Read, Write};
 use std::process::exit;
 
-use nibble::common::Error;
-use nibble::runtime::Runtime;
+use nib_core::common::Error;
+use nib_core::runtime::Runtime;
 
 /// Simple runner of Nib code. Anything more elaborate goes into
 /// another crate, where it can pull in dependencies and go wild

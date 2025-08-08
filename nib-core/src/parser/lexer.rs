@@ -220,7 +220,18 @@ impl<'a> super::ParserState<'a> {
                 "@" => Ok(self.token(TokenValue::As)),
                 "->" => Ok(self.token(TokenValue::RightArrow)),
                 "=>" => Ok(self.token(TokenValue::FatRightArrow)),
-                "-" => Ok(self.token(TokenValue::Operator(id.to_string()))),
+                "-" => {
+// TODO: We can't lex a leading minus as belonging to the number
+// since (n-1) would lex as Id(n) Int(-1). So we handle prefix -
+// in the expression parser and translate to (negate <num>)
+// Is there a smarter way to handle it? 
+/*                     if let Some((_, ch)) = self.chars.peek() {
+                        if ch.is_ascii_digit() {
+                            return self.read_number(true);
+                        }
+                    } */
+                    Ok(self.token(TokenValue::Operator(id.to_string())))
+                },
                 _ => Ok(self.token(TokenValue::Operator(id.to_string()))),
             }
         } else {
@@ -339,8 +350,8 @@ impl<'a> super::ParserState<'a> {
                 }
                 if next == 'e' || next == 'E' {
                     self.advance(1);
-                    let sign = self.peek()?;
-                    if sign == '+' || sign == '-' {
+                    let esign = self.peek()?;
+                    if esign == '+' || esign == '-' {
                         self.advance(1);
                     }
                     stop = self.snarf(char::is_ascii_digit)?;
@@ -349,14 +360,14 @@ impl<'a> super::ParserState<'a> {
                     Ok(c) => c,
                     Err(_) => return self.lex_error("Invalid float literal"),
                 };
-                return Ok(self.token(TokenValue::Float(if neg { -float } else { float })));
+                return Ok(self.token(TokenValue::Float(float)));
             }
         }
         let int = match i64::from_str_radix(&self.src[self.token_start..stop], 10) {
             Ok(c) => c,
             Err(_) => return self.lex_error("Invalid integer literal"),
         };
-        Ok(self.token(TokenValue::Integer(sign * int)))
+        Ok(self.token(TokenValue::Integer(int)))
     }
 
     fn snarf(&mut self, pred: impl Fn(&char) -> bool) -> Result<usize> {
