@@ -1,4 +1,4 @@
-use std::ops::{Not, Shl, Shr};
+use std::ops::{Shl, Shr};
 
 use crate::common::{Error, Name, Result};
 use crate::core::Arity;
