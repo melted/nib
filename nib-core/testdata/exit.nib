@@ -1,6 +1,0 @@
-_ = print "Gets here"
-
-// Totally normal exit
-_ = exit 0
-
-_ = print "Never gets here"

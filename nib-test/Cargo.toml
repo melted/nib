@@ -6,4 +6,4 @@ description = "A test runner for Nib tests"
 
 [dependencies]
 clap = { version = "4.5.43", features = ["derive"] }
-nib-core = { version = "0.0.1", path = "../nib-core" }
+log = "0.4.27"

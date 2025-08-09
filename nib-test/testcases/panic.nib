@@ -1,0 +1,8 @@
+// @Name: Test panic primitive
+// @Tags: primitive error
+
+_ = panic "OH NO!"
+// @ErrorOut:
+// Error: OH NO!
+// @EndErrorOut
+// @ExitCode: 1

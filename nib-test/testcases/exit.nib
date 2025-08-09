@@ -1,0 +1,13 @@
+// @Name: Test early exit
+// @Tags: primitives
+
+_ = print "Gets here"
+
+// Totally normal exit
+_ = exit 0
+
+_ = print "Never gets here"
+// @Output:
+// Gets here
+// @EndOutput
+// @ExitCode: 0

@@ -1,10 +1,16 @@
-// Name: Test negative number literals
-// Tags: lexer
+// @Name: Test negative number literals
+// @Tags: lexer
 
 a = 3.0 - -1.0
 b = 3 - -1
 c = 0x03 - -0x01
-
+// Irrelevant comment
 _ = println a
 _ = println b
 _ = println c
+// @Output:
+// 4
+// 4
+// 4
+// @EndOutput
+// @ExitCode: 0

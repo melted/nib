@@ -37,6 +37,7 @@ fn main() -> io::Result<()> {
             }
             _ => {
                 stderr().write(&format!("{}", err).as_bytes())?;
+                exit(1);
             }
         }
     }

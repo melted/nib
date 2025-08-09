@@ -1,0 +1,17 @@
+// @Name: Test basic array features
+// @Tags: array
+
+arr = [1,2,3,4,5,6]
+
+_ = array.set arr 3 9
+
+_ = print arr
+
+doubled = array.map { a * 2 } arr
+
+_ = print arr
+_ = print doubled
+// @Output:
+// [1, 2, 3, 9, 5, 6][1, 2, 3, 9, 5, 6][2, 4, 6, 18, 10, 12]
+// @EndOutput
+// @ExitCode: 0
