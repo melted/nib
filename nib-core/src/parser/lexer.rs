@@ -221,17 +221,17 @@ impl<'a> super::ParserState<'a> {
                 "->" => Ok(self.token(TokenValue::RightArrow)),
                 "=>" => Ok(self.token(TokenValue::FatRightArrow)),
                 "-" => {
-// TODO: We can't lex a leading minus as belonging to the number
-// since (n-1) would lex as Id(n) Int(-1). So we handle prefix -
-// in the expression parser and translate to (negate <num>)
-// Is there a smarter way to handle it? 
-/*                     if let Some((_, ch)) = self.chars.peek() {
+                    // TODO: We can't lex a leading minus as belonging to the number
+                    // since (n-1) would lex as Id(n) Int(-1). So we handle prefix -
+                    // in the expression parser and translate to (negate <num>)
+                    // Is there a smarter way to handle it?
+                    /*                     if let Some((_, ch)) = self.chars.peek() {
                         if ch.is_ascii_digit() {
                             return self.read_number(true);
                         }
                     } */
                     Ok(self.token(TokenValue::Operator(id.to_string())))
-                },
+                }
                 _ => Ok(self.token(TokenValue::Operator(id.to_string()))),
             }
         } else {

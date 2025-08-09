@@ -22,20 +22,16 @@ impl Runtime {
             Primitive::Panic => self.nib_panic(arg),
             Primitive::Load => self.load_prim(arg),
             Primitive::TableKeys => self.table_keys(arg),
-            Primitive::TableCreate => {
-                Ok(Value::new_table())
-            },
+            Primitive::TableCreate => Ok(Value::new_table()),
             Primitive::TableSize => match arg {
-                Value::Table(t) => {
-                    Ok(Value::Integer(t.borrow().table.len() as i64))
-                }
-                _ => self.error("The argument to _prim_table_size must be a table")
-            }
+                Value::Table(t) => Ok(Value::Integer(t.borrow().table.len() as i64)),
+                _ => self.error("The argument to _prim_table_size must be a table"),
+            },
             Primitive::BitNot => match arg {
                 Value::Integer(a) => Ok(Value::Integer(!a)),
                 Value::Pointer(a) => Ok(Value::Pointer(!a)),
-                _ => self.error("The argument to _prim_bitnot must be an integer or pointer")
-            }
+                _ => self.error("The argument to _prim_bitnot must be an integer or pointer"),
+            },
             Primitive::ArraySize => match arg {
                 Value::Array(arr) => Ok(Value::Integer(arr.borrow().array.len() as i64)),
                 _ => self.error(&format!(
@@ -58,94 +54,101 @@ impl Runtime {
                     } else {
                         Ok(Value::Bool(false))
                     }
-                },
-                _ => self.error("The argument to _prim_symbol_name must be a symbol")
+                }
+                _ => self.error("The argument to _prim_symbol_name must be a symbol"),
             },
             Primitive::Ceiling => match arg {
                 Value::Real(f) => Ok(Value::Real(f.ceil())),
-                _ => self.error("The argument to _prim_ceiling must be a float")
+                _ => self.error("The argument to _prim_ceiling must be a float"),
             },
             Primitive::Floor => match arg {
                 Value::Real(f) => Ok(Value::Real(f.floor())),
-                _ => self.error("The argument to _prim_floor must be a float")
+                _ => self.error("The argument to _prim_floor must be a float"),
             },
             Primitive::Round => match arg {
                 Value::Real(f) => Ok(Value::Real(f.round())),
-                _ => self.error("The argument to _prim_round must be a float")
+                _ => self.error("The argument to _prim_round must be a float"),
             },
             Primitive::Sin => match arg {
                 Value::Real(f) => Ok(Value::Real(f.sin())),
-                _ => self.error("The argument to _prim_sin must be a float")
+                _ => self.error("The argument to _prim_sin must be a float"),
             },
             Primitive::Cos => match arg {
                 Value::Real(f) => Ok(Value::Real(f.cos())),
-                _ => self.error("The argument to _prim_cos must be a float")
+                _ => self.error("The argument to _prim_cos must be a float"),
             },
             Primitive::Tan => match arg {
                 Value::Real(f) => Ok(Value::Real(f.tan())),
-                _ => self.error("The argument to _prim_tan must be a float")
+                _ => self.error("The argument to _prim_tan must be a float"),
             },
             Primitive::Atan => match arg {
                 Value::Real(f) => Ok(Value::Real(f.atan())),
-                _ => self.error("The argument to _prim_atan must be a float")
+                _ => self.error("The argument to _prim_atan must be a float"),
             },
             Primitive::Acos => match arg {
                 Value::Real(f) => Ok(Value::Real(f.acos())),
-                _ => self.error("The argument to _prim_acos must be a float")
+                _ => self.error("The argument to _prim_acos must be a float"),
             },
             Primitive::Asin => match arg {
                 Value::Real(f) => Ok(Value::Real(f.asin())),
-                _ => self.error("The argument to _prim_asin must be a float")
+                _ => self.error("The argument to _prim_asin must be a float"),
             },
             Primitive::Log => match arg {
                 Value::Real(f) => Ok(Value::Real(f.round())),
-                _ => self.error("The argument to _prim_log must be a float")
+                _ => self.error("The argument to _prim_log must be a float"),
             },
             Primitive::Exp => match arg {
                 Value::Real(f) => Ok(Value::Real(f.exp())),
-                _ => self.error("The argument to _prim_exp must be a float")
+                _ => self.error("The argument to _prim_exp must be a float"),
             },
             Primitive::Negate => match arg {
                 Value::Integer(n) => Ok(Value::Integer(-n)),
                 Value::Real(f) => Ok(Value::Real(-f)),
-                _ => self.error("The argument to _prim_negate must be an int or a float")
+                _ => self.error("The argument to _prim_negate must be an int or a float"),
             },
             Primitive::ToInt => match arg {
                 Value::Real(f) => Ok(Value::Integer(*f as i64)),
-                Value::Bool(b) => Ok(Value::Integer(if *b {1} else {0})),
+                Value::Bool(b) => Ok(Value::Integer(if *b { 1 } else { 0 })),
                 Value::Char(c) => Ok(Value::Integer(*c as i64)),
-                _ => self.error("The argument to _prim_to_int must be a float or bool")
+                _ => self.error("The argument to _prim_to_int must be a float or bool"),
             },
             Primitive::ToChar => match arg {
-                Value::Integer(n) => if let Some(c) = char::from_u32(
-                    *n as u32) {
+                Value::Integer(n) => {
+                    if let Some(c) = char::from_u32(*n as u32) {
                         Ok(Value::Char(c))
                     } else {
                         Ok(Value::Bool(false))
-                    },
-                _ => self.error("The argument to _prim_to_char must be an integer between 0 and 1048576")
+                    }
+                }
+                _ => self.error(
+                    "The argument to _prim_to_char must be an integer between 0 and 1048576",
+                ),
             },
             Primitive::StringUnpack => match arg {
                 Value::Bytes(b) if self.is_type(arg, "string") => {
                     let str = self.format_string(&arg)?;
-                    let vals:Vec<Value> = str.chars().map(|c| Value::Char(c)).collect();
+                    let vals: Vec<Value> = str.chars().map(|c| Value::Char(c)).collect();
                     Ok(Value::new_array(&vals))
-                },
-                _ => self.error("The argument to _prim_string_unpack must be a string")
+                }
+                _ => self.error("The argument to _prim_string_unpack must be a string"),
             },
-            Primitive::StringPack => match arg {
-                Value::Array(a) => {
-                    let mut chars = Vec::new();
-                    for v in &a.borrow().array {
-                        match v {
-                            Value::Char(c) => chars.push(*c),
-                            _ => return self.error("The argument to _prim_string_pack must be an array of chars")
+            Primitive::StringPack => {
+                match arg {
+                    Value::Array(a) => {
+                        let mut chars = Vec::new();
+                        for v in &a.borrow().array {
+                            match v {
+                                Value::Char(c) => chars.push(*c),
+                                _ => return self.error(
+                                    "The argument to _prim_string_pack must be an array of chars",
+                                ),
+                            }
                         }
+                        let str = String::from_iter(chars.iter());
+                        self.make_string(&str)
                     }
-                    let str = String::from_iter(chars.iter());
-                    self.make_string(&str)
-                },
-                _ => self.error("The argument to _prim_string_pack must be an array of chars") 
+                    _ => self.error("The argument to _prim_string_pack must be an array of chars"),
+                }
             }
             _ => self.error(&format!("Primitive {:?} is not implemented", prim)),
         }
@@ -252,11 +255,11 @@ impl Runtime {
             },
             Primitive::BitShift => match (arg, arg2) {
                 (Value::Integer(a), Value::Integer(b)) => {
-                    let val = if *b < 0 { a.shl(b.abs())} else { a.shr(b) };    
+                    let val = if *b < 0 { a.shl(b.abs())} else { a.shr(b) };
                     Ok(Value::Integer(val))
                 },
                 (Value::Pointer(a), Value::Integer(b)) => {
-                    let val = if *b < 0 { a.shl(b.abs())} else { a.shr(b) };    
+                    let val = if *b < 0 { a.shl(b.abs())} else { a.shr(b) };
                     Ok(Value::Pointer(val))
                 },
                 _ => self.error(&format!("The arguments to _prim_bitshift should be int or ptr and an int, got {} and {}", arg, arg2))
@@ -365,8 +368,12 @@ impl Runtime {
                     match a {
                         Value::Integer(v) if *v >= 0 && *v < 256 => {
                             b.push(*v as u8);
-                        },
-                        _ => return self.error("The arguments to _prim_bytes_make must be ints between 0-255")
+                        }
+                        _ => {
+                            return self.error(
+                                "The arguments to _prim_bytes_make must be ints between 0-255",
+                            );
+                        }
                     }
                 }
                 Ok(Value::new_bytes(b))
@@ -377,7 +384,10 @@ impl Runtime {
 
     pub(super) fn register_primitives(&mut self) -> Result<()> {
         self.add_global("global", Value::Table(self.globals.clone()));
-        self.add_global("_prim_print_representation", Value::Primitive(Primitive::RepPrint, Arity::Fixed(1)));
+        self.add_global(
+            "_prim_print_representation",
+            Value::Primitive(Primitive::RepPrint, Arity::Fixed(1)),
+        );
         self.add_global(
             "_prim_project",
             Value::Primitive(Primitive::Project, Arity::VarArg(2)),
@@ -386,8 +396,14 @@ impl Runtime {
             "_prim_array_make",
             Value::Primitive(Primitive::ArrayMk, Arity::VarArg(1)),
         );
-        self.add_global("_prim_type", Value::Primitive(Primitive::Type, Arity::Fixed(1)));
-        self.add_global("_prim_type_set", Value::Primitive(Primitive::TypeSet, Arity::Fixed(2)));
+        self.add_global(
+            "_prim_type",
+            Value::Primitive(Primitive::Type, Arity::Fixed(1)),
+        );
+        self.add_global(
+            "_prim_type_set",
+            Value::Primitive(Primitive::TypeSet, Arity::Fixed(2)),
+        );
         self.add_global(
             "_prim_add",
             Value::Primitive(Primitive::Add, Arity::Fixed(2)),
@@ -415,7 +431,7 @@ impl Runtime {
         self.add_global(
             "_prim_bitand",
             Value::Primitive(Primitive::BitAnd, Arity::Fixed(2)),
-        );        
+        );
         self.add_global(
             "_prim_bitor",
             Value::Primitive(Primitive::BitOr, Arity::Fixed(2)),
@@ -733,12 +749,10 @@ impl Runtime {
 
     fn format_string(&self, arg: &Value) -> Result<String> {
         let str = match arg {
-            Value::Bytes(b) if self.is_type(arg, "string") => {
-                str::from_utf8(&b.borrow().bytes).map_err(|_| Error::runtime_error(
-                    "Invalid string in _prim_string_print"
-                ))?.to_owned()
-            },
-            _ => format!("{}", arg)
+            Value::Bytes(b) if self.is_type(arg, "string") => str::from_utf8(&b.borrow().bytes)
+                .map_err(|_| Error::runtime_error("Invalid string in _prim_string_print"))?
+                .to_owned(),
+            _ => format!("{}", arg),
         };
         Ok(str)
     }
@@ -839,30 +853,34 @@ impl Runtime {
         }
     }
 
-    fn set_type(&mut self, arg:&Value, arg1:&Value) -> Result<Value> {
+    fn set_type(&mut self, arg: &Value, arg1: &Value) -> Result<Value> {
         match arg1 {
-            Value::Table(t) => {
-                match arg {
-                    Value::Array(arr) => {
-                        let mut array = arr.borrow_mut();
-                        array.type_table = Some(t.clone());
-                    }
-                    Value::Bytes(b) => {
-                        let mut bytes = b.borrow_mut();
-                        bytes.type_table = Some(t.clone());
-                    }
-                    Value::Symbol(symb) => {
-                        let mut sym_info = symb.symbol_info.borrow_mut();
-                        sym_info.type_table = Some(t.clone());
-                    }
-                    Value::Table(table) =>  {
-                        let mut table = table.borrow_mut();
-                        table.type_table = Some(t.clone());
-                    },
-                    _ => return self.error(&format!("The first argument to _prime_type_set must be an array, bytes, symbol or table"))
+            Value::Table(t) => match arg {
+                Value::Array(arr) => {
+                    let mut array = arr.borrow_mut();
+                    array.type_table = Some(t.clone());
                 }
+                Value::Bytes(b) => {
+                    let mut bytes = b.borrow_mut();
+                    bytes.type_table = Some(t.clone());
+                }
+                Value::Symbol(symb) => {
+                    let mut sym_info = symb.symbol_info.borrow_mut();
+                    sym_info.type_table = Some(t.clone());
+                }
+                Value::Table(table) => {
+                    let mut table = table.borrow_mut();
+                    table.type_table = Some(t.clone());
+                }
+                _ => return self.error(&format!(
+                    "The first argument to _prime_type_set must be an array, bytes, symbol or table"
+                )),
             },
-            _ => return self.error(&format!("The second argument to _prime_type_set must be a table"))
+            _ => {
+                return self.error(&format!(
+                    "The second argument to _prime_type_set must be a table"
+                ));
+            }
         }
         Ok(Value::Nil)
     }
@@ -898,17 +916,18 @@ impl Runtime {
         match arg {
             Value::Bytes(b) => {
                 let name = &b.borrow().bytes;
-                let file = str::from_utf8(name).map_err(|_| Error::runtime_error("Invalid utf8 string"))?;
+                let file = str::from_utf8(name)
+                    .map_err(|_| Error::runtime_error("Invalid utf8 string"))?;
                 match self.load(file) {
                     Ok(_) => Ok(Value::Bool(true)),
-                    Err(_) => Ok(Value::Bool(false)) 
+                    Err(_) => Ok(Value::Bool(false)),
                 }
-            },
-            _ => self.error(&format!("_prim_load expects a string, got {}", arg)) 
+            }
+            _ => self.error(&format!("_prim_load expects a string, got {}", arg)),
         }
     }
 
-    fn prim_apply(&mut self, fun:&Value, args:&Value) -> Result<Value> {
+    fn prim_apply(&mut self, fun: &Value, args: &Value) -> Result<Value> {
         let Value::Array(arr) = args else {
             return self.error("The second argument to _prim_apply must be an array");
         };
@@ -919,7 +938,7 @@ impl Runtime {
         self.apply_values("", &vals)
     }
 
-    fn table_keys(&self, arg:&Value) -> Result<Value> {
+    fn table_keys(&self, arg: &Value) -> Result<Value> {
         match arg {
             Value::Table(tab) => {
                 let mut keys = Vec::new();
@@ -929,20 +948,22 @@ impl Runtime {
                 }
                 // TODO: sort the keys?
                 Ok(Value::new_array(&keys))
-            },
-            _ => self.error("The argument to _prim_table_keys must be a table")
+            }
+            _ => self.error("The argument to _prim_table_keys must be a table"),
         }
     }
 
-    fn nib_panic(&mut self, msg:&Value) -> Result<Value> {
+    fn nib_panic(&mut self, msg: &Value) -> Result<Value> {
         let str = self.format_string(msg)?;
         Err(Error::NibPanic { msg: str })
     }
 
-    fn nib_exit(&mut self, arg:&Value) -> Result<Value> {
+    fn nib_exit(&mut self, arg: &Value) -> Result<Value> {
         match arg {
-            Value::Integer(n) => Err(Error::NibExit { exit_code: *n as i32 }),
-            _ => self.error("Argument to _prim_exit must be an int")
+            Value::Integer(n) => Err(Error::NibExit {
+                exit_code: *n as i32,
+            }),
+            _ => self.error("Argument to _prim_exit must be an int"),
         }
     }
 }

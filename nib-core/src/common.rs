@@ -1,7 +1,7 @@
 use std::{
     collections::{HashMap, HashSet},
     fmt::Display,
-    io
+    io,
 };
 
 use anyhow::anyhow;
@@ -75,7 +75,7 @@ pub enum Error {
     #[error("Error: {}", msg)]
     NibPanic { msg: String },
     #[error("Exit {}", exit_code)]
-    NibExit { exit_code: i32 }
+    NibExit { exit_code: i32 },
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

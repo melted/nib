@@ -4,7 +4,13 @@
 // the testcase file.
 
 use std::{
-    collections::HashSet, env::{self, consts::EXE_SUFFIX}, fmt::format, fs::{read_dir, File}, io::{self, Write}, path::PathBuf, process::{Command, ExitCode}
+    collections::HashSet,
+    env::{self, consts::EXE_SUFFIX},
+    fmt::format,
+    fs::{File, read_dir},
+    io::{self, Write},
+    path::PathBuf,
+    process::{Command, ExitCode},
 };
 
 use clap::Parser;
@@ -91,7 +97,7 @@ fn get_tests(path: &PathBuf, tests: &mut Vec<PathBuf>) -> io::Result<()> {
 
 fn run_test(opts: &Options, nib_path: &PathBuf, test: &PathBuf) -> io::Result<bool> {
     let test_code = io::read_to_string(File::open(test)?)?;
-    let meta = extract_metadata(test,&test_code);
+    let meta = extract_metadata(test, &test_code);
     if meta.tags.contains("disabled") {
         println!("{} ... Skipping(disabled)", &meta.name);
         return Ok(true);
@@ -113,7 +119,12 @@ fn run_test(opts: &Options, nib_path: &PathBuf, test: &PathBuf) -> io::Result<bo
         let res_error = compare_output(&meta.name, "stderr", &meta.expected_error_out, error_str);
         let res_status = status_code == meta.expected_exit_code;
         if !res_status {
-            println!("{}: Expected exit code: {} Got: {}", &meta.name, meta.expected_exit_code.unwrap_or_default(), status_code.unwrap_or_default());
+            println!(
+                "{}: Expected exit code: {} Got: {}",
+                &meta.name,
+                meta.expected_exit_code.unwrap_or_default(),
+                status_code.unwrap_or_default()
+            );
         }
         if res && res_error && res_status {
             println!("{} ... OK", &meta.name);
@@ -130,7 +141,7 @@ fn run_test(opts: &Options, nib_path: &PathBuf, test: &PathBuf) -> io::Result<bo
     Ok(true)
 }
 
-fn compare_output(name: &str, feed: &str, expected:&Vec<String>, output: &str) -> bool {
+fn compare_output(name: &str, feed: &str, expected: &Vec<String>, output: &str) -> bool {
     let mut result = true;
     let empty = String::new();
     let mut line = 0;
@@ -182,12 +193,12 @@ impl Metadata {
             tags: HashSet::new(),
             expected_output: Vec::new(),
             expected_error_out: Vec::new(),
-            expected_exit_code: None
+            expected_exit_code: None,
         }
     }
 }
 
-fn extract_metadata(file:&PathBuf, input: &str) -> Metadata {
+fn extract_metadata(file: &PathBuf, input: &str) -> Metadata {
     let mut meta = Metadata::new();
     meta.file = file.clone();
     let comments: Vec<_> = input
@@ -224,7 +235,7 @@ fn extract_metadata(file:&PathBuf, input: &str) -> Metadata {
                         let ec = i32::from_str_radix(code, 10).ok();
                         meta.expected_exit_code = ec;
                     }
-                },
+                }
                 Some("@Output:") | Some("@ErrorOut:") => {
                     in_output = true;
                 }
@@ -235,7 +246,13 @@ fn extract_metadata(file:&PathBuf, input: &str) -> Metadata {
     meta
 }
 
-fn update_test(test: &PathBuf, test_code: &str, output: &str, error_out: &str, status: Option<i32>) -> io::Result<()> {
+fn update_test(
+    test: &PathBuf,
+    test_code: &str,
+    output: &str,
+    error_out: &str,
+    status: Option<i32>,
+) -> io::Result<()> {
     let mut new_test_code: Vec<String> = Vec::new();
     let mut in_output = false;
     for l in test_code.lines() {

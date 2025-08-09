@@ -1,4 +1,7 @@
-use crate::{common::{Metadata, Name, Node}, parser::lexer};
+use crate::{
+    common::{Metadata, Name, Node},
+    parser::lexer,
+};
 use std::{collections::HashSet, fmt::Display};
 
 #[derive(Debug, Clone, PartialEq)]
@@ -500,7 +503,7 @@ impl Operator {
     }
 }
 
-fn operator_id(op : &str) -> String {
+fn operator_id(op: &str) -> String {
     if lexer::identifier_initial_char(op.chars().next().unwrap()) {
         op.to_owned()
     } else {

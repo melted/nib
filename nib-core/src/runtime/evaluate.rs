@@ -203,7 +203,7 @@ impl Runtime {
             _ => {
                 panic!("sss");
                 self.error(&format!("Not a callable type in application {}", vals[0]))
-            },
+            }
         }
     }
 

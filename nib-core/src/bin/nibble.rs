@@ -1,5 +1,5 @@
 use std::env::args;
-use std::io::{self, stderr, stdin, Read, Write};
+use std::io::{self, Read, Write, stderr, stdin};
 use std::process::exit;
 
 use nib_core::common::Error;
@@ -32,7 +32,7 @@ fn main() -> io::Result<()> {
     };
     if let Err(err) = res {
         match err {
-            Error::NibExit{ exit_code } => {
+            Error::NibExit { exit_code } => {
                 exit(exit_code);
             }
             _ => {
@@ -45,13 +45,16 @@ fn main() -> io::Result<()> {
 }
 
 pub struct Options {
-    pub no_prelude : bool,
-    pub files : Vec<String>
+    pub no_prelude: bool,
+    pub files: Vec<String>,
 }
 
 impl Options {
     fn new() -> Self {
-        Options { no_prelude: false, files: Vec::new() }
+        Options {
+            no_prelude: false,
+            files: Vec::new(),
+        }
     }
 }
 
@@ -61,7 +64,7 @@ fn parse_options() -> Options {
         match arg {
             _ if arg == "--no-prelude" => {
                 opts.no_prelude = true;
-            },
+            }
             file => {
                 opts.files.push(file);
             }
