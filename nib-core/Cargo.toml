@@ -12,6 +12,3 @@ random = "0.14.0"
 libffi = "4.1.1"
 minidl = "0.1.6"
 simple_logger = "5.0.0"
-
-[profile.release]
-lto = true
