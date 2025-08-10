@@ -1,4 +1,4 @@
-name: Nib
+name: Nib CI
 
 on:
   push:
@@ -13,9 +13,10 @@ jobs:
   build:
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest]
-    runs-on: [ubuntu-latest, windows-latest]
-
+        config:
+          - os: ubuntu-latest 
+          - os: windows-latest
+    runs-on: ${{ matrix.config.os }}
     steps:
     - uses: actions/checkout@v4
     - name: Build
