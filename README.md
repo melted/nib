@@ -1,4 +1,4 @@
-[![Nib CI](https://github.com/melted/nib/actions/workflows/ci.yml/badge.svg)](https://github.com/melted/nib/actions/workflows/ci.yml)
+[![Nib CI](https://github.com/melted/nib/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/melted/nib/actions/workflows/ci.yml)
 
 # Nib
 
