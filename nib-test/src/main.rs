@@ -6,10 +6,9 @@
 use std::{
     collections::HashSet,
     env::{self, consts::EXE_SUFFIX},
-    fmt::format,
-    fs::{File, read_dir},
+    fs::{read_dir, File},
     io::{self, Write},
-    path::PathBuf,
+    path::{Path, PathBuf},
     process::{Command, ExitCode},
 };
 
@@ -37,14 +36,14 @@ struct Options {
 
 fn main() -> ExitCode {
     let opts = Options::parse();
-    let code = match run_tests(&opts) {
+    
+    match run_tests(&opts) {
         Ok(()) => ExitCode::SUCCESS,
         Err(err) => {
             println!("{}", err);
             ExitCode::FAILURE
         }
-    };
-    code
+    }
 }
 
 fn run_tests(opts: &Options) -> io::Result<()> {
@@ -68,8 +67,7 @@ fn run_tests(opts: &Options) -> io::Result<()> {
     }
     println!("{}/{} test(s) passed", total - count, total);
     if count > 0 {
-        return Err(io::Error::new(
-            io::ErrorKind::Other,
+        return Err(io::Error::other(
             format!("{} test(s) failed", count),
         ));
     }
@@ -79,18 +77,13 @@ fn run_tests(opts: &Options) -> io::Result<()> {
 fn get_tests(path: &PathBuf, tests: &mut Vec<PathBuf>) -> io::Result<()> {
     if path.is_dir() {
         let d = read_dir(path);
-        match d {
-            Ok(iter) => {
-                for entry in iter.filter_map(|d| d.ok()) {
-                    get_tests(&entry.path(), tests)?;
-                }
+        if let Ok(iter) = d {
+            for entry in iter.filter_map(|d| d.ok()) {
+                get_tests(&entry.path(), tests)?;
             }
-            _ => {}
         }
-    } else {
-        if path.extension().is_some_and(|os| os == "nib") {
-            tests.push(path.clone());
-        }
+    } else if path.extension().is_some_and(|os| os == "nib") {
+        tests.push(path.clone());
     }
     Ok(())
 }
@@ -108,8 +101,8 @@ fn run_test(opts: &Options, nib_path: &PathBuf, test: &PathBuf) -> io::Result<bo
         command.arg("--no-prelude");
     }
     let out = command.output()?;
-    let out_str = str::from_utf8(&out.stdout).map_err(|u| io::Error::other(u))?;
-    let error_str = str::from_utf8(&out.stderr).map_err(|u| io::Error::other(u))?;
+    let out_str = str::from_utf8(&out.stdout).map_err(io::Error::other)?;
+    let error_str = str::from_utf8(&out.stderr).map_err(io::Error::other)?;
     let status_code = out.status.code();
     if !out_str.is_empty() && meta.expected_output.is_empty() {
         println!("{} has no expected output. Updating.", &meta.name);
@@ -128,23 +121,21 @@ fn run_test(opts: &Options, nib_path: &PathBuf, test: &PathBuf) -> io::Result<bo
         }
         if res && res_error && res_status {
             println!("{} ... OK", &meta.name);
+        } else if opts.update {
+            println!("Updating {}", &meta.name);
+            update_test(test, &test_code, out_str, error_str, status_code)?;
         } else {
-            if opts.update {
-                println!("Updating {}", &meta.name);
-                update_test(test, &test_code, out_str, error_str, status_code)?;
-            } else {
-                println!("{} ... Failed", &meta.name);
-                return Ok(false);
-            }
+            println!("{} ... Failed", &meta.name);
+            return Ok(false);
         }
     }
     Ok(true)
 }
 
-fn compare_output(name: &str, feed: &str, expected: &Vec<String>, output: &str) -> bool {
+fn compare_output(name: &str, feed: &str, expected: &[String], output: &str) -> bool {
     let mut result = true;
     let empty = String::new();
-    let mut line = 0;
+    let line = 0;
     let mut exp_iter = expected.iter();
     let mut out_iter = output.lines();
     loop {
@@ -198,9 +189,9 @@ impl Metadata {
     }
 }
 
-fn extract_metadata(file: &PathBuf, input: &str) -> Metadata {
+fn extract_metadata(file: &Path, input: &str) -> Metadata {
     let mut meta = Metadata::new();
-    meta.file = file.clone();
+    meta.file = file.to_path_buf();
     let comments: Vec<_> = input
         .lines()
         .filter_map(|l| l.strip_prefix("// "))
@@ -232,7 +223,7 @@ fn extract_metadata(file: &PathBuf, input: &str) -> Metadata {
                 }
                 Some("@ExitCode:") => {
                     if let Some(code) = words.next() {
-                        let ec = i32::from_str_radix(code, 10).ok();
+                        let ec:Option<i32> = code.parse().ok();
                         meta.expected_exit_code = ec;
                     }
                 }
@@ -291,5 +282,5 @@ fn update_test(
     }
     let mut file = File::create(test)?;
     let code = new_test_code.join("\n");
-    file.write_all(&code.as_bytes())
+    file.write_all(code.as_bytes())
 }

@@ -22,7 +22,7 @@ pub struct Metadata {
 impl Metadata {
     pub fn new(file: Option<String>) -> Self {
         Metadata {
-            file: file,
+            file,
             trivia: Vec::new(),
             annotations: HashMap::new(),
             locations: HashMap::new(),
@@ -122,7 +122,7 @@ impl Name {
                 let mut str = String::new();
                 for s in path {
                     str.push_str(s);
-                    str.push_str(".");
+                    str.push('.');
                 }
                 str.push_str(name);
                 str

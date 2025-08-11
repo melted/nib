@@ -35,7 +35,7 @@ impl<'a> ParserState<'a> {
             TokenValue::As => {
                 self.get_next_token()?;
                 let TokenValue::Identifier(name) = self.get_next_token()?.value else {
-                    return self.error(&format!("Expected identifier in alias pattern"));
+                    return self.error("Expected identifier in alias pattern");
                 };
                 self.alias_pattern(lhs, Name::name(&name))
             }

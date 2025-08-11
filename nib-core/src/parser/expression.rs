@@ -140,8 +140,8 @@ impl<'a> ParserState<'a> {
                 break;
             }
             let mut binding = self.parse_binding()?;
-            if let Some(mut last) = bindings.last_mut() {
-                if !self.merge_same_binding(&mut last, &mut binding) {
+            if let Some(last) = bindings.last_mut() {
+                if !self.merge_same_binding(last, &mut binding) {
                     bindings.push(binding);
                 }
             } else {
@@ -332,7 +332,7 @@ impl<'a> ParserState<'a> {
         ExpressionNode {
             id: self.counter,
             expr: Expression::Binop(Binop {
-                op: op,
+                op,
                 lhs: Box::new(lhs),
                 rhs: Box::new(rhs),
             }),
@@ -392,14 +392,11 @@ impl UsedImplicits {
 
 impl AstVisitor for UsedImplicits {
     fn on_expression(&mut self, expr: &ExpressionNode) -> bool {
-        match &expr.expr {
-            Expression::Var(name) => {
-                let v = name.string();
-                if v == "a" || v == "b" || v == "c" || v == "d" {
-                    self.vars.insert(name.clone());
-                }
+        if let Expression::Var(name) = &expr.expr {
+            let v = name.string();
+            if v == "a" || v == "b" || v == "c" || v == "d" {
+                self.vars.insert(name.clone());
             }
-            _ => {}
         };
         true
     }

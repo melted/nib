@@ -613,7 +613,7 @@ pub fn free_vars(expr: &Expression, vars: &mut HashSet<String>) -> Result<()> {
                     _ => {}
                 };
             }
-            free_vars(&expression, &mut used)?;
+            free_vars(expression, &mut used)?;
             for v in used.difference(&bound) {
                 vars.insert(v.to_owned());
             }
@@ -640,7 +640,7 @@ pub fn bound_vars(pat: &Pattern, vars: &mut HashSet<String>) -> Result<()> {
             }
         }
         Pattern::Alias(pattern, name) => {
-            bound_vars(&pattern, vars)?;
+            bound_vars(pattern, vars)?;
             let n = name.string();
             if vars.contains(&n) {
                 return Err(Error::runtime_error(&format!(

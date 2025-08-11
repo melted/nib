@@ -190,7 +190,7 @@ impl Runtime {
                         }
                         let mut v =
                             self.evaluate_expression(binding_name, &clause.rhs, &mut env)?;
-                        if remaining.len() > 0 {
+                        if !remaining.is_empty() {
                             remaining.insert(0, v);
                             v = self.apply_values(binding_name, &remaining)?;
                         }
@@ -198,10 +198,9 @@ impl Runtime {
                         return Ok(v);
                     }
                 }
-                self.error(&format!("No matching pattern for closure"))
+                self.error("No matching pattern for closure")
             }
             _ => {
-                panic!("sss");
                 self.error(&format!("Not a callable type in application {}", vals[0]))
             }
         }
@@ -223,10 +222,10 @@ impl Runtime {
                 let c = self
                     .closures_to_check
                     .entry(v.to_owned())
-                    .or_insert_with(|| HashSet::new());
+                    .or_default();
                 c.insert(binding_name.to_owned());
             }
-            lexical_env.add(&v, &val);
+            lexical_env.add(v, &val);
         }
         let mut arity = get_arity(&clauses[0].args);
         for c in clauses[1..].iter() {
@@ -270,7 +269,7 @@ impl Runtime {
                 r
             } else {
                 let r = self.match_pattern(&args[current_arg], p, env)?;
-                current_arg = current_arg + 1;
+                current_arg += 1;
                 r
             };
             if let Some(vars) = res {
@@ -360,12 +359,11 @@ impl Runtime {
         let udef: Vec<_> = {
             env.envs
                 .iter()
-                .map(|hm| {
+                .flat_map(|hm| {
                     hm.iter()
                         .filter(|&(k, v)| v == &Value::Undefined)
                         .map(|(k, v)| k.to_owned())
                 })
-                .flatten()
                 .collect()
         };
         for k in udef {
@@ -389,6 +387,12 @@ pub(super) fn get_arity(patterns: &[Pattern]) -> Arity {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Environment {
     pub envs: Vec<HashMap<String, Value>>,
+}
+
+impl Default for Environment {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Environment {
@@ -416,7 +420,7 @@ impl Environment {
         for e in self.envs.iter().rev() {
             let v = e.get(id);
             if v.is_some() {
-                return v.map(|x| x.clone());
+                return v.cloned();
             }
         }
         None

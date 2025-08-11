@@ -6,9 +6,7 @@ use crate::runtime::{Runtime, Value};
 
 impl Runtime {
     pub(super) fn call_primitive0(&mut self, prim: &Primitive) -> Result<Value> {
-        match prim {
-            _ => self.error("Boom!"),
-        }
+        self.error("Boom!")
     }
 
     pub(super) fn call_primitive1(&mut self, prim: &Primitive, arg: &Value) -> Result<Value> {
@@ -126,8 +124,8 @@ impl Runtime {
             },
             Primitive::StringUnpack => match arg {
                 Value::Bytes(b) if self.is_type(arg, "string") => {
-                    let str = self.format_string(&arg)?;
-                    let vals: Vec<Value> = str.chars().map(|c| Value::Char(c)).collect();
+                    let str = self.format_string(arg)?;
+                    let vals: Vec<Value> = str.chars().map(Value::Char).collect();
                     Ok(Value::new_array(&vals))
                 }
                 _ => self.error("The argument to _prim_string_unpack must be a string"),
@@ -735,7 +733,7 @@ pub enum Primitive {
 
 impl Runtime {
     fn value_printer(&self, arg: &Value) -> Result<Value> {
-        print!("{}\n", arg);
+        println!("{}", arg);
         Ok(Value::Nil)
     }
 
@@ -763,7 +761,7 @@ impl Runtime {
                 let b = &bytes.borrow().bytes;
                 print!(
                     "{}",
-                    str::from_utf8(&b).map_err(|_| Error::runtime_error(
+                    str::from_utf8(b).map_err(|_| Error::runtime_error(
                         "Invalid string in _prim_string_print"
                     ))?
                 );
@@ -872,14 +870,10 @@ impl Runtime {
                     let mut table = table.borrow_mut();
                     table.type_table = Some(t.clone());
                 }
-                _ => return self.error(&format!(
-                    "The first argument to _prime_type_set must be an array, bytes, symbol or table"
-                )),
+                _ => return self.error("The first argument to _prime_type_set must be an array, bytes, symbol or table"),
             },
             _ => {
-                return self.error(&format!(
-                    "The second argument to _prime_type_set must be a table"
-                ));
+                return self.error("The second argument to _prime_type_set must be a table");
             }
         }
         Ok(Value::Nil)
@@ -896,12 +890,12 @@ impl Runtime {
                 (Value::Table(from), Value::Symbol(sym)) => {
                     let table_ref = from.borrow();
                     let table = &table_ref.table;
-                    if table.contains_key(&sym) {
+                    if table.contains_key(sym) {
                         if slice.len() > 1 {
-                            tab = table[&sym].clone();
+                            tab = table[sym].clone();
                             slice = &slice[1..];
                         } else {
-                            return Ok(table[&sym].clone());
+                            return Ok(table[sym].clone());
                         }
                     } else {
                         return Ok(Value::Nil);

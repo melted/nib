@@ -341,8 +341,8 @@ impl<'a> super::ParserState<'a> {
         }
         let mut stop = self.snarf(char::is_ascii_digit)?;
         let res = self.peek();
-        if let Ok(mut next) = res {
-            if next == '.' || next == 'e' || next == 'E' {
+        if let Ok(mut next) = res
+            && (next == '.' || next == 'e' || next == 'E') {
                 if next == '.' {
                     self.advance(1);
                     stop = self.snarf(char::is_ascii_digit)?;
@@ -362,7 +362,6 @@ impl<'a> super::ParserState<'a> {
                 };
                 return Ok(self.token(TokenValue::Float(float)));
             }
-        }
         let int = match i64::from_str_radix(&self.src[self.token_start..stop], 10) {
             Ok(c) => c,
             Err(_) => return self.lex_error("Invalid integer literal"),
@@ -428,8 +427,7 @@ impl<'a> super::ParserState<'a> {
         Err(Error::Syntax {
             msg: msg.to_string(),
             loc: self.location_current_token(),
-        }
-        .into())
+        })
     }
 
     fn token(&mut self, token: TokenValue) -> Token {

@@ -18,7 +18,7 @@ fn main() -> io::Result<()> {
     }
     let res = if opts.files.is_empty() {
         let mut buffer = String::new();
-        let read = stdin().read_to_string(&mut buffer)?;
+        let _read = stdin().read_to_string(&mut buffer)?;
         rt.add_code("stdin", &buffer)
     } else {
         let mut res = Ok(());
@@ -36,7 +36,7 @@ fn main() -> io::Result<()> {
                 exit(exit_code);
             }
             _ => {
-                stderr().write(&format!("{}", err).as_bytes())?;
+                stderr().write_all(format!("{}", err).as_bytes())?;
                 exit(1);
             }
         }

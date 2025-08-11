@@ -71,11 +71,10 @@ impl<'a> ParserState<'a> {
 
     pub(super) fn parse_add_declaration(&mut self, decls: &mut Vec<Declaration>) -> Result<()> {
         let mut decl = self.parse_declaration()?;
-        if let Some(mut last) = decls.last_mut() {
-            if self.merge_same_declaration(&mut last, &mut decl) {
+        if let Some(last) = decls.last_mut()
+            && self.merge_same_declaration(last, &mut decl) {
                 return Ok(());
             }
-        }
         decls.push(decl);
         Ok(())
     }
@@ -115,44 +114,40 @@ impl<'a> ParserState<'a> {
                 .locations
                 .insert(bind.id, Location::at(start, pos));
             Ok(Binding::VarBinding(bind))
-        } else {
-            if self.peek_operator()? {
-                let op = self.parse_operator()?;
-                let rpat = self.parse_pattern()?;
-                let guard = if self.is_next(TokenValue::Bar)? {
-                    Some(self.parse_expression()?)
-                } else {
-                    None
-                };
-                self.expect(TokenValue::Equals)?;
-                let rhs = self.parse_expression()?;
-                let bind = self.op_binding(op, initial, rpat, guard, rhs);
-                let pos = self.position();
-                self.metadata
-                    .locations
-                    .insert(bind.clauses[0].id, Location::at(start, pos));
-                self.metadata
-                    .locations
-                    .insert(bind.id, Location::at(start, pos));
-                Ok(Binding::OpBinding(bind))
+        } else if self.peek_operator()? {
+            let op = self.parse_operator()?;
+            let rpat = self.parse_pattern()?;
+            let guard = if self.is_next(TokenValue::Bar)? {
+                Some(self.parse_expression()?)
             } else {
-                if let Pattern::Var(name) = initial.pattern {
-                    let (args, guard) = self.parse_fun_args()?;
-                    self.expect(TokenValue::Equals)?;
-                    let rhs = self.parse_expression()?;
-                    let bind = self.fun_binding(name, args, guard, rhs);
-                    let pos = self.position();
-                    self.metadata
-                        .locations
-                        .insert(bind.clauses[0].id, Location::at(start, pos));
-                    self.metadata
-                        .locations
-                        .insert(bind.id, Location::at(start, pos));
-                    Ok(Binding::FunBinding(bind))
-                } else {
-                    self.error("Binding pattern matches neither a var, fun or operator binding")
-                }
-            }
+                None
+            };
+            self.expect(TokenValue::Equals)?;
+            let rhs = self.parse_expression()?;
+            let bind = self.op_binding(op, initial, rpat, guard, rhs);
+            let pos = self.position();
+            self.metadata
+                .locations
+                .insert(bind.clauses[0].id, Location::at(start, pos));
+            self.metadata
+                .locations
+                .insert(bind.id, Location::at(start, pos));
+            Ok(Binding::OpBinding(bind))
+        } else if let Pattern::Var(name) = initial.pattern {
+            let (args, guard) = self.parse_fun_args()?;
+            self.expect(TokenValue::Equals)?;
+            let rhs = self.parse_expression()?;
+            let bind = self.fun_binding(name, args, guard, rhs);
+            let pos = self.position();
+            self.metadata
+                .locations
+                .insert(bind.clauses[0].id, Location::at(start, pos));
+            self.metadata
+                .locations
+                .insert(bind.id, Location::at(start, pos));
+            Ok(Binding::FunBinding(bind))
+        } else {
+            self.error("Binding pattern matches neither a var, fun or operator binding")
         }
     }
 
@@ -160,7 +155,7 @@ impl<'a> ParserState<'a> {
         self.counter += 1;
         ModuleDirective {
             id: self.counter,
-            name: name,
+            name,
         }
     }
 
@@ -168,7 +163,7 @@ impl<'a> ParserState<'a> {
         self.counter += 1;
         UseDirective {
             id: self.counter,
-            name: name,
+            name,
         }
     }
 
@@ -177,7 +172,7 @@ impl<'a> ParserState<'a> {
         VarBinding {
             id: self.counter,
             lhs: pat,
-            rhs: rhs,
+            rhs,
         }
     }
 
@@ -192,8 +187,8 @@ impl<'a> ParserState<'a> {
         self.counter += 1;
         FunBinding {
             id: self.counter,
-            name: name,
-            clauses: clauses,
+            name,
+            clauses,
         }
     }
 
@@ -216,8 +211,8 @@ impl<'a> ParserState<'a> {
         self.counter += 1;
         OpBinding {
             id: self.counter,
-            op: op,
-            clauses: clauses,
+            op,
+            clauses,
         }
     }
 }

@@ -29,6 +29,12 @@ pub struct Runtime {
     closures_to_check: HashMap<String, HashSet<String>>,
 }
 
+impl Default for Runtime {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Runtime {
     pub fn new() -> Self {
         let mut rt = Runtime {
@@ -87,9 +93,7 @@ impl Runtime {
     }
 
     pub fn get_from_table(&self, table: Rc<RefCell<Table>>, name: &str) -> Option<Value> {
-        let Some(sym) = self.get_named_symbol(name) else {
-            return None;
-        };
+        let sym = self.get_named_symbol(name)?;
         table.borrow().table.get(&sym).cloned()
     }
 
@@ -105,9 +109,7 @@ impl Runtime {
     }
 
     pub fn get_global(&self, name: &str) -> Option<Value> {
-        let Some(sym) = self.named_symbols.get(name) else {
-            return None;
-        };
+        let sym = self.named_symbols.get(name)?;
         self.globals.borrow().table.get(sym).cloned()
     }
 
@@ -141,12 +143,10 @@ impl Runtime {
         let mut rest = path;
         let mut table = self.globals.clone();
         while !rest.is_empty() {
-            let Some(sym) = self.get_named_symbol(&rest[0]) else {
-                return None;
-            };
+            let sym = self.get_named_symbol(&rest[0])?;
             table = {
                 let t = &mut table.borrow_mut().table;
-                let v = t.get(&sym).clone();
+                let v = t.get(&sym);
                 match v {
                     Some(Value::Table(n)) => n.clone(),
                     _ => {
@@ -166,7 +166,7 @@ impl Runtime {
             let sym = self.get_or_add_named_symbol(&rest[0]);
             table = {
                 let t = &mut table.borrow_mut().table;
-                let v = t.get(&sym).clone();
+                let v = t.get(&sym);
                 match v {
                     Some(Value::Table(n)) => n.clone(),
                     None | Some(Value::Nil) => {
@@ -501,7 +501,7 @@ impl Bytes {
     fn with(bytes: Vec<u8>) -> Self {
         Bytes {
             type_table: None,
-            bytes: bytes,
+            bytes,
         }
     }
 }
