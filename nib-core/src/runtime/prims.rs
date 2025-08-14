@@ -247,30 +247,32 @@ impl Runtime {
     pub(super) fn prim_gte(&self, args: &[Value]) -> Result<Value> {
         match (&args[0], &args[1]) {
             (Value::Integer(a), Value::Integer(b)) => Ok(if a >= b {
-                args[1].clone()
+                args[0].clone()
             } else {
                 Value::Bool(false)
             }),
             (Value::Real(a), Value::Real(b)) => Ok(if a >= b {
-                args[1].clone()
+                args[0].clone()
             } else {
                 Value::Bool(false)
             }),
             (Value::Integer(a), Value::Real(b)) => Ok(if *a as f64 >= *b {
-                args[1].clone()
+                args[0].clone()
             } else {
                 Value::Bool(false)
             }),
             (Value::Real(a), Value::Integer(b)) => Ok(if *a >= *b as f64 {
-                args[1].clone()
+                args[0].clone()
             } else {
                 Value::Bool(false)
             }),
             (Value::Char(a), Value::Char(b)) => Ok(if a >= b {
-                args[1].clone()
+                args[0].clone()
             } else {
                 Value::Bool(false)
             }),
+            (Value::Bool(b), _) => Ok(Value::Bool(false)),
+            (_, Value::Bool(b)) => Ok(Value::Bool(false)),
             (arg, arg2) => self.error(&format!("Can't compare {} and {}", arg, arg2)),
         }
     }
@@ -278,30 +280,32 @@ impl Runtime {
     pub(super) fn prim_gt(&self, args: &[Value]) -> Result<Value> {
         match (&args[0], &args[1]) {
             (Value::Integer(a), Value::Integer(b)) => Ok(if a > b {
-                args[1].clone()
+                args[0].clone()
             } else {
                 Value::Bool(false)
             }),
             (Value::Real(a), Value::Real(b)) => Ok(if a > b {
-                args[1].clone()
+                args[0].clone()
             } else {
                 Value::Bool(false)
             }),
             (Value::Integer(a), Value::Real(b)) => Ok(if *a as f64 > *b {
-                args[1].clone()
+                args[0].clone()
             } else {
                 Value::Bool(false)
             }),
             (Value::Real(a), Value::Integer(b)) => Ok(if *a > *b as f64 {
-                args[1].clone()
+                args[0].clone()
             } else {
                 Value::Bool(false)
             }),
             (Value::Char(a), Value::Char(b)) => Ok(if a > b {
-                args[1].clone()
+                args[0].clone()
             } else {
                 Value::Bool(false)
             }),
+            (Value::Bool(b), _) => Ok(Value::Bool(false)),
+            (_, Value::Bool(b)) => Ok(Value::Bool(false)),
             (arg, arg2) => self.error(&format!("Can't compare {} and {}", arg, arg2)),
         }
     }
@@ -309,30 +313,32 @@ impl Runtime {
     pub(super) fn prim_lte(&self, args: &[Value]) -> Result<Value> {
         match (&args[0], &args[1]) {
             (Value::Integer(a), Value::Integer(b)) => Ok(if a <= b {
-                args[1].clone()
+                args[0].clone()
             } else {
                 Value::Bool(false)
             }),
             (Value::Real(a), Value::Real(b)) => Ok(if a <= b {
-                args[1].clone()
+                args[0].clone()
             } else {
                 Value::Bool(false)
             }),
             (Value::Integer(a), Value::Real(b)) => Ok(if *a as f64 <= *b {
-                args[1].clone()
+                args[0].clone()
             } else {
                 Value::Bool(false)
             }),
             (Value::Real(a), Value::Integer(b)) => Ok(if *a <= *b as f64 {
-                args[1].clone()
+                args[0].clone()
             } else {
                 Value::Bool(false)
             }),
             (Value::Char(a), Value::Char(b)) => Ok(if a <= b {
-                args[1].clone()
+                args[0].clone()
             } else {
                 Value::Bool(false)
             }),
+            (Value::Bool(b), _) => Ok(Value::Bool(false)),
+            (_, Value::Bool(b)) => Ok(Value::Bool(false)),
             (arg, arg2) => self.error(&format!("Can't compare {} and {}", arg, arg2)),
         }
     }
@@ -340,30 +346,32 @@ impl Runtime {
     pub(super) fn prim_lt(&self, args: &[Value]) -> Result<Value> {
         match (&args[0], &args[1]) {
             (Value::Integer(a), Value::Integer(b)) => Ok(if a < b {
-                args[1].clone()
+                args[0].clone()
             } else {
                 Value::Bool(false)
             }),
             (Value::Real(a), Value::Real(b)) => Ok(if a < b {
-                args[1].clone()
+                args[0].clone()
             } else {
                 Value::Bool(false)
             }),
             (Value::Integer(a), Value::Real(b)) => Ok(if (*a as f64) < *b {
-                args[1].clone()
+                args[0].clone()
             } else {
                 Value::Bool(false)
             }),
             (Value::Real(a), Value::Integer(b)) => Ok(if *a < *b as f64 {
-                args[1].clone()
+                args[0].clone()
             } else {
                 Value::Bool(false)
             }),
             (Value::Char(a), Value::Char(b)) => Ok(if a < b {
-                args[1].clone()
+                args[0].clone()
             } else {
                 Value::Bool(false)
             }),
+            (Value::Bool(b), _) => Ok(Value::Bool(false)),
+            (_, Value::Bool(b)) => Ok(Value::Bool(false)),
             (arg, arg2) => self.error(&format!("Can't compare {} and {}", arg, arg2)),
         }
     }

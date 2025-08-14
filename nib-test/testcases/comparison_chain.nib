@@ -1,0 +1,14 @@
+// @Name: Test chained comparisons
+// @Tags: primitives
+
+mid x = (3 < x < 10) => "In the zone"; "Outside"
+
+_ = println (mid 6)
+_ = println (mid 1)
+_ = println (mid 11)
+// @Output:
+// In the zone
+// Outside
+// Outside
+// @EndOutput
+// @ExitCode: 0
