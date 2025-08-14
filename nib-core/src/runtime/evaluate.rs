@@ -1,6 +1,7 @@
 use std::{
     cmp::max,
-    collections::{HashMap, HashSet}, ops::Deref,
+    collections::{HashMap, HashSet},
+    ops::Deref,
 };
 
 use log::info;
@@ -8,8 +9,8 @@ use log::info;
 use crate::{
     ast::Literal,
     common::{Name, Result},
-    core::{free_vars, Arity, Binder, Binding, Expression, FunClause, Module, Pattern},
-    runtime::{new_ref, Bytes, Closure, Code, Runtime, Value},
+    core::{Arity, Binder, Binding, Expression, FunClause, Module, Pattern, free_vars},
+    runtime::{Bytes, Closure, Code, Runtime, Value, new_ref},
 };
 
 impl Runtime {
@@ -169,44 +170,38 @@ impl Runtime {
 
                 let mut ret = match code.borrow().deref() {
                     Code::Nib(clauses) => {
-                        let mut v:Value = Value::Nil;
+                        let mut v: Value = Value::Nil;
                         for clause in clauses.iter() {
                             if let Some(binds) = self.match_patterns(&args, &clause.args, &env)? {
                                 env.push_env(binds);
                                 if let Some(guard) = &clause.guard {
-                                    let guard = self.evaluate_expression(binding_name, guard, &mut env)?;
+                                    let guard =
+                                        self.evaluate_expression(binding_name, guard, &mut env)?;
                                     if guard == Value::Bool(false) {
                                         env.pop();
                                         continue;
                                     }
                                 }
-                                v = self.evaluate_expression(binding_name, &clause.rhs, &mut env)?;
+                                v =
+                                    self.evaluate_expression(binding_name, &clause.rhs, &mut env)?;
                                 env.pop();
                                 break;
                             }
                         }
                         v
                     }
-                    Code::ExternSimple(ext) => {
-                        ext(&args)?
-                    }
-                    Code::ExternMut(ext) => {
-                        ext(self, &args)?
-                    }
-                    Code::Extern(ext) => {
-                        ext(self, &args)?
-                    }
+                    Code::ExternSimple(ext) => ext(&args)?,
+                    Code::ExternMut(ext) => ext(self, &args)?,
+                    Code::Extern(ext) => ext(self, &args)?,
                 };
-               
+
                 if !remaining.is_empty() {
                     remaining.insert(0, ret);
                     ret = self.apply_values(binding_name, &remaining)?;
                 }
                 Ok(ret)
             }
-            _ => {
-                self.error(&format!("Not a callable type in application {}", vals[0]))
-            }
+            _ => self.error(&format!("Not a callable type in application {}", vals[0])),
         }
     }
 
@@ -223,10 +218,7 @@ impl Runtime {
         for v in free.iter() {
             let val = self.lookup(env, v).unwrap_or(Value::Undefined);
             if val == Value::Undefined {
-                let c = self
-                    .closures_to_check
-                    .entry(v.to_owned())
-                    .or_default();
+                let c = self.closures_to_check.entry(v.to_owned()).or_default();
                 c.insert(binding_name.to_owned());
             }
             lexical_env.add(v, &val);

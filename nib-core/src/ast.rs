@@ -31,7 +31,9 @@ impl Declaration {
         if !visitor.on_declaration(self) {
             return;
         }
-        if let Declaration::Binding(b) = &self { b.visit(visitor) }
+        if let Declaration::Binding(b) = &self {
+            b.visit(visitor)
+        }
         visitor.on_post_declaration(self);
     }
 }
@@ -62,7 +64,9 @@ impl Binding {
             Binding::FunBinding(fb) => {
                 for c in &fb.clauses {
                     c.args.iter().for_each(|p| p.visit(visitor));
-                    if let Some(g) = c.guard.as_ref() { g.visit(visitor) }
+                    if let Some(g) = c.guard.as_ref() {
+                        g.visit(visitor)
+                    }
                     c.body.visit(visitor);
                 }
             }
@@ -70,7 +74,9 @@ impl Binding {
                 for c in &ob.clauses {
                     c.lpat.visit(visitor);
                     c.rpat.visit(visitor);
-                    if let Some(e) = c.guard.as_ref() { e.visit(visitor) }
+                    if let Some(e) = c.guard.as_ref() {
+                        e.visit(visitor)
+                    }
                     c.body.visit(visitor);
                 }
             }
@@ -361,7 +367,6 @@ impl ExpressionNode {
     }
 
     pub fn free_variables(&self) -> HashSet<Name> {
-        
         //      let mut bound = HashSet::new();
         HashSet::new()
     }

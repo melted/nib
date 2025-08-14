@@ -6,7 +6,7 @@
 use std::{
     collections::HashSet,
     env::{self, consts::EXE_SUFFIX},
-    fs::{read_dir, File},
+    fs::{File, read_dir},
     io::{self, Write},
     path::{Path, PathBuf},
     process::{Command, ExitCode},
@@ -36,7 +36,7 @@ struct Options {
 
 fn main() -> ExitCode {
     let opts = Options::parse();
-    
+
     match run_tests(&opts) {
         Ok(()) => ExitCode::SUCCESS,
         Err(err) => {
@@ -67,9 +67,7 @@ fn run_tests(opts: &Options) -> io::Result<()> {
     }
     println!("{}/{} test(s) passed", total - count, total);
     if count > 0 {
-        return Err(io::Error::other(
-            format!("{} test(s) failed", count),
-        ));
+        return Err(io::Error::other(format!("{} test(s) failed", count)));
     }
     Ok(())
 }
@@ -223,7 +221,7 @@ fn extract_metadata(file: &Path, input: &str) -> Metadata {
                 }
                 Some("@ExitCode:") => {
                     if let Some(code) = words.next() {
-                        let ec:Option<i32> = code.parse().ok();
+                        let ec: Option<i32> = code.parse().ok();
                         meta.expected_exit_code = ec;
                     }
                 }

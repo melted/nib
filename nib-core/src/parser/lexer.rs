@@ -342,26 +342,27 @@ impl<'a> super::ParserState<'a> {
         let mut stop = self.snarf(char::is_ascii_digit)?;
         let res = self.peek();
         if let Ok(mut next) = res
-            && (next == '.' || next == 'e' || next == 'E') {
-                if next == '.' {
-                    self.advance(1);
-                    stop = self.snarf(char::is_ascii_digit)?;
-                    next = self.peek()?
-                }
-                if next == 'e' || next == 'E' {
-                    self.advance(1);
-                    let esign = self.peek()?;
-                    if esign == '+' || esign == '-' {
-                        self.advance(1);
-                    }
-                    stop = self.snarf(char::is_ascii_digit)?;
-                }
-                let float = match self.src[self.token_start..stop].parse::<f64>() {
-                    Ok(c) => c,
-                    Err(_) => return self.lex_error("Invalid float literal"),
-                };
-                return Ok(self.token(TokenValue::Float(float)));
+            && (next == '.' || next == 'e' || next == 'E')
+        {
+            if next == '.' {
+                self.advance(1);
+                stop = self.snarf(char::is_ascii_digit)?;
+                next = self.peek()?
             }
+            if next == 'e' || next == 'E' {
+                self.advance(1);
+                let esign = self.peek()?;
+                if esign == '+' || esign == '-' {
+                    self.advance(1);
+                }
+                stop = self.snarf(char::is_ascii_digit)?;
+            }
+            let float = match self.src[self.token_start..stop].parse::<f64>() {
+                Ok(c) => c,
+                Err(_) => return self.lex_error("Invalid float literal"),
+            };
+            return Ok(self.token(TokenValue::Float(float)));
+        }
         let int = match i64::from_str_radix(&self.src[self.token_start..stop], 10) {
             Ok(c) => c,
             Err(_) => return self.lex_error("Invalid integer literal"),

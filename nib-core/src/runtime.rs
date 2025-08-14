@@ -11,7 +11,7 @@ use crate::{
     common::{Error, Metadata, Name, Result},
     core::{Arity, FunClause, desugar, desugar_expression},
     parser::{parse_declarations, parse_expression},
-    runtime::{evaluate::Environment},
+    runtime::evaluate::Environment,
 };
 
 mod evaluate;
@@ -289,11 +289,14 @@ impl Value {
         Value::Array(new_ref(Array::with(vals)))
     }
 
-    pub fn new_extern_mut_fun(fun: fn(&mut Runtime, &[Value]) -> Result<Value>, arity:&Arity) -> Self {
+    pub fn new_extern_mut_fun(
+        fun: fn(&mut Runtime, &[Value]) -> Result<Value>,
+        arity: &Arity,
+    ) -> Self {
         Value::Closure(new_ref(Closure::extern_mut_fun(fun, arity)))
     }
 
-    pub fn new_extern_fun(fun: fn(&Runtime, &[Value]) -> Result<Value>, arity:&Arity) -> Self {
+    pub fn new_extern_fun(fun: fn(&Runtime, &[Value]) -> Result<Value>, arity: &Arity) -> Self {
         Value::Closure(new_ref(Closure::extern_fun(fun, arity)))
     }
 
@@ -514,7 +517,6 @@ pub enum Code {
     ExternMut(fn(&mut Runtime, &[Value]) -> Result<Value>),
     ExternSimple(fn(&[Value]) -> Result<Value>),
 }
-  
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Closure {
@@ -547,11 +549,23 @@ impl Closure {
         }
     }
 
-    pub fn extern_mut_fun(fun: fn(&mut Runtime, &[Value]) -> Result<Value>, arity:&Arity) -> Self {
-        Closure { type_table: None, code: new_ref(Code::ExternMut(fun)), env: Environment::new(), args: Vec::new(), arity: arity.clone() }
+    pub fn extern_mut_fun(fun: fn(&mut Runtime, &[Value]) -> Result<Value>, arity: &Arity) -> Self {
+        Closure {
+            type_table: None,
+            code: new_ref(Code::ExternMut(fun)),
+            env: Environment::new(),
+            args: Vec::new(),
+            arity: arity.clone(),
+        }
     }
 
-    pub fn extern_fun(fun: fn(&Runtime, &[Value]) -> Result<Value>, arity:&Arity) -> Self {
-        Closure { type_table: None, code: new_ref(Code::Extern(fun)), env: Environment::new(), args: Vec::new(), arity: arity.clone() }
+    pub fn extern_fun(fun: fn(&Runtime, &[Value]) -> Result<Value>, arity: &Arity) -> Self {
+        Closure {
+            type_table: None,
+            code: new_ref(Code::Extern(fun)),
+            env: Environment::new(),
+            args: Vec::new(),
+            arity: arity.clone(),
+        }
     }
 }

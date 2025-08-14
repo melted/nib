@@ -72,9 +72,10 @@ impl<'a> ParserState<'a> {
     pub(super) fn parse_add_declaration(&mut self, decls: &mut Vec<Declaration>) -> Result<()> {
         let mut decl = self.parse_declaration()?;
         if let Some(last) = decls.last_mut()
-            && self.merge_same_declaration(last, &mut decl) {
-                return Ok(());
-            }
+            && self.merge_same_declaration(last, &mut decl)
+        {
+            return Ok(());
+        }
         decls.push(decl);
         Ok(())
     }

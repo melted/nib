@@ -25,9 +25,9 @@ impl Runtime {
                     Ok(Value::Bool(false))
                 }
             }
-            _ => self.error(
-                "The argument to _prim_to_char must be an integer between 0 and 1048576",
-            ),
+            _ => {
+                self.error("The argument to _prim_to_char must be an integer between 0 and 1048576")
+            }
         }
     }
 
@@ -50,9 +50,9 @@ impl Runtime {
         match &args[0] {
             Value::Array(arr) => Ok(Value::Integer(arr.borrow().array.len() as i64)),
             arg => self.error(&format!(
-                    "The argument to _prim_array_size must be an array, got {}",
-                    arg
-                )),
+                "The argument to _prim_array_size must be an array, got {}",
+                arg
+            )),
         }
     }
 
@@ -60,22 +60,22 @@ impl Runtime {
         match &args[0] {
             Value::Bytes(bytes) => Ok(Value::Integer(bytes.borrow().bytes.len() as i64)),
             arg => self.error(&format!(
-                    "The argument to _prim_bytes_size must be an array, got {}",
-                    arg
-                )),
+                "The argument to _prim_bytes_size must be an array, got {}",
+                arg
+            )),
         }
     }
 
     pub(super) fn prim_symbol_name(&self, args: &[Value]) -> Result<Value> {
         match &args[0] {
             Value::Symbol(sym) => {
-                    let name = &sym.symbol_info.borrow().symbol;
-                    if !name.is_empty() {
-                        Ok(self.make_string(name)?)
-                    } else {
-                        Ok(Value::Bool(false))
-                    }
+                let name = &sym.symbol_info.borrow().symbol;
+                if !name.is_empty() {
+                    Ok(self.make_string(name)?)
+                } else {
+                    Ok(Value::Bool(false))
                 }
+            }
             _ => self.error("The argument to _prim_symbol_name must be a symbol"),
         }
     }
@@ -172,9 +172,11 @@ impl Runtime {
                 for v in &a.borrow().array {
                     match v {
                         Value::Char(c) => chars.push(*c),
-                        _ => return self.error(
-                            "The argument to _prim_string_pack must be an array of chars",
-                        ),
+                        _ => {
+                            return self.error(
+                                "The argument to _prim_string_pack must be an array of chars",
+                            );
+                        }
                     }
                 }
                 let str = String::from_iter(chars.iter());
@@ -238,57 +240,139 @@ impl Runtime {
     pub(super) fn prim_mod(&self, args: &[Value]) -> Result<Value> {
         match (&args[0], &args[1]) {
             (Value::Integer(a), Value::Integer(b)) => Ok(Value::Integer(a % b)),
-            _ => self.error("`mod` requires two integers as arguments")
+            _ => self.error("`mod` requires two integers as arguments"),
         }
     }
 
     pub(super) fn prim_gte(&self, args: &[Value]) -> Result<Value> {
         match (&args[0], &args[1]) {
-            (Value::Integer(a), Value::Integer(b)) => Ok(if a >= b { args[1].clone() } else { Value::Bool(false) }),
-            (Value::Real(a), Value::Real(b)) => Ok(if a >= b { args[1].clone() } else { Value::Bool(false) }),
-            (Value::Integer(a), Value::Real(b)) => Ok(if *a as f64 >= *b { args[1].clone() } else { Value::Bool(false) }),
-            (Value::Real(a), Value::Integer(b)) => Ok(if *a >= *b as f64 { args[1].clone() } else { Value::Bool(false) }),
-            (Value::Char(a), Value::Char(b)) => Ok(if a >= b { args[1].clone() } else { Value::Bool(false) }),
+            (Value::Integer(a), Value::Integer(b)) => Ok(if a >= b {
+                args[1].clone()
+            } else {
+                Value::Bool(false)
+            }),
+            (Value::Real(a), Value::Real(b)) => Ok(if a >= b {
+                args[1].clone()
+            } else {
+                Value::Bool(false)
+            }),
+            (Value::Integer(a), Value::Real(b)) => Ok(if *a as f64 >= *b {
+                args[1].clone()
+            } else {
+                Value::Bool(false)
+            }),
+            (Value::Real(a), Value::Integer(b)) => Ok(if *a >= *b as f64 {
+                args[1].clone()
+            } else {
+                Value::Bool(false)
+            }),
+            (Value::Char(a), Value::Char(b)) => Ok(if a >= b {
+                args[1].clone()
+            } else {
+                Value::Bool(false)
+            }),
             (arg, arg2) => self.error(&format!("Can't compare {} and {}", arg, arg2)),
         }
     }
 
     pub(super) fn prim_gt(&self, args: &[Value]) -> Result<Value> {
         match (&args[0], &args[1]) {
-            (Value::Integer(a), Value::Integer(b)) => Ok(if a > b { args[1].clone() } else { Value::Bool(false) }),
-            (Value::Real(a), Value::Real(b)) => Ok(if a > b { args[1].clone() } else { Value::Bool(false) }),
-            (Value::Integer(a), Value::Real(b)) => Ok(if *a as f64 > *b { args[1].clone() } else { Value::Bool(false) }),
-            (Value::Real(a), Value::Integer(b)) => Ok(if *a > *b as f64 { args[1].clone() } else { Value::Bool(false) }),
-            (Value::Char(a), Value::Char(b)) => Ok(if a > b { args[1].clone() } else { Value::Bool(false) }),
+            (Value::Integer(a), Value::Integer(b)) => Ok(if a > b {
+                args[1].clone()
+            } else {
+                Value::Bool(false)
+            }),
+            (Value::Real(a), Value::Real(b)) => Ok(if a > b {
+                args[1].clone()
+            } else {
+                Value::Bool(false)
+            }),
+            (Value::Integer(a), Value::Real(b)) => Ok(if *a as f64 > *b {
+                args[1].clone()
+            } else {
+                Value::Bool(false)
+            }),
+            (Value::Real(a), Value::Integer(b)) => Ok(if *a > *b as f64 {
+                args[1].clone()
+            } else {
+                Value::Bool(false)
+            }),
+            (Value::Char(a), Value::Char(b)) => Ok(if a > b {
+                args[1].clone()
+            } else {
+                Value::Bool(false)
+            }),
             (arg, arg2) => self.error(&format!("Can't compare {} and {}", arg, arg2)),
         }
     }
 
     pub(super) fn prim_lte(&self, args: &[Value]) -> Result<Value> {
         match (&args[0], &args[1]) {
-            (Value::Integer(a), Value::Integer(b)) => Ok(if a <= b { args[1].clone() } else { Value::Bool(false) }),
-            (Value::Real(a), Value::Real(b)) => Ok(if a <= b { args[1].clone() } else { Value::Bool(false) }),
-            (Value::Integer(a), Value::Real(b)) => Ok(if *a as f64 <= *b { args[1].clone() } else { Value::Bool(false) }),
-            (Value::Real(a), Value::Integer(b)) => Ok(if *a <= *b as f64 { args[1].clone() } else { Value::Bool(false) }),
-            (Value::Char(a), Value::Char(b)) => Ok(if a <= b { args[1].clone() } else { Value::Bool(false) }),
+            (Value::Integer(a), Value::Integer(b)) => Ok(if a <= b {
+                args[1].clone()
+            } else {
+                Value::Bool(false)
+            }),
+            (Value::Real(a), Value::Real(b)) => Ok(if a <= b {
+                args[1].clone()
+            } else {
+                Value::Bool(false)
+            }),
+            (Value::Integer(a), Value::Real(b)) => Ok(if *a as f64 <= *b {
+                args[1].clone()
+            } else {
+                Value::Bool(false)
+            }),
+            (Value::Real(a), Value::Integer(b)) => Ok(if *a <= *b as f64 {
+                args[1].clone()
+            } else {
+                Value::Bool(false)
+            }),
+            (Value::Char(a), Value::Char(b)) => Ok(if a <= b {
+                args[1].clone()
+            } else {
+                Value::Bool(false)
+            }),
             (arg, arg2) => self.error(&format!("Can't compare {} and {}", arg, arg2)),
         }
     }
 
     pub(super) fn prim_lt(&self, args: &[Value]) -> Result<Value> {
         match (&args[0], &args[1]) {
-            (Value::Integer(a), Value::Integer(b)) => Ok(if a < b { args[1].clone() } else { Value::Bool(false) }),
-            (Value::Real(a), Value::Real(b)) => Ok(if a < b { args[1].clone() } else { Value::Bool(false) }),
-            (Value::Integer(a), Value::Real(b)) => Ok(if (*a as f64) < *b { args[1].clone() } else { Value::Bool(false) }),
-            (Value::Real(a), Value::Integer(b)) => Ok(if *a < *b as f64 { args[1].clone() } else { Value::Bool(false) }),
-            (Value::Char(a), Value::Char(b)) => Ok(if a < b { args[1].clone() } else { Value::Bool(false) }),
+            (Value::Integer(a), Value::Integer(b)) => Ok(if a < b {
+                args[1].clone()
+            } else {
+                Value::Bool(false)
+            }),
+            (Value::Real(a), Value::Real(b)) => Ok(if a < b {
+                args[1].clone()
+            } else {
+                Value::Bool(false)
+            }),
+            (Value::Integer(a), Value::Real(b)) => Ok(if (*a as f64) < *b {
+                args[1].clone()
+            } else {
+                Value::Bool(false)
+            }),
+            (Value::Real(a), Value::Integer(b)) => Ok(if *a < *b as f64 {
+                args[1].clone()
+            } else {
+                Value::Bool(false)
+            }),
+            (Value::Char(a), Value::Char(b)) => Ok(if a < b {
+                args[1].clone()
+            } else {
+                Value::Bool(false)
+            }),
             (arg, arg2) => self.error(&format!("Can't compare {} and {}", arg, arg2)),
         }
     }
 
     pub(super) fn prim_eq(&self, args: &[Value]) -> Result<Value> {
         match (&args[0], &args[1]) {
-            (x, y) if std::mem::discriminant(x) == std::mem::discriminant(y) => Ok(Value::Bool(x == y)),
+            (x, y) if std::mem::discriminant(x) == std::mem::discriminant(y) => {
+                Ok(Value::Bool(x == y))
+            }
             (Value::Integer(a), Value::Integer(b)) => Ok(Value::Bool(a == b)),
             (Value::Real(a), Value::Real(b)) => Ok(Value::Bool(a == b)),
             (arg, arg2) => self.error(&format!("Can't compare {} with {}", arg, arg2)),
@@ -300,8 +384,11 @@ impl Runtime {
             (Value::Array(arr), Value::Integer(n)) => {
                 let array = arr.borrow();
                 Ok(array.array[*n as usize].clone())
-            },
-            (x, y) => self.error(&format!("The arguments to _prim_array_ref should be an array and an integer, got {} and {}", x, y))
+            }
+            (x, y) => self.error(&format!(
+                "The arguments to _prim_array_ref should be an array and an integer, got {} and {}",
+                x, y
+            )),
         }
     }
 
@@ -309,7 +396,10 @@ impl Runtime {
         match (&args[0], &args[1]) {
             (Value::Integer(a), Value::Integer(b)) => Ok(Value::Integer(a & b)),
             (Value::Pointer(a), Value::Pointer(b)) => Ok(Value::Pointer(a & b)),
-            (arg, arg2) => self.error(&format!("The arguments to _prim_bitand should be int or ptr, got {} and {}", arg, arg2))
+            (arg, arg2) => self.error(&format!(
+                "The arguments to _prim_bitand should be int or ptr, got {} and {}",
+                arg, arg2
+            )),
         }
     }
 
@@ -317,7 +407,10 @@ impl Runtime {
         match (&args[0], &args[1]) {
             (Value::Integer(a), Value::Integer(b)) => Ok(Value::Integer(a | b)),
             (Value::Pointer(a), Value::Pointer(b)) => Ok(Value::Pointer(a | b)),
-            (arg, arg2) => self.error(&format!("The arguments to _prim_bitor should be int or ptr, got {} and {}", arg, arg2))
+            (arg, arg2) => self.error(&format!(
+                "The arguments to _prim_bitor should be int or ptr, got {} and {}",
+                arg, arg2
+            )),
         }
     }
 
@@ -325,21 +418,27 @@ impl Runtime {
         match (&args[0], &args[1]) {
             (Value::Integer(a), Value::Integer(b)) => Ok(Value::Integer(a ^ b)),
             (Value::Pointer(a), Value::Pointer(b)) => Ok(Value::Pointer(a ^ b)),
-            (arg, arg2) => self.error(&format!("The arguments to _prim_bitxor should be int or ptr, got {} and {}", arg, arg2))
+            (arg, arg2) => self.error(&format!(
+                "The arguments to _prim_bitxor should be int or ptr, got {} and {}",
+                arg, arg2
+            )),
         }
     }
 
     pub(super) fn prim_bitshift(&self, args: &[Value]) -> Result<Value> {
         match (&args[0], &args[1]) {
             (Value::Integer(a), Value::Integer(b)) => {
-                let val = if *b < 0 { a.shl(b.abs())} else { a.shr(b) };
+                let val = if *b < 0 { a.shl(b.abs()) } else { a.shr(b) };
                 Ok(Value::Integer(val))
-            },
+            }
             (Value::Pointer(a), Value::Integer(b)) => {
-                let val = if *b < 0 { a.shl(b.abs())} else { a.shr(b) };
+                let val = if *b < 0 { a.shl(b.abs()) } else { a.shr(b) };
                 Ok(Value::Pointer(val))
-            },
-            (arg, arg2) => self.error(&format!("The arguments to _prim_bitshift should be int or ptr and an int, got {} and {}", arg, arg2))
+            }
+            (arg, arg2) => self.error(&format!(
+                "The arguments to _prim_bitshift should be int or ptr and an int, got {} and {}",
+                arg, arg2
+            )),
         }
     }
 
@@ -352,11 +451,11 @@ impl Runtime {
                 let mut b = Vec::with_capacity(*n as usize);
                 b.resize(*n as usize, *v as u8);
                 Ok(Value::new_bytes(b))
-            },
+            }
             (arg, _) => self.error(&format!(
                 "The first argument to _prim_bytes_create must be an integer, got {}",
                 arg
-            ))
+            )),
         }
     }
 
@@ -397,7 +496,6 @@ impl Runtime {
         Ok(Value::Nil)
     }
 
-    
     pub(super) fn prim_bytes_set(&self, args: &[Value]) -> Result<Value> {
         match(&args[0], &args[1], &args[2]) {
             (Value::Bytes(b), Value::Integer(n), Value::Integer(v)) => {
@@ -412,7 +510,6 @@ impl Runtime {
         }
     }
 
-    
     pub(super) fn prim_table_set(&self, args: &[Value]) -> Result<Value> {
         let Value::Table(tab) = &args[0] else {
             return self.error("First argument to _prim_table_set must be a table");
@@ -425,17 +522,18 @@ impl Runtime {
         Ok(Value::Nil)
     }
 
-    
     pub(super) fn prim_string_sub(&self, args: &[Value]) -> Result<Value> {
         match (&args[0], &args[1], &args[2]) {
             (Value::Bytes(b), Value::Integer(start), Value::Integer(stop)) => {
                 let str = self.format_string(&args[0])?;
                 let iter = str.chars();
-                let it = iter.skip(*start as usize).take((stop-start) as usize);
+                let it = iter.skip(*start as usize).take((stop - start) as usize);
                 let subs = String::from_iter(it);
                 self.make_string(&subs)
-            },
-            _ => self.error("_prim_string_substring takes a string, an integer and an integer as argument")
+            }
+            _ => self.error(
+                "_prim_string_substring takes a string, an integer and an integer as argument",
+            ),
         }
     }
 
@@ -447,7 +545,7 @@ impl Runtime {
         );
         self.add_global(
             "_prim_project",
-            Value::new_extern_fun(Runtime::project, &Arity::VarArg(2))
+            Value::new_extern_fun(Runtime::project, &Arity::VarArg(2)),
         );
         self.add_global(
             "_prim_array_make",
@@ -509,13 +607,22 @@ impl Runtime {
             "_prim_gte",
             Value::new_extern_fun(Runtime::prim_gte, &Arity::Fixed(2)),
         );
-        self.add_global("_prim_gt", Value::new_extern_fun(Runtime::prim_gt, &Arity::Fixed(2)));
+        self.add_global(
+            "_prim_gt",
+            Value::new_extern_fun(Runtime::prim_gt, &Arity::Fixed(2)),
+        );
         self.add_global(
             "_prim_lte",
             Value::new_extern_fun(Runtime::prim_lte, &Arity::Fixed(2)),
         );
-        self.add_global("_prim_lt", Value::new_extern_fun(Runtime::prim_lt, &Arity::Fixed(2)));
-        self.add_global("_prim_eq", Value::new_extern_fun(Runtime::prim_eq, &Arity::Fixed(2)));
+        self.add_global(
+            "_prim_lt",
+            Value::new_extern_fun(Runtime::prim_lt, &Arity::Fixed(2)),
+        );
+        self.add_global(
+            "_prim_eq",
+            Value::new_extern_fun(Runtime::prim_eq, &Arity::Fixed(2)),
+        );
         self.add_global(
             "_prim_array_ref",
             Value::new_extern_fun(Runtime::prim_array_ref, &Arity::Fixed(2)),
@@ -542,7 +649,8 @@ impl Runtime {
         );
         self.add_global(
             "_prim_load",
-            Value::new_extern_mut_fun(Runtime::load_prim, &Arity::Fixed(1)));
+            Value::new_extern_mut_fun(Runtime::load_prim, &Arity::Fixed(1)),
+        );
         self.add_global(
             "_prim_symbol_name",
             Value::new_extern_fun(Runtime::prim_symbol_name, &Arity::Fixed(1)),
@@ -645,7 +753,7 @@ impl Runtime {
         );
         self.add_global(
             "_prim_acos",
-           Value::new_extern_fun(Runtime::prim_acos, &Arity::Fixed(1)),
+            Value::new_extern_fun(Runtime::prim_acos, &Arity::Fixed(1)),
         );
         self.add_global(
             "_prim_atan",
@@ -765,7 +873,7 @@ impl Runtime {
         }
     }
 
-    fn type_prim(&self, args:&[Value]) -> Result<Value> {
+    fn type_prim(&self, args: &[Value]) -> Result<Value> {
         self.type_query(&args[0])
     }
 
@@ -934,9 +1042,8 @@ impl Runtime {
                     b.push(*v as u8);
                 }
                 _ => {
-                    return self.error(
-                        "The arguments to _prim_bytes_make must be ints between 0-255",
-                    );
+                    return self
+                        .error("The arguments to _prim_bytes_make must be ints between 0-255");
                 }
             }
         }
