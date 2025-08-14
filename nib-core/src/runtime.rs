@@ -11,7 +11,7 @@ use crate::{
     common::{Error, Metadata, Name, Result},
     core::{Arity, FunClause, desugar, desugar_expression},
     parser::{parse_declarations, parse_expression},
-    runtime::{evaluate::Environment, prims::Primitive},
+    runtime::{evaluate::Environment},
 };
 
 mod evaluate;
@@ -199,7 +199,6 @@ fn new_ref<T>(val: T) -> Rc<RefCell<T>> {
 pub enum Value {
     Nil,
     Undefined,
-    Primitive(Primitive, Arity),
     Bool(bool),
     Integer(i64),
     Real(f64),
@@ -215,7 +214,6 @@ pub enum Value {
 impl PartialEq for Value {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
-            (Self::Primitive(l0, l1), Self::Primitive(r0, r1)) => l0 == r0 && l1 == r1,
             (Self::Bool(l0), Self::Bool(r0)) => l0 == r0,
             (Self::Integer(l0), Self::Integer(r0)) => l0 == r0,
             (Self::Real(l0), Self::Real(r0)) => l0 == r0,
@@ -242,7 +240,6 @@ impl Eq for Value {}
 impl Ord for Value {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         match (self, other) {
-            (Value::Primitive(a, x), Value::Primitive(b, y)) => a.cmp(b),
             (Value::Bool(a), Value::Bool(b)) => a.cmp(b),
             (Value::Integer(a), Value::Integer(b)) => a.cmp(b),
             (Value::Real(a), Value::Real(b)) => {
@@ -265,9 +262,6 @@ impl Display for Value {
         match self {
             Value::Nil => write!(f, "()"),
             Value::Undefined => write!(f, "<undefined>"),
-            Value::Primitive(primitive, arity) => {
-                write!(f, "¤<primitive:{:?}:{}>", primitive, arity)
-            }
             Value::Bool(b) => write!(f, "{}", b),
             Value::Integer(i) => write!(f, "{}", i),
             Value::Real(x) => write!(f, "{}", x),
@@ -295,6 +289,14 @@ impl Value {
         Value::Array(new_ref(Array::with(vals)))
     }
 
+    pub fn new_extern_mut_fun(fun: fn(&mut Runtime, &[Value]) -> Result<Value>, arity:&Arity) -> Self {
+        Value::Closure(new_ref(Closure::extern_mut_fun(fun, arity)))
+    }
+
+    pub fn new_extern_fun(fun: fn(&Runtime, &[Value]) -> Result<Value>, arity:&Arity) -> Self {
+        Value::Closure(new_ref(Closure::extern_fun(fun, arity)))
+    }
+
     pub fn is_complex(&self) -> bool {
         match self {
             Value::Array(_) | Value::Table(_) | Value::Closure(_) => true,
@@ -306,7 +308,6 @@ impl Value {
         match self {
             Value::Nil => 0,
             Value::Undefined => 1,
-            Value::Primitive(primitive, arity) => 2,
             Value::Bool(_) => 3,
             Value::Integer(_) => 4,
             Value::Real(_) => 5,
@@ -507,9 +508,18 @@ impl Bytes {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub enum Code {
+    Nib(Vec<FunClause>),
+    Extern(fn(&Runtime, &[Value]) -> Result<Value>),
+    ExternMut(fn(&mut Runtime, &[Value]) -> Result<Value>),
+    ExternSimple(fn(&[Value]) -> Result<Value>),
+}
+  
+
+#[derive(Debug, Clone, PartialEq)]
 pub struct Closure {
     type_table: Option<Rc<RefCell<Table>>>,
-    pub code: Rc<RefCell<Vec<FunClause>>>,
+    pub code: Rc<RefCell<Code>>,
     pub env: Environment,
     pub args: Vec<Value>,
     pub arity: Arity,
@@ -535,5 +545,13 @@ impl Closure {
             args: args.to_vec(),
             arity: self.arity.clone(),
         }
+    }
+
+    pub fn extern_mut_fun(fun: fn(&mut Runtime, &[Value]) -> Result<Value>, arity:&Arity) -> Self {
+        Closure { type_table: None, code: new_ref(Code::ExternMut(fun)), env: Environment::new(), args: Vec::new(), arity: arity.clone() }
+    }
+
+    pub fn extern_fun(fun: fn(&Runtime, &[Value]) -> Result<Value>, arity:&Arity) -> Self {
+        Closure { type_table: None, code: new_ref(Code::Extern(fun)), env: Environment::new(), args: Vec::new(), arity: arity.clone() }
     }
 }

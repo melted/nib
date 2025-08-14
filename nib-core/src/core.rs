@@ -515,8 +515,8 @@ pub enum Pattern {
 
 #[derive(Debug, Clone, PartialEq, PartialOrd, Hash)]
 pub enum Arity {
-    Fixed(usize),
-    VarArg(usize),
+    Fixed(u32),
+    VarArg(u32),
 }
 
 impl Display for Arity {
@@ -529,7 +529,7 @@ impl Display for Arity {
 }
 
 impl Arity {
-    pub fn min_arity(&self) -> usize {
+    pub fn min_arity(&self) -> u32 {
         match self {
             Arity::Fixed(n) | Arity::VarArg(n) => *n,
         }

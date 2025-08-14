@@ -1,7 +1,6 @@
-use core::panic;
 use std::{
     cmp::max,
-    collections::{HashMap, HashSet},
+    collections::{HashMap, HashSet}, ops::Deref,
 };
 
 use log::info;
@@ -9,8 +8,8 @@ use log::info;
 use crate::{
     ast::Literal,
     common::{Name, Result},
-    core::{Arity, Binder, Binding, Expression, FunClause, Module, Pattern, free_vars},
-    runtime::{Bytes, Closure, Runtime, Value, new_ref},
+    core::{free_vars, Arity, Binder, Binding, Expression, FunClause, Module, Pattern},
+    runtime::{new_ref, Bytes, Closure, Code, Runtime, Value},
 };
 
 impl Runtime {
@@ -147,26 +146,16 @@ impl Runtime {
     pub(super) fn apply_values(&mut self, binding_name: &str, vals: &[Value]) -> Result<Value> {
         info!("Applying {} to {} arguments", &vals[0], &vals[1..].len());
         match &vals[0] {
-            Value::Primitive(prim, Arity::Fixed(1)) => self.call_primitive1(prim, &vals[1]),
-            Value::Primitive(prim, Arity::Fixed(2)) => {
-                self.call_primitive2(prim, &vals[1], &vals[2])
-            }
-            Value::Primitive(prim, Arity::Fixed(3)) => {
-                self.call_primitive3(prim, &vals[1], &vals[2], &vals[3])
-            }
-            Value::Primitive(prim, Arity::VarArg(_)) => {
-                self.call_primitive_vararg(prim, &vals[1..])
-            }
             Value::Closure(closure_rc) => {
                 let mut env: Environment;
-                let (mut args, clauses, arity) = {
+                let (mut args, code, arity) = {
                     let mut args = Vec::new();
                     let mut closure = closure_rc.borrow_mut();
 
                     args.append(&mut closure.args);
                     args.append(&mut vals[1..].to_vec());
 
-                    if args.len() < closure.arity.min_arity() {
+                    if args.len() < closure.arity.min_arity() as usize {
                         return Ok(Value::Closure(new_ref(closure.with_args(&args))));
                     }
                     env = closure.env.clone();
@@ -174,31 +163,46 @@ impl Runtime {
                 };
 
                 let mut remaining = match arity {
-                    Arity::Fixed(n) => args.split_off(n),
+                    Arity::Fixed(n) => args.split_off(n as usize),
                     Arity::VarArg(_) => Vec::new(),
                 };
 
-                for clause in clauses.borrow().iter() {
-                    if let Some(binds) = self.match_patterns(&args, &clause.args, &env)? {
-                        env.push_env(binds);
-                        if let Some(guard) = &clause.guard {
-                            let v = self.evaluate_expression(binding_name, guard, &mut env)?;
-                            if v == Value::Bool(false) {
+                let mut ret = match code.borrow().deref() {
+                    Code::Nib(clauses) => {
+                        let mut v:Value = Value::Nil;
+                        for clause in clauses.iter() {
+                            if let Some(binds) = self.match_patterns(&args, &clause.args, &env)? {
+                                env.push_env(binds);
+                                if let Some(guard) = &clause.guard {
+                                    let guard = self.evaluate_expression(binding_name, guard, &mut env)?;
+                                    if guard == Value::Bool(false) {
+                                        env.pop();
+                                        continue;
+                                    }
+                                }
+                                v = self.evaluate_expression(binding_name, &clause.rhs, &mut env)?;
                                 env.pop();
-                                continue;
+                                break;
                             }
                         }
-                        let mut v =
-                            self.evaluate_expression(binding_name, &clause.rhs, &mut env)?;
-                        if !remaining.is_empty() {
-                            remaining.insert(0, v);
-                            v = self.apply_values(binding_name, &remaining)?;
-                        }
-                        env.pop();
-                        return Ok(v);
+                        v
                     }
+                    Code::ExternSimple(ext) => {
+                        ext(&args)?
+                    }
+                    Code::ExternMut(ext) => {
+                        ext(self, &args)?
+                    }
+                    Code::Extern(ext) => {
+                        ext(self, &args)?
+                    }
+                };
+               
+                if !remaining.is_empty() {
+                    remaining.insert(0, ret);
+                    ret = self.apply_values(binding_name, &remaining)?;
                 }
-                self.error("No matching pattern for closure")
+                Ok(ret)
             }
             _ => {
                 self.error(&format!("Not a callable type in application {}", vals[0]))
@@ -241,7 +245,7 @@ impl Runtime {
             }
         }
         Ok(Value::Closure(new_ref(Closure {
-            code: new_ref(clauses.clone()),
+            code: new_ref(Code::Nib(clauses.clone())),
             type_table: None,
             env: lexical_env,
             args: Vec::new(),
@@ -376,7 +380,7 @@ impl Runtime {
 
 pub(super) fn get_arity(patterns: &[Pattern]) -> Arity {
     let vararg = patterns.iter().any(|p| p.is_ellipsis());
-    let len = patterns.len();
+    let len = patterns.len() as u32;
     if vararg {
         Arity::VarArg(len - 1)
     } else {
