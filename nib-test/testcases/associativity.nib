@@ -1,0 +1,10 @@
+// @Name: Test left associativity of binops
+// @Tags: binops
+
+res = 3+4*7
+
+_ = print (res == 49)
+// @Output:
+// true
+// @EndOutput
+// @ExitCode: 0

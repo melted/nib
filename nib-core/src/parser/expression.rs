@@ -159,7 +159,7 @@ impl<'a> ParserState<'a> {
         lhs: ExpressionNode,
         op: Operator,
     ) -> Result<ExpressionNode> {
-        let rhs = self.parse_inner_expression(5)?;
+        let rhs = self.parse_inner_expression(6)?;
         Ok(self.binop_expression(op, lhs, rhs))
     }
 

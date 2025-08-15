@@ -247,27 +247,27 @@ impl Runtime {
     pub(super) fn prim_gte(&self, args: &[Value]) -> Result<Value> {
         match (&args[0], &args[1]) {
             (Value::Integer(a), Value::Integer(b)) => Ok(if a >= b {
-                args[0].clone()
+                args[1].clone()
             } else {
                 Value::Bool(false)
             }),
             (Value::Real(a), Value::Real(b)) => Ok(if a >= b {
-                args[0].clone()
+                args[1].clone()
             } else {
                 Value::Bool(false)
             }),
             (Value::Integer(a), Value::Real(b)) => Ok(if *a as f64 >= *b {
-                args[0].clone()
+                args[1].clone()
             } else {
                 Value::Bool(false)
             }),
             (Value::Real(a), Value::Integer(b)) => Ok(if *a >= *b as f64 {
-                args[0].clone()
+                args[1].clone()
             } else {
                 Value::Bool(false)
             }),
             (Value::Char(a), Value::Char(b)) => Ok(if a >= b {
-                args[0].clone()
+                args[1].clone()
             } else {
                 Value::Bool(false)
             }),
@@ -280,27 +280,27 @@ impl Runtime {
     pub(super) fn prim_gt(&self, args: &[Value]) -> Result<Value> {
         match (&args[0], &args[1]) {
             (Value::Integer(a), Value::Integer(b)) => Ok(if a > b {
-                args[0].clone()
+                args[1].clone()
             } else {
                 Value::Bool(false)
             }),
             (Value::Real(a), Value::Real(b)) => Ok(if a > b {
-                args[0].clone()
+                args[1].clone()
             } else {
                 Value::Bool(false)
             }),
             (Value::Integer(a), Value::Real(b)) => Ok(if *a as f64 > *b {
-                args[0].clone()
+                args[1].clone()
             } else {
                 Value::Bool(false)
             }),
             (Value::Real(a), Value::Integer(b)) => Ok(if *a > *b as f64 {
-                args[0].clone()
+                args[1].clone()
             } else {
                 Value::Bool(false)
             }),
             (Value::Char(a), Value::Char(b)) => Ok(if a > b {
-                args[0].clone()
+                args[1].clone()
             } else {
                 Value::Bool(false)
             }),
@@ -313,27 +313,27 @@ impl Runtime {
     pub(super) fn prim_lte(&self, args: &[Value]) -> Result<Value> {
         match (&args[0], &args[1]) {
             (Value::Integer(a), Value::Integer(b)) => Ok(if a <= b {
-                args[0].clone()
+                args[1].clone()
             } else {
                 Value::Bool(false)
             }),
             (Value::Real(a), Value::Real(b)) => Ok(if a <= b {
-                args[0].clone()
+                args[1].clone()
             } else {
                 Value::Bool(false)
             }),
             (Value::Integer(a), Value::Real(b)) => Ok(if *a as f64 <= *b {
-                args[0].clone()
+                args[1].clone()
             } else {
                 Value::Bool(false)
             }),
             (Value::Real(a), Value::Integer(b)) => Ok(if *a <= *b as f64 {
-                args[0].clone()
+                args[1].clone()
             } else {
                 Value::Bool(false)
             }),
             (Value::Char(a), Value::Char(b)) => Ok(if a <= b {
-                args[0].clone()
+                args[1].clone()
             } else {
                 Value::Bool(false)
             }),
@@ -346,27 +346,27 @@ impl Runtime {
     pub(super) fn prim_lt(&self, args: &[Value]) -> Result<Value> {
         match (&args[0], &args[1]) {
             (Value::Integer(a), Value::Integer(b)) => Ok(if a < b {
-                args[0].clone()
+                args[1].clone()
             } else {
                 Value::Bool(false)
             }),
             (Value::Real(a), Value::Real(b)) => Ok(if a < b {
-                args[0].clone()
+                args[1].clone()
             } else {
                 Value::Bool(false)
             }),
             (Value::Integer(a), Value::Real(b)) => Ok(if (*a as f64) < *b {
-                args[0].clone()
+                args[1].clone()
             } else {
                 Value::Bool(false)
             }),
             (Value::Real(a), Value::Integer(b)) => Ok(if *a < *b as f64 {
-                args[0].clone()
+                args[1].clone()
             } else {
                 Value::Bool(false)
             }),
             (Value::Char(a), Value::Char(b)) => Ok(if a < b {
-                args[0].clone()
+                args[1].clone()
             } else {
                 Value::Bool(false)
             }),
