@@ -1,0 +1,5 @@
+_ = println "hello"
+// @Output:
+// hello
+// @EndOutput
+// @ExitCode: 0

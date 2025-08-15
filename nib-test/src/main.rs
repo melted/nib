@@ -190,6 +190,7 @@ impl Metadata {
 fn extract_metadata(file: &Path, input: &str) -> Metadata {
     let mut meta = Metadata::new();
     meta.file = file.to_path_buf();
+    meta.name = format!("Unnamed test [{}]", file.to_string_lossy());
     let comments: Vec<_> = input
         .lines()
         .filter_map(|l| l.strip_prefix("// "))
