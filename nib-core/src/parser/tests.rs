@@ -163,10 +163,10 @@ fn parse_double_binop() -> Result<()> {
     let expr = state.parse_expression()?;
     match expr.expr {
         Expression::Binop(op) => {
-            assert_eq!(op.lhs.expr, Expression::Literal(Literal::Integer(1)));
-            match op.rhs.expr {
+            assert_eq!(op.rhs.expr, Expression::Literal(Literal::Integer(3)));
+            match op.lhs.expr {
                 Expression::Binop(op2) => {
-                    assert_eq!(op2.lhs.expr, Expression::Literal(Literal::Integer(2)));
+                    assert_eq!(op2.lhs.expr, Expression::Literal(Literal::Integer(1)));
                 }
                 _ => assert!(false),
             }
