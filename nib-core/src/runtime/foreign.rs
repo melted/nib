@@ -18,14 +18,12 @@ impl Runtime {
         let str = self.format_string(&arg)?;
         match Library::load(PathBuf::from(str)) {
             Ok(lib) => {
-                // TODO: Better representation
                 unsafe {
                     let ptr:usize = mem::transmute(lib.as_ptr());
                     Ok(Value::Pointer(ptr))
                 }
             }
             Err(err) => {
-                // TODO: Return a better error value
                 Ok(Value::Bool(false))
             }
         }
