@@ -1,0 +1,11 @@
+// @Name: Test Foreign Function Interface
+// @Tags: FFI
+
+libc = _prim_load_library "libc" || { _prim_load_library "msvcrt" }
+
+_ = println (libc != false)
+
+// @Output:
+// true
+// @EndOutput
+// @ExitCode: 0

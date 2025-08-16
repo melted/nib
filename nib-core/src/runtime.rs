@@ -15,6 +15,7 @@ use crate::{
 };
 
 mod evaluate;
+mod foreign;
 pub mod heap;
 mod prims;
 pub mod table;
@@ -44,8 +45,11 @@ impl Runtime {
             local_module: None,
             closures_to_check: HashMap::new(),
         };
-        rt.register_primitives().unwrap();
+ 
         rt.register_type_tables();
+        rt.register_primitives().unwrap();
+        rt.register_system_constants().unwrap();
+        rt.register_foreign_interface().unwrap();
         rt
     }
 

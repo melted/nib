@@ -1,0 +1,3 @@
+
+_ = println system.os
+_ = println system.arch

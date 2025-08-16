@@ -383,7 +383,7 @@ impl Runtime {
             }
             (Value::Integer(a), Value::Integer(b)) => Ok(Value::Bool(a == b)),
             (Value::Real(a), Value::Real(b)) => Ok(Value::Bool(a == b)),
-            (arg, arg2) => self.error(&format!("Can't compare {} with {}", arg, arg2)),
+            (arg, arg2) => Ok(Value::Bool(false)),
         }
     }
 
@@ -783,6 +783,16 @@ impl Runtime {
         Ok(())
     }
 
+    pub(super) fn register_system_constants(&mut self) -> Result<()> {
+        self.add_name(&Name::name("system.os"), &self.make_string(std::env::consts::OS)?)?;
+        self.add_name(&Name::name("system.os_family"), &self.make_string(std::env::consts::FAMILY)?)?;
+        self.add_name(&Name::name("system.arch"), &self.make_string(std::env::consts::ARCH)?)?;
+        self.add_name(&Name::name("system.dll_extension"), &self.make_string(std::env::consts::DLL_EXTENSION)?)?;
+        self.add_name(&Name::name("system.dll_prefix"), &self.make_string(std::env::consts::DLL_PREFIX)?)?;
+        self.add_name(&Name::name("system.exe_extension"), &self.make_string(std::env::consts::EXE_EXTENSION)?)?;
+        Ok(())
+    }
+
     pub(super) fn register_type_tables(&mut self) {
         // Since strings created without the string table present will
         // not have the string type, create that first.
@@ -814,7 +824,7 @@ impl Runtime {
         Ok(Value::Nil)
     }
 
-    fn to_string(&self, args: &[Value]) -> Result<Value> {
+    pub fn to_string(&self, args: &[Value]) -> Result<Value> {
         let arg = &args[0];
         if self.is_type(arg, "string") {
             return Ok(arg.clone());
@@ -823,7 +833,7 @@ impl Runtime {
         self.make_string(&str)
     }
 
-    fn format_string(&self, arg: &Value) -> Result<String> {
+    pub fn format_string(&self, arg: &Value) -> Result<String> {
         let str = match arg {
             Value::Bytes(b) if self.is_type(arg, "string") => str::from_utf8(&b.borrow().bytes)
                 .map_err(|_| Error::runtime_error("Invalid string in _prim_string_print"))?
@@ -864,7 +874,7 @@ impl Runtime {
         Ok(Value::new_array(v.as_slice()))
     }
 
-    fn is_type(&self, arg: &Value, t: &str) -> bool {
+    pub fn is_type(&self, arg: &Value, t: &str) -> bool {
         match self.type_query(arg) {
             Ok(Value::Table(type_table)) => {
                 let table = &type_table.borrow().table;

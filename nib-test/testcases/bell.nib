@@ -1,6 +1,7 @@
+// @Name: Test recursive computation
+// @Tags: array recursion rosetta
+
 // Rosetta code task: https://rosettacode.org/wiki/Bell_numbers
-
-
 
 bell 0 = [1]
 bell n = out where
@@ -13,8 +14,7 @@ bell n = out where
                 _ = go 0 first
 
 _ = print (bell 14)
-
-test a:int = "!!!"
-test _ = "nope"
-
-_ = print (test 2)
+// @Output:
+// [190899322, 218543759, 250401793, 287151994, 329588907, 378644199, 435411946, 501178937, 577461075, 666047210, 769052061, 888980293, 1028804338, 1192059223, 1382958545]
+// @EndOutput
+// @ExitCode: 0
