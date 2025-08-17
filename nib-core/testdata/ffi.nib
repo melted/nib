@@ -1,0 +1,13 @@
+// @Name: Test Foreign Function Interface
+// @Tags: FFI
+
+libc = _prim_load_library "libc.so.6" || { _prim_load_library "msvcrt" }
+
+puts = _prim_foreign_sym libc "puts"
+
+_ = println puts
+
+// @Output:
+// true
+// @EndOutput
+// @ExitCode: 0

@@ -784,12 +784,30 @@ impl Runtime {
     }
 
     pub(super) fn register_system_constants(&mut self) -> Result<()> {
-        self.add_name(&Name::name("system.os"), &self.make_string(std::env::consts::OS)?)?;
-        self.add_name(&Name::name("system.os_family"), &self.make_string(std::env::consts::FAMILY)?)?;
-        self.add_name(&Name::name("system.arch"), &self.make_string(std::env::consts::ARCH)?)?;
-        self.add_name(&Name::name("system.dll_extension"), &self.make_string(std::env::consts::DLL_EXTENSION)?)?;
-        self.add_name(&Name::name("system.dll_prefix"), &self.make_string(std::env::consts::DLL_PREFIX)?)?;
-        self.add_name(&Name::name("system.exe_extension"), &self.make_string(std::env::consts::EXE_EXTENSION)?)?;
+        self.add_name(
+            &Name::name("system.os"),
+            &self.make_string(std::env::consts::OS)?,
+        )?;
+        self.add_name(
+            &Name::name("system.os_family"),
+            &self.make_string(std::env::consts::FAMILY)?,
+        )?;
+        self.add_name(
+            &Name::name("system.arch"),
+            &self.make_string(std::env::consts::ARCH)?,
+        )?;
+        self.add_name(
+            &Name::name("system.dll_extension"),
+            &self.make_string(std::env::consts::DLL_EXTENSION)?,
+        )?;
+        self.add_name(
+            &Name::name("system.dll_prefix"),
+            &self.make_string(std::env::consts::DLL_PREFIX)?,
+        )?;
+        self.add_name(
+            &Name::name("system.exe_extension"),
+            &self.make_string(std::env::consts::EXE_EXTENSION)?,
+        )?;
         Ok(())
     }
 

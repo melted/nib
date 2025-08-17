@@ -193,6 +193,9 @@ impl Runtime {
                     Code::ExternSimple(ext) => ext(&args)?,
                     Code::ExternMut(ext) => ext(self, &args)?,
                     Code::Extern(ext) => ext(self, &args)?,
+                    Code::Foreign(cif, code) => {
+                        todo!()
+                    }
                 };
 
                 if !remaining.is_empty() {

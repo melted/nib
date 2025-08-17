@@ -4,14 +4,17 @@ use std::{
     fmt::{Debug, Display},
     fs::read_to_string,
     hash::Hash,
+    mem,
     rc::Rc,
 };
+
+use libffi::low::{CodePtr, ffi_cif};
 
 use crate::{
     common::{Error, Metadata, Name, Result},
     core::{Arity, FunClause, desugar, desugar_expression},
     parser::{parse_declarations, parse_expression},
-    runtime::evaluate::Environment,
+    runtime::{self, evaluate::Environment},
 };
 
 mod evaluate;
@@ -45,7 +48,7 @@ impl Runtime {
             local_module: None,
             closures_to_check: HashMap::new(),
         };
- 
+
         rt.register_type_tables();
         rt.register_primitives().unwrap();
         rt.register_system_constants().unwrap();
@@ -329,6 +332,283 @@ impl Value {
     }
 }
 
+impl From<u8> for Value {
+    fn from(value: u8) -> Self {
+        Value::Integer(i64::from(value))
+    }
+}
+
+impl From<u16> for Value {
+    fn from(value: u16) -> Self {
+        Value::Integer(i64::from(value))
+    }
+}
+
+impl From<u32> for Value {
+    fn from(value: u32) -> Self {
+        Value::Integer(i64::from(value))
+    }
+}
+
+impl From<u64> for Value {
+    fn from(value: u64) -> Self {
+        Value::Integer(value as i64)
+    }
+}
+
+impl From<usize> for Value {
+    fn from(value: usize) -> Self {
+        Value::Pointer(value)
+    }
+}
+
+impl From<i8> for Value {
+    fn from(value: i8) -> Self {
+        Value::Integer(i64::from(value))
+    }
+}
+
+impl From<i16> for Value {
+    fn from(value: i16) -> Self {
+        Value::Integer(i64::from(value))
+    }
+}
+
+impl From<i32> for Value {
+    fn from(value: i32) -> Self {
+        Value::Integer(i64::from(value))
+    }
+}
+
+impl From<i64> for Value {
+    fn from(value: i64) -> Self {
+        Value::Integer(value)
+    }
+}
+
+impl From<f64> for Value {
+    fn from(value: f64) -> Self {
+        Value::Real(value)
+    }
+}
+
+impl From<f32> for Value {
+    fn from(value: f32) -> Self {
+        Value::Real(value as f64)
+    }
+}
+
+impl From<bool> for Value {
+    fn from(value: bool) -> Self {
+        Value::Bool(value)
+    }
+}
+
+impl<T> From<*mut T> for Value {
+    fn from(value: *mut T) -> Self {
+        unsafe { Value::Pointer(mem::transmute(value)) }
+    }
+}
+
+impl<T> From<*const T> for Value {
+    fn from(value: *const T) -> Self {
+        unsafe { Value::Pointer(mem::transmute(value)) }
+    }
+}
+
+impl From<char> for Value {
+    fn from(value: char) -> Self {
+        Value::Char(value)
+    }
+}
+
+impl From<&[u8]> for Value {
+    fn from(value: &[u8]) -> Self {
+        Value::new_bytes(value.to_vec())
+    }
+}
+
+impl TryFrom<Value> for u8 {
+    type Error = Error;
+
+    fn try_from(value: Value) -> std::result::Result<Self, Self::Error> {
+        match value {
+            Value::Integer(i) => {
+                u8::try_from(i).map_err(|_| Error::runtime_error("Value not an u8"))
+            }
+            _ => Err(Error::runtime_error("Value not an u8")),
+        }
+    }
+}
+
+impl TryFrom<Value> for u16 {
+    type Error = Error;
+
+    fn try_from(value: Value) -> std::result::Result<Self, Self::Error> {
+        match value {
+            Value::Integer(i) => {
+                u16::try_from(i).map_err(|_| Error::runtime_error("Value not an u16"))
+            }
+            _ => Err(Error::runtime_error("Value not an u16")),
+        }
+    }
+}
+
+impl TryFrom<Value> for u32 {
+    type Error = Error;
+
+    fn try_from(value: Value) -> std::result::Result<Self, Self::Error> {
+        match value {
+            Value::Integer(i) => {
+                u32::try_from(i).map_err(|_| Error::runtime_error("Value not an u32"))
+            }
+            _ => Err(Error::runtime_error("Value not an u32")),
+        }
+    }
+}
+
+impl TryFrom<Value> for u64 {
+    type Error = Error;
+
+    fn try_from(value: Value) -> std::result::Result<Self, Self::Error> {
+        match value {
+            Value::Integer(i) => Ok(i as u64),
+            _ => Err(Error::runtime_error("Value not an u64")),
+        }
+    }
+}
+
+impl TryFrom<Value> for i8 {
+    type Error = Error;
+
+    fn try_from(value: Value) -> std::result::Result<Self, Self::Error> {
+        match value {
+            Value::Integer(i) => {
+                i8::try_from(i).map_err(|_| Error::runtime_error("Value not an i8"))
+            }
+            _ => Err(Error::runtime_error("Value not an i8")),
+        }
+    }
+}
+
+impl TryFrom<Value> for i16 {
+    type Error = Error;
+
+    fn try_from(value: Value) -> std::result::Result<Self, Self::Error> {
+        match value {
+            Value::Integer(i) => {
+                i16::try_from(i).map_err(|_| Error::runtime_error("Value not an i16"))
+            }
+            _ => Err(Error::runtime_error("Value not an i16")),
+        }
+    }
+}
+
+impl TryFrom<Value> for i32 {
+    type Error = Error;
+
+    fn try_from(value: Value) -> std::result::Result<Self, Self::Error> {
+        match value {
+            Value::Integer(i) => {
+                i32::try_from(i).map_err(|_| Error::runtime_error("Value not an i32"))
+            }
+            _ => Err(Error::runtime_error("Value not an i32")),
+        }
+    }
+}
+
+impl TryFrom<Value> for i64 {
+    type Error = Error;
+
+    fn try_from(value: Value) -> std::result::Result<Self, Self::Error> {
+        match value {
+            Value::Integer(i) => Ok(i),
+            _ => Err(Error::runtime_error("Value not an u64")),
+        }
+    }
+}
+
+impl TryFrom<Value> for usize {
+    type Error = Error;
+
+    fn try_from(value: Value) -> std::result::Result<Self, Self::Error> {
+        match value {
+            Value::Pointer(i) => Ok(i),
+            _ => Err(Error::runtime_error("Value not an usize")),
+        }
+    }
+}
+
+impl TryFrom<Value> for f32 {
+    type Error = Error;
+
+    fn try_from(value: Value) -> std::result::Result<Self, Self::Error> {
+        match value {
+            Value::Real(f) => Ok(f as f32),
+            _ => Err(Error::runtime_error("Value not a float")),
+        }
+    }
+}
+
+impl TryFrom<Value> for f64 {
+    type Error = Error;
+
+    fn try_from(value: Value) -> std::result::Result<Self, Self::Error> {
+        match value {
+            Value::Real(f) => Ok(f),
+            _ => Err(Error::runtime_error("Value not an float")),
+        }
+    }
+}
+
+impl TryFrom<Value> for bool {
+    type Error = Error;
+
+    fn try_from(value: Value) -> std::result::Result<Self, Self::Error> {
+        match value {
+            Value::Bool(i) => Ok(i),
+            _ => Err(Error::runtime_error("Value not a bool")),
+        }
+    }
+}
+
+impl TryFrom<Value> for char {
+    type Error = Error;
+
+    fn try_from(value: Value) -> std::result::Result<Self, Self::Error> {
+        match value {
+            Value::Char(i) => Ok(i),
+            _ => Err(Error::runtime_error("Value not a char")),
+        }
+    }
+}
+
+impl<T> TryFrom<Value> for *mut T {
+    type Error = Error;
+
+    fn try_from(value: Value) -> std::result::Result<Self, Self::Error> {
+        unsafe {
+            match value {
+                Value::Pointer(i) => Ok(mem::transmute(i)),
+                _ => Err(Error::runtime_error("Value not a pointer")),
+            }
+        }
+    }
+}
+
+impl<T> TryFrom<Value> for *const T {
+    type Error = Error;
+
+    fn try_from(value: Value) -> std::result::Result<Self, Self::Error> {
+        unsafe {
+            match value {
+                Value::Pointer(i) => Ok(mem::transmute(i)),
+                _ => Err(Error::runtime_error("Value not an pointer")),
+            }
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Symbol {
     symbol_info: Rc<RefCell<SymbolInfo>>,
@@ -514,12 +794,26 @@ impl Bytes {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub enum Code {
     Nib(Vec<FunClause>),
     Extern(fn(&Runtime, &[Value]) -> Result<Value>),
     ExternMut(fn(&mut Runtime, &[Value]) -> Result<Value>),
     ExternSimple(fn(&[Value]) -> Result<Value>),
+    Foreign(*mut ffi_cif, CodePtr),
+}
+
+impl PartialEq for Code {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Nib(l0), Self::Nib(r0)) => l0 == r0,
+            (Self::Extern(l0), Self::Extern(r0)) => l0 == r0,
+            (Self::ExternMut(l0), Self::ExternMut(r0)) => l0 == r0,
+            (Self::ExternSimple(l0), Self::ExternSimple(r0)) => l0 == r0,
+            (Self::Foreign(l0, l1), Self::Foreign(r0, r1)) => false,
+            _ => false,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -570,6 +864,17 @@ impl Closure {
             env: Environment::new(),
             args: Vec::new(),
             arity: arity.clone(),
+        }
+    }
+
+    pub fn foreign_fun(cif: *mut ffi_cif, ptr: CodePtr) -> Self {
+        let arity = unsafe { (*cif).nargs };
+        Closure {
+            type_table: None,
+            code: new_ref(Code::Foreign(cif, ptr)),
+            env: Environment::new(),
+            args: Vec::new(),
+            arity: Arity::Fixed(arity),
         }
     }
 }
