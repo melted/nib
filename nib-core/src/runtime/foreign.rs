@@ -32,10 +32,7 @@ impl Runtime {
         }
         let str = self.format_string(&arg)?;
         match Library::load(PathBuf::from(str)) {
-            Ok(lib) => unsafe {
-                let ptr: usize = mem::transmute(lib.as_ptr());
-                Ok(Value::Pointer(ptr))
-            },
+            Ok(lib) => Ok(Value::Pointer(lib.as_ptr())),
             Err(err) => Ok(Value::Bool(false)),
         }
     }
@@ -60,7 +57,7 @@ impl Runtime {
             let Some(ptr): Option<*mut c_void> = lib.sym_opt(str) else {
                 return Ok(Value::Bool(false));
             };
-            Ok(Value::Pointer(ptr as usize))
+            Ok(Value::Pointer(ptr))
         }
     }
 

@@ -9,8 +9,8 @@ use crate::{
 fn simple_pattern_match() -> Result<()> {
     let pats = vec![
         Pattern::Wildcard,
-        Pattern::Ellipsis(Some(Name::name("xs"))),
-        Pattern::Bind(Name::name("x")),
+        Pattern::Ellipsis(Some(Name::from_str("xs"))),
+        Pattern::Bind(Name::from_str("x")),
     ];
     let args = vec![Value::Integer(1), Value::Integer(2), Value::Integer(3)];
     let mut rt = Runtime::new();
@@ -32,7 +32,7 @@ fn simple_pattern_match() -> Result<()> {
 fn pattern_arity_fail() -> Result<()> {
     let pats = vec![
         Pattern::Wildcard,
-        Pattern::Bind(Name::name("x")),
+        Pattern::Bind(Name::from_str("x")),
         Pattern::Wildcard,
         Pattern::Wildcard,
     ];

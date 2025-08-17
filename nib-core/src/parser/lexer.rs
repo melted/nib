@@ -363,8 +363,8 @@ impl<'a> super::ParserState<'a> {
             };
             return Ok(self.token(TokenValue::Float(float)));
         }
-        let int = match i64::from_str_radix(&self.src[self.token_start..stop], 10) {
-            Ok(c) => c,
+        let int = match &self.src[self.token_start..stop].parse::<i64>() {
+            Ok(c) => *c,
             Err(_) => return self.lex_error("Invalid integer literal"),
         };
         Ok(self.token(TokenValue::Integer(int)))

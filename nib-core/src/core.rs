@@ -230,7 +230,7 @@ impl DesugarState {
                 for f in fields {
                     args.push(self.desugar_pattern(f)?);
                 }
-                Ok(Pattern::Custom(Name::name("array"), args))
+                Ok(Pattern::Custom(Name::from_str("array"), args))
             }
             ast::Pattern::Ellipsis(name) => Ok(Pattern::Ellipsis(name)),
             ast::Pattern::Literal(lit) => Ok(Pattern::Literal(lit)),

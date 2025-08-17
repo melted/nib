@@ -131,7 +131,7 @@ impl Name {
         }
     }
 
-    pub fn name(n: &str) -> Self {
+    pub fn from_str(n: &str) -> Self {
         let mut parts: Vec<&str> = n.split(".").collect();
         if parts.len() == 1 {
             Name::Plain(parts[0].to_string())

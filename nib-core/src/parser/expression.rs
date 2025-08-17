@@ -105,13 +105,13 @@ impl<'a> ParserState<'a> {
             TokenValue::LeftParen => self.parse_paren_expression(),
             TokenValue::Identifier(name) => {
                 self.get_next_token()?;
-                let name = Name::name(&name);
+                let name = Name::from_str(&name);
                 Ok(self.var_expression(name))
             }
             TokenValue::Operator(op) if op == "-" => {
                 self.get_next_token()?;
                 // Special rule for prefix -, it's sugar for _prim_negate.
-                Ok(self.var_expression(Name::name("_prim_negate")))
+                Ok(self.var_expression(Name::from_str("_prim_negate")))
             }
             _ => self.error(&format!("Illegal token in left expression {tok:?}")),
         }

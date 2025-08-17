@@ -1,11 +1,10 @@
+
+#![allow(clippy::not_unsafe_ptr_arg_deref)]
+#![allow(clippy::unpredictable_function_pointer_comparisons)]
+#![allow(clippy::mutable_key_type)]
+
 use std::{
-    cell::RefCell,
-    collections::{BTreeSet, HashMap, HashSet},
-    fmt::{Debug, Display},
-    fs::read_to_string,
-    hash::Hash,
-    mem,
-    rc::Rc,
+    cell::RefCell, collections::{BTreeSet, HashMap, HashSet}, ffi::c_void, fmt::{Debug, Display}, fs::read_to_string, hash::Hash, mem, rc::Rc
 };
 
 use libffi::low::{CodePtr, ffi_cif};
@@ -14,7 +13,7 @@ use crate::{
     common::{Error, Metadata, Name, Result},
     core::{Arity, FunClause, desugar, desugar_expression},
     parser::{parse_declarations, parse_expression},
-    runtime::{self, evaluate::Environment},
+    runtime::evaluate::Environment,
 };
 
 mod evaluate;
@@ -210,7 +209,7 @@ pub enum Value {
     Integer(i64),
     Real(f64),
     Char(char),
-    Pointer(usize),
+    Pointer(*mut c_void),
     Symbol(Symbol),
     Bytes(Rc<RefCell<Bytes>>),
     Array(Rc<RefCell<Array>>),
@@ -273,7 +272,7 @@ impl Display for Value {
             Value::Integer(i) => write!(f, "{}", i),
             Value::Real(x) => write!(f, "{}", x),
             Value::Char(c) => write!(f, "{}", c),
-            Value::Pointer(p) => write!(f, "ptr({:x})", p),
+            Value::Pointer(p) => write!(f, "ptr({:x})", p.addr()),
             Value::Symbol(symbol) => write!(f, "{}", symbol),
             Value::Bytes(ref_cell) => write!(f, "{}", &ref_cell.borrow()),
             Value::Array(ref_cell) => write!(f, "{}", &ref_cell.borrow()),
@@ -330,6 +329,52 @@ impl Value {
             Value::Closure(ref_cell) => 12,
         }
     }
+
+    pub fn get_type_table(&self) -> Option<Rc<RefCell<Table>>> {
+        match self {
+            Value::Bytes(b) => b.borrow().type_table.clone(),
+            Value::Closure(c) => c.borrow().type_table.clone(),
+            Value::Array(a) => a.borrow().type_table.clone(),
+            Value::Table(t) => t.borrow().type_table.clone(),
+            Value::Symbol(s) => s.symbol_info.borrow().type_table.clone(),
+            _ => None,
+        }
+    }
+
+    pub fn get_table(&self) -> Result<Rc<RefCell<Table>>> {
+        match self {
+            Value::Table(t) => Ok(t.clone()),
+            _ => Err(Error::runtime_error("Value not a table")),
+        }
+    }
+
+    pub fn get_array(&self) -> Result<Rc<RefCell<Array>>> {
+        match self {
+            Value::Array(t) => Ok(t.clone()),
+            _ => Err(Error::runtime_error("Value not an array")),
+        }
+    }
+
+    pub fn get_bytes(&self) -> Result<Rc<RefCell<Bytes>>> {
+        match self {
+            Value::Bytes(t) => Ok(t.clone()),
+            _ => Err(Error::runtime_error("Value not a bytes array")),
+        }
+    }
+
+    pub fn get_closure(&self) -> Result<Rc<RefCell<Closure>>> {
+        match self {
+            Value::Closure(t) => Ok(t.clone()),
+            _ => Err(Error::runtime_error("Value not a closure")),
+        }
+    }
+
+    pub fn get_symbol(&self) -> Result<Symbol> {
+        match self {
+            Value::Symbol(t) => Ok(t.clone()),
+            _ => Err(Error::runtime_error("Value not a symbol")),
+        }
+    }
 }
 
 impl From<u8> for Value {
@@ -358,7 +403,7 @@ impl From<u64> for Value {
 
 impl From<usize> for Value {
     fn from(value: usize) -> Self {
-        Value::Pointer(value)
+        Value::Integer(value as i64)
     }
 }
 
@@ -428,183 +473,216 @@ impl From<&[u8]> for Value {
     }
 }
 
-impl TryFrom<Value> for u8 {
+impl From<&str> for Value {
+    fn from(value: &str) -> Self {
+        // BUG: Can't set type to string without runtime
+        Value::new_bytes(value.as_bytes().to_vec())
+    }
+}
+
+impl TryFrom<&Value> for u8 {
     type Error = Error;
 
-    fn try_from(value: Value) -> std::result::Result<Self, Self::Error> {
+    fn try_from(value: &Value) -> std::result::Result<Self, Self::Error> {
         match value {
             Value::Integer(i) => {
-                u8::try_from(i).map_err(|_| Error::runtime_error("Value not an u8"))
+                u8::try_from(*i).map_err(|_| Error::runtime_error("Value not an u8"))
             }
             _ => Err(Error::runtime_error("Value not an u8")),
         }
     }
 }
 
-impl TryFrom<Value> for u16 {
+impl TryFrom<&Value> for u16 {
     type Error = Error;
 
-    fn try_from(value: Value) -> std::result::Result<Self, Self::Error> {
+    fn try_from(value: &Value) -> std::result::Result<Self, Self::Error> {
         match value {
             Value::Integer(i) => {
-                u16::try_from(i).map_err(|_| Error::runtime_error("Value not an u16"))
+                u16::try_from(*i).map_err(|_| Error::runtime_error("Value not an u16"))
             }
             _ => Err(Error::runtime_error("Value not an u16")),
         }
     }
 }
 
-impl TryFrom<Value> for u32 {
+impl TryFrom<&Value> for u32 {
     type Error = Error;
 
-    fn try_from(value: Value) -> std::result::Result<Self, Self::Error> {
+    fn try_from(value: &Value) -> std::result::Result<Self, Self::Error> {
         match value {
             Value::Integer(i) => {
-                u32::try_from(i).map_err(|_| Error::runtime_error("Value not an u32"))
+                u32::try_from(*i).map_err(|_| Error::runtime_error("Value not an u32"))
             }
             _ => Err(Error::runtime_error("Value not an u32")),
         }
     }
 }
 
-impl TryFrom<Value> for u64 {
+impl TryFrom<&Value> for u64 {
     type Error = Error;
 
-    fn try_from(value: Value) -> std::result::Result<Self, Self::Error> {
+    fn try_from(value: &Value) -> std::result::Result<Self, Self::Error> {
         match value {
-            Value::Integer(i) => Ok(i as u64),
+            Value::Integer(i) => Ok(*i as u64),
             _ => Err(Error::runtime_error("Value not an u64")),
         }
     }
 }
 
-impl TryFrom<Value> for i8 {
+impl TryFrom<&Value> for i8 {
     type Error = Error;
 
-    fn try_from(value: Value) -> std::result::Result<Self, Self::Error> {
+    fn try_from(value: &Value) -> std::result::Result<Self, Self::Error> {
         match value {
             Value::Integer(i) => {
-                i8::try_from(i).map_err(|_| Error::runtime_error("Value not an i8"))
+                i8::try_from(*i).map_err(|_| Error::runtime_error("Value not an i8"))
             }
             _ => Err(Error::runtime_error("Value not an i8")),
         }
     }
 }
 
-impl TryFrom<Value> for i16 {
+impl TryFrom<&Value> for i16 {
     type Error = Error;
 
-    fn try_from(value: Value) -> std::result::Result<Self, Self::Error> {
+    fn try_from(value: &Value) -> std::result::Result<Self, Self::Error> {
         match value {
             Value::Integer(i) => {
-                i16::try_from(i).map_err(|_| Error::runtime_error("Value not an i16"))
+                i16::try_from(*i).map_err(|_| Error::runtime_error("Value not an i16"))
             }
             _ => Err(Error::runtime_error("Value not an i16")),
         }
     }
 }
 
-impl TryFrom<Value> for i32 {
+impl TryFrom<&Value> for i32 {
     type Error = Error;
 
-    fn try_from(value: Value) -> std::result::Result<Self, Self::Error> {
+    fn try_from(value: &Value) -> std::result::Result<Self, Self::Error> {
         match value {
             Value::Integer(i) => {
-                i32::try_from(i).map_err(|_| Error::runtime_error("Value not an i32"))
+                i32::try_from(*i).map_err(|_| Error::runtime_error("Value not an i32"))
             }
             _ => Err(Error::runtime_error("Value not an i32")),
         }
     }
 }
 
-impl TryFrom<Value> for i64 {
+impl TryFrom<&Value> for i64 {
     type Error = Error;
 
-    fn try_from(value: Value) -> std::result::Result<Self, Self::Error> {
+    fn try_from(value: &Value) -> std::result::Result<Self, Self::Error> {
         match value {
-            Value::Integer(i) => Ok(i),
+            Value::Integer(i) => Ok(*i),
             _ => Err(Error::runtime_error("Value not an u64")),
         }
     }
 }
 
-impl TryFrom<Value> for usize {
+impl TryFrom<&Value> for usize {
     type Error = Error;
 
-    fn try_from(value: Value) -> std::result::Result<Self, Self::Error> {
+    fn try_from(value: &Value) -> std::result::Result<Self, Self::Error> {
         match value {
-            Value::Pointer(i) => Ok(i),
+            Value::Integer(i) => Ok(*i as usize),
             _ => Err(Error::runtime_error("Value not an usize")),
         }
     }
 }
 
-impl TryFrom<Value> for f32 {
+impl TryFrom<&Value> for f32 {
     type Error = Error;
 
-    fn try_from(value: Value) -> std::result::Result<Self, Self::Error> {
+    fn try_from(value: &Value) -> std::result::Result<Self, Self::Error> {
         match value {
-            Value::Real(f) => Ok(f as f32),
+            Value::Real(f) => Ok(*f as f32),
             _ => Err(Error::runtime_error("Value not a float")),
         }
     }
 }
 
-impl TryFrom<Value> for f64 {
+impl TryFrom<&Value> for f64 {
     type Error = Error;
 
-    fn try_from(value: Value) -> std::result::Result<Self, Self::Error> {
+    fn try_from(value: &Value) -> std::result::Result<Self, Self::Error> {
         match value {
-            Value::Real(f) => Ok(f),
+            Value::Real(f) => Ok(*f),
             _ => Err(Error::runtime_error("Value not an float")),
         }
     }
 }
 
-impl TryFrom<Value> for bool {
+impl TryFrom<&Value> for bool {
     type Error = Error;
 
-    fn try_from(value: Value) -> std::result::Result<Self, Self::Error> {
+    fn try_from(value: &Value) -> std::result::Result<Self, Self::Error> {
         match value {
-            Value::Bool(i) => Ok(i),
+            Value::Bool(i) => Ok(*i),
             _ => Err(Error::runtime_error("Value not a bool")),
         }
     }
 }
 
-impl TryFrom<Value> for char {
+impl TryFrom<&Value> for char {
     type Error = Error;
 
-    fn try_from(value: Value) -> std::result::Result<Self, Self::Error> {
+    fn try_from(value: &Value) -> std::result::Result<Self, Self::Error> {
         match value {
-            Value::Char(i) => Ok(i),
+            Value::Char(i) => Ok(*i),
             _ => Err(Error::runtime_error("Value not a char")),
         }
     }
 }
 
-impl<T> TryFrom<Value> for *mut T {
+impl<T> TryFrom<&Value> for *mut T {
     type Error = Error;
 
-    fn try_from(value: Value) -> std::result::Result<Self, Self::Error> {
-        unsafe {
-            match value {
-                Value::Pointer(i) => Ok(mem::transmute(i)),
-                _ => Err(Error::runtime_error("Value not a pointer")),
-            }
+    fn try_from(value: &Value) -> std::result::Result<Self, Self::Error> {
+        match value {
+            Value::Pointer(i) => Ok(*i as *mut T),
+            _ => Err(Error::runtime_error("Value not a pointer")),
         }
     }
 }
 
-impl<T> TryFrom<Value> for *const T {
+impl<T> TryFrom<&Value> for *const T {
     type Error = Error;
 
-    fn try_from(value: Value) -> std::result::Result<Self, Self::Error> {
-        unsafe {
-            match value {
-                Value::Pointer(i) => Ok(mem::transmute(i)),
-                _ => Err(Error::runtime_error("Value not an pointer")),
+    fn try_from(value: &Value) -> std::result::Result<Self, Self::Error> {
+        match value {
+            Value::Pointer(i) => Ok(*i as *const T),
+            _ => Err(Error::runtime_error("Value not an pointer")),
+        }
+    }
+}
+
+impl TryFrom<&Value> for Vec<u8> {
+    type Error = Error;
+
+    fn try_from(value: &Value) -> std::result::Result<Self, Self::Error> {
+        match value {
+            Value::Bytes(bytes) => {
+                let b = bytes.borrow();
+                Ok(b.bytes.clone())
             }
+            _ => Err(Error::runtime_error("Value not a bytes array")),
+        }
+    }
+}
+
+impl TryFrom<&Value> for String {
+    type Error = Error;
+
+    fn try_from(value: &Value) -> std::result::Result<Self, Self::Error> {
+        match value {
+            Value::Bytes(bytes) => {
+                let str = str::from_utf8(&bytes.borrow().bytes)
+                    .map_err(|_| Error::runtime_error("Not a valid UTF-8 string"))?
+                    .to_owned();
+                Ok(str)
+            }
+            _ => Err(Error::runtime_error("Value not a bytes array")),
         }
     }
 }
@@ -807,10 +885,6 @@ impl PartialEq for Code {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
             (Self::Nib(l0), Self::Nib(r0)) => l0 == r0,
-            (Self::Extern(l0), Self::Extern(r0)) => l0 == r0,
-            (Self::ExternMut(l0), Self::ExternMut(r0)) => l0 == r0,
-            (Self::ExternSimple(l0), Self::ExternSimple(r0)) => l0 == r0,
-            (Self::Foreign(l0, l1), Self::Foreign(r0, r1)) => false,
             _ => false,
         }
     }

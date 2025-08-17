@@ -112,8 +112,8 @@ fn parse_custom_pattern() -> Result<()> {
     match &pat.pattern {
         Pattern::Custom(name, fields) => {
             assert_eq!(name.string(), "pair");
-            assert_eq!(fields[0].pattern, Pattern::Var(Name::name("a")));
-            assert_eq!(fields[1].pattern, Pattern::Var(Name::name("b")));
+            assert_eq!(fields[0].pattern, Pattern::Var(Name::from_str("a")));
+            assert_eq!(fields[1].pattern, Pattern::Var(Name::from_str("b")));
         }
         _ => assert!(false),
     }
@@ -126,7 +126,7 @@ fn parse_simple_binding() -> Result<()> {
     let decl = state.parse_declaration()?;
     match decl {
         Declaration::Binding(Binding::VarBinding(bind)) => {
-            assert_eq!(bind.lhs.pattern, Pattern::Var(Name::name("a")));
+            assert_eq!(bind.lhs.pattern, Pattern::Var(Name::from_str("a")));
             let exp = bind.rhs.expr;
             assert_eq!(exp, Expression::Literal(Literal::Integer(1)));
         }
@@ -146,7 +146,7 @@ fn parse_lambda_expression() -> Result<()> {
                 assert!(false);
                 return state.error("meh");
             };
-            assert_eq!(x, &Name::name("a"));
+            assert_eq!(x, &Name::from_str("a"));
             let Expression::Binop(ref op) = fc[0].body.expr else {
                 assert!(false);
                 return state.error("meh");
@@ -201,9 +201,9 @@ fn test_implicit_visitor() -> Result<()> {
     let expr = state.parse_expression()?;
     let mut visitor = UsedImplicits::new();
     expr.visit(&mut visitor);
-    assert!(visitor.vars.contains(&Name::name("a")));
-    assert!(visitor.vars.contains(&Name::name("b")));
-    assert!(!visitor.vars.contains(&Name::name("e")));
+    assert!(visitor.vars.contains(&Name::from_str("a")));
+    assert!(visitor.vars.contains(&Name::from_str("b")));
+    assert!(!visitor.vars.contains(&Name::from_str("e")));
     Ok(())
 }
 
@@ -264,7 +264,7 @@ fn parse_conditional_expression() -> Result<()> {
             on_true,
             on_false,
         }) => {
-            assert_eq!(on_true.expr, Expression::Var(Name::name("x")));
+            assert_eq!(on_true.expr, Expression::Var(Name::from_str("x")));
         }
         _ => assert!(false),
     }
@@ -276,11 +276,5 @@ fn disallow_multiple_ellipsises() -> Result<()> {
     let mut state = ParserState::new("evil ... ... x = x");
     let res = state.parse_declaration();
     assert!(res.is_err());
-    Ok(())
-}
-
-#[test]
-fn empty_test_skeleton() -> Result<()> {
-    let mut state = ParserState::new("");
     Ok(())
 }

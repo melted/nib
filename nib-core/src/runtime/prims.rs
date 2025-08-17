@@ -1,550 +1,10 @@
 use std::ops::{Shl, Shr};
 
-use libffi::middle::Closure;
-
 use crate::common::{Error, Name, Result};
 use crate::core::Arity;
 use crate::runtime::{Runtime, Value};
 
 impl Runtime {
-    pub(super) fn prim_to_int(&self, args: &[Value]) -> Result<Value> {
-        match &args[0] {
-            Value::Real(f) => Ok(Value::Integer(*f as i64)),
-            Value::Bool(b) => Ok(Value::Integer(if *b { 1 } else { 0 })),
-            Value::Char(c) => Ok(Value::Integer(*c as i64)),
-            _ => self.error("The argument to _prim_to_int must be a float or bool"),
-        }
-    }
-
-    pub(super) fn prim_to_char(&self, args: &[Value]) -> Result<Value> {
-        match &args[0] {
-            Value::Integer(n) => {
-                if let Some(c) = char::from_u32(*n as u32) {
-                    Ok(Value::Char(c))
-                } else {
-                    Ok(Value::Bool(false))
-                }
-            }
-            _ => {
-                self.error("The argument to _prim_to_char must be an integer between 0 and 1048576")
-            }
-        }
-    }
-
-    pub(super) fn prim_table_size(&self, args: &[Value]) -> Result<Value> {
-        match &args[0] {
-            Value::Table(t) => Ok(Value::Integer(t.borrow().table.len() as i64)),
-            _ => self.error("The argument to _prim_table_size must be a table"),
-        }
-    }
-
-    pub(super) fn prim_bitnot(&self, args: &[Value]) -> Result<Value> {
-        match &args[0] {
-            Value::Integer(a) => Ok(Value::Integer(!a)),
-            Value::Pointer(a) => Ok(Value::Pointer(!a)),
-            _ => self.error("The argument to _prim_bitnot must be an integer or pointer"),
-        }
-    }
-
-    pub(super) fn prim_array_size(&self, args: &[Value]) -> Result<Value> {
-        match &args[0] {
-            Value::Array(arr) => Ok(Value::Integer(arr.borrow().array.len() as i64)),
-            arg => self.error(&format!(
-                "The argument to _prim_array_size must be an array, got {}",
-                arg
-            )),
-        }
-    }
-
-    pub(super) fn prim_bytes_size(&self, args: &[Value]) -> Result<Value> {
-        match &args[0] {
-            Value::Bytes(bytes) => Ok(Value::Integer(bytes.borrow().bytes.len() as i64)),
-            arg => self.error(&format!(
-                "The argument to _prim_bytes_size must be an array, got {}",
-                arg
-            )),
-        }
-    }
-
-    pub(super) fn prim_symbol_name(&self, args: &[Value]) -> Result<Value> {
-        match &args[0] {
-            Value::Symbol(sym) => {
-                let name = &sym.symbol_info.borrow().symbol;
-                if !name.is_empty() {
-                    Ok(self.make_string(name)?)
-                } else {
-                    Ok(Value::Bool(false))
-                }
-            }
-            _ => self.error("The argument to _prim_symbol_name must be a symbol"),
-        }
-    }
-
-    pub(super) fn prim_ceiling(&self, args: &[Value]) -> Result<Value> {
-        match &args[0] {
-            Value::Real(f) => Ok(Value::Real(f.ceil())),
-            _ => self.error("The argument to _prim_ceiling must be a float"),
-        }
-    }
-
-    pub(super) fn prim_floor(&self, args: &[Value]) -> Result<Value> {
-        match &args[0] {
-            Value::Real(f) => Ok(Value::Real(f.floor())),
-            _ => self.error("The argument to _prim_floor must be a float"),
-        }
-    }
-
-    pub(super) fn prim_round(&self, args: &[Value]) -> Result<Value> {
-        match &args[0] {
-            Value::Real(f) => Ok(Value::Real(f.round())),
-            _ => self.error("The argument to _prim_round must be a float"),
-        }
-    }
-
-    pub(super) fn prim_sin(&self, args: &[Value]) -> Result<Value> {
-        match &args[0] {
-            Value::Real(f) => Ok(Value::Real(f.sin())),
-            _ => self.error("The argument to _prim_sin must be a float"),
-        }
-    }
-
-    pub(super) fn prim_cos(&self, args: &[Value]) -> Result<Value> {
-        match &args[0] {
-            Value::Real(f) => Ok(Value::Real(f.cos())),
-            _ => self.error("The argument to _prim_cos must be a float"),
-        }
-    }
-
-    pub(super) fn prim_tan(&self, args: &[Value]) -> Result<Value> {
-        match &args[0] {
-            Value::Real(f) => Ok(Value::Real(f.tan())),
-            _ => self.error("The argument to _prim_tan must be a float"),
-        }
-    }
-
-    pub(super) fn prim_asin(&self, args: &[Value]) -> Result<Value> {
-        match &args[0] {
-            Value::Real(f) => Ok(Value::Real(f.asin())),
-            _ => self.error("The argument to _prim_asin must be a float"),
-        }
-    }
-
-    pub(super) fn prim_acos(&self, args: &[Value]) -> Result<Value> {
-        match &args[0] {
-            Value::Real(f) => Ok(Value::Real(f.acos())),
-            _ => self.error("The argument to _prim_acos must be a float"),
-        }
-    }
-
-    pub(super) fn prim_atan(&self, args: &[Value]) -> Result<Value> {
-        match &args[0] {
-            Value::Real(f) => Ok(Value::Real(f.atan())),
-            _ => self.error("The argument to _prim_atan must be a float"),
-        }
-    }
-
-    pub(super) fn prim_log(&self, args: &[Value]) -> Result<Value> {
-        match &args[0] {
-            Value::Real(f) => Ok(Value::Real(f.ln())),
-            _ => self.error("The argument to _prim_log must be a float"),
-        }
-    }
-
-    pub(super) fn prim_exp(&self, args: &[Value]) -> Result<Value> {
-        match &args[0] {
-            Value::Real(f) => Ok(Value::Real(f.exp())),
-            _ => self.error("The argument to _prim_exp must be a float"),
-        }
-    }
-
-    pub(super) fn prim_negate(&self, args: &[Value]) -> Result<Value> {
-        match &args[0] {
-            Value::Integer(n) => Ok(Value::Integer(-n)),
-            Value::Real(f) => Ok(Value::Real(-f)),
-            _ => self.error("The argument to _prim_negate must be an int or a float"),
-        }
-    }
-
-    pub(super) fn prim_string_pack(&self, args: &[Value]) -> Result<Value> {
-        match &args[0] {
-            Value::Array(a) => {
-                let mut chars = Vec::new();
-                for v in &a.borrow().array {
-                    match v {
-                        Value::Char(c) => chars.push(*c),
-                        _ => {
-                            return self.error(
-                                "The argument to _prim_string_pack must be an array of chars",
-                            );
-                        }
-                    }
-                }
-                let str = String::from_iter(chars.iter());
-                self.make_string(&str)
-            }
-            _ => self.error("The argument to _prim_string_pack must be an array of chars"),
-        }
-    }
-
-    pub(super) fn prim_string_unpack(&self, args: &[Value]) -> Result<Value> {
-        match &args[0] {
-            Value::Bytes(b) if self.is_type(&args[0], "string") => {
-                let str = self.format_string(&args[0])?;
-                let vals: Vec<Value> = str.chars().map(Value::Char).collect();
-                Ok(Value::new_array(&vals))
-            }
-            _ => self.error("The argument to _prim_string_unpack must be a string"),
-        }
-    }
-
-    pub(super) fn prim_add(&self, args: &[Value]) -> Result<Value> {
-        match (&args[0], &args[1]) {
-            (Value::Integer(a), Value::Integer(b)) => Ok(Value::Integer(a + b)),
-            (Value::Real(a), Value::Real(b)) => Ok(Value::Real(a + b)),
-            (Value::Integer(a), Value::Real(b)) => Ok(Value::Real(*a as f64 + b)),
-            (Value::Real(a), Value::Integer(b)) => Ok(Value::Real(a + *b as f64)),
-            (arg, arg2) => self.error(&format!("Can't add {} and {}", arg, arg2)),
-        }
-    }
-
-    pub(super) fn prim_sub(&self, args: &[Value]) -> Result<Value> {
-        match (&args[0], &args[1]) {
-            (Value::Integer(a), Value::Integer(b)) => Ok(Value::Integer(a - b)),
-            (Value::Real(a), Value::Real(b)) => Ok(Value::Real(a - b)),
-            (Value::Integer(a), Value::Real(b)) => Ok(Value::Real(*a as f64 - b)),
-            (Value::Real(a), Value::Integer(b)) => Ok(Value::Real(a - *b as f64)),
-            (arg, arg2) => self.error(&format!("Can't subtract {} from {}", arg2, arg)),
-        }
-    }
-
-    pub(super) fn prim_mul(&self, args: &[Value]) -> Result<Value> {
-        match (&args[0], &args[1]) {
-            (Value::Integer(a), Value::Integer(b)) => Ok(Value::Integer(a * b)),
-            (Value::Real(a), Value::Real(b)) => Ok(Value::Real(a * b)),
-            (Value::Integer(a), Value::Real(b)) => Ok(Value::Real(*a as f64 * b)),
-            (Value::Real(a), Value::Integer(b)) => Ok(Value::Real(a * *b as f64)),
-            (arg, arg2) => self.error(&format!("Can't multiply {} and {}", arg, arg2)),
-        }
-    }
-
-    pub(super) fn prim_div(&self, args: &[Value]) -> Result<Value> {
-        match (&args[0], &args[1]) {
-            (Value::Integer(a), Value::Integer(b)) => Ok(Value::Integer(a / b)),
-            (Value::Real(a), Value::Real(b)) => Ok(Value::Real(a / b)),
-            (Value::Integer(a), Value::Real(b)) => Ok(Value::Real(*a as f64 / b)),
-            (Value::Real(a), Value::Integer(b)) => Ok(Value::Real(a / *b as f64)),
-            (arg, arg2) => self.error(&format!("Can't divide {} by {}", arg, arg2)),
-        }
-    }
-
-    pub(super) fn prim_mod(&self, args: &[Value]) -> Result<Value> {
-        match (&args[0], &args[1]) {
-            (Value::Integer(a), Value::Integer(b)) => Ok(Value::Integer(a % b)),
-            _ => self.error("`mod` requires two integers as arguments"),
-        }
-    }
-
-    pub(super) fn prim_gte(&self, args: &[Value]) -> Result<Value> {
-        match (&args[0], &args[1]) {
-            (Value::Integer(a), Value::Integer(b)) => Ok(if a >= b {
-                args[1].clone()
-            } else {
-                Value::Bool(false)
-            }),
-            (Value::Real(a), Value::Real(b)) => Ok(if a >= b {
-                args[1].clone()
-            } else {
-                Value::Bool(false)
-            }),
-            (Value::Integer(a), Value::Real(b)) => Ok(if *a as f64 >= *b {
-                args[1].clone()
-            } else {
-                Value::Bool(false)
-            }),
-            (Value::Real(a), Value::Integer(b)) => Ok(if *a >= *b as f64 {
-                args[1].clone()
-            } else {
-                Value::Bool(false)
-            }),
-            (Value::Char(a), Value::Char(b)) => Ok(if a >= b {
-                args[1].clone()
-            } else {
-                Value::Bool(false)
-            }),
-            (Value::Bool(b), _) => Ok(Value::Bool(false)),
-            (_, Value::Bool(b)) => Ok(Value::Bool(false)),
-            (arg, arg2) => self.error(&format!("Can't compare {} and {}", arg, arg2)),
-        }
-    }
-
-    pub(super) fn prim_gt(&self, args: &[Value]) -> Result<Value> {
-        match (&args[0], &args[1]) {
-            (Value::Integer(a), Value::Integer(b)) => Ok(if a > b {
-                args[1].clone()
-            } else {
-                Value::Bool(false)
-            }),
-            (Value::Real(a), Value::Real(b)) => Ok(if a > b {
-                args[1].clone()
-            } else {
-                Value::Bool(false)
-            }),
-            (Value::Integer(a), Value::Real(b)) => Ok(if *a as f64 > *b {
-                args[1].clone()
-            } else {
-                Value::Bool(false)
-            }),
-            (Value::Real(a), Value::Integer(b)) => Ok(if *a > *b as f64 {
-                args[1].clone()
-            } else {
-                Value::Bool(false)
-            }),
-            (Value::Char(a), Value::Char(b)) => Ok(if a > b {
-                args[1].clone()
-            } else {
-                Value::Bool(false)
-            }),
-            (Value::Bool(b), _) => Ok(Value::Bool(false)),
-            (_, Value::Bool(b)) => Ok(Value::Bool(false)),
-            (arg, arg2) => self.error(&format!("Can't compare {} and {}", arg, arg2)),
-        }
-    }
-
-    pub(super) fn prim_lte(&self, args: &[Value]) -> Result<Value> {
-        match (&args[0], &args[1]) {
-            (Value::Integer(a), Value::Integer(b)) => Ok(if a <= b {
-                args[1].clone()
-            } else {
-                Value::Bool(false)
-            }),
-            (Value::Real(a), Value::Real(b)) => Ok(if a <= b {
-                args[1].clone()
-            } else {
-                Value::Bool(false)
-            }),
-            (Value::Integer(a), Value::Real(b)) => Ok(if *a as f64 <= *b {
-                args[1].clone()
-            } else {
-                Value::Bool(false)
-            }),
-            (Value::Real(a), Value::Integer(b)) => Ok(if *a <= *b as f64 {
-                args[1].clone()
-            } else {
-                Value::Bool(false)
-            }),
-            (Value::Char(a), Value::Char(b)) => Ok(if a <= b {
-                args[1].clone()
-            } else {
-                Value::Bool(false)
-            }),
-            (Value::Bool(b), _) => Ok(Value::Bool(false)),
-            (_, Value::Bool(b)) => Ok(Value::Bool(false)),
-            (arg, arg2) => self.error(&format!("Can't compare {} and {}", arg, arg2)),
-        }
-    }
-
-    pub(super) fn prim_lt(&self, args: &[Value]) -> Result<Value> {
-        match (&args[0], &args[1]) {
-            (Value::Integer(a), Value::Integer(b)) => Ok(if a < b {
-                args[1].clone()
-            } else {
-                Value::Bool(false)
-            }),
-            (Value::Real(a), Value::Real(b)) => Ok(if a < b {
-                args[1].clone()
-            } else {
-                Value::Bool(false)
-            }),
-            (Value::Integer(a), Value::Real(b)) => Ok(if (*a as f64) < *b {
-                args[1].clone()
-            } else {
-                Value::Bool(false)
-            }),
-            (Value::Real(a), Value::Integer(b)) => Ok(if *a < *b as f64 {
-                args[1].clone()
-            } else {
-                Value::Bool(false)
-            }),
-            (Value::Char(a), Value::Char(b)) => Ok(if a < b {
-                args[1].clone()
-            } else {
-                Value::Bool(false)
-            }),
-            (Value::Bool(b), _) => Ok(Value::Bool(false)),
-            (_, Value::Bool(b)) => Ok(Value::Bool(false)),
-            (arg, arg2) => self.error(&format!("Can't compare {} and {}", arg, arg2)),
-        }
-    }
-
-    pub(super) fn prim_eq(&self, args: &[Value]) -> Result<Value> {
-        match (&args[0], &args[1]) {
-            (x, y) if std::mem::discriminant(x) == std::mem::discriminant(y) => {
-                Ok(Value::Bool(x == y))
-            }
-            (Value::Integer(a), Value::Integer(b)) => Ok(Value::Bool(a == b)),
-            (Value::Real(a), Value::Real(b)) => Ok(Value::Bool(a == b)),
-            (arg, arg2) => Ok(Value::Bool(false)),
-        }
-    }
-
-    pub(super) fn prim_array_ref(&self, args: &[Value]) -> Result<Value> {
-        match (&args[0], &args[1]) {
-            (Value::Array(arr), Value::Integer(n)) => {
-                let array = arr.borrow();
-                Ok(array.array[*n as usize].clone())
-            }
-            (x, y) => self.error(&format!(
-                "The arguments to _prim_array_ref should be an array and an integer, got {} and {}",
-                x, y
-            )),
-        }
-    }
-
-    pub(super) fn prim_bitand(&self, args: &[Value]) -> Result<Value> {
-        match (&args[0], &args[1]) {
-            (Value::Integer(a), Value::Integer(b)) => Ok(Value::Integer(a & b)),
-            (Value::Pointer(a), Value::Pointer(b)) => Ok(Value::Pointer(a & b)),
-            (arg, arg2) => self.error(&format!(
-                "The arguments to _prim_bitand should be int or ptr, got {} and {}",
-                arg, arg2
-            )),
-        }
-    }
-
-    pub(super) fn prim_bitor(&self, args: &[Value]) -> Result<Value> {
-        match (&args[0], &args[1]) {
-            (Value::Integer(a), Value::Integer(b)) => Ok(Value::Integer(a | b)),
-            (Value::Pointer(a), Value::Pointer(b)) => Ok(Value::Pointer(a | b)),
-            (arg, arg2) => self.error(&format!(
-                "The arguments to _prim_bitor should be int or ptr, got {} and {}",
-                arg, arg2
-            )),
-        }
-    }
-
-    pub(super) fn prim_bitxor(&self, args: &[Value]) -> Result<Value> {
-        match (&args[0], &args[1]) {
-            (Value::Integer(a), Value::Integer(b)) => Ok(Value::Integer(a ^ b)),
-            (Value::Pointer(a), Value::Pointer(b)) => Ok(Value::Pointer(a ^ b)),
-            (arg, arg2) => self.error(&format!(
-                "The arguments to _prim_bitxor should be int or ptr, got {} and {}",
-                arg, arg2
-            )),
-        }
-    }
-
-    pub(super) fn prim_bitshift(&self, args: &[Value]) -> Result<Value> {
-        match (&args[0], &args[1]) {
-            (Value::Integer(a), Value::Integer(b)) => {
-                let val = if *b < 0 { a.shl(b.abs()) } else { a.shr(b) };
-                Ok(Value::Integer(val))
-            }
-            (Value::Pointer(a), Value::Integer(b)) => {
-                let val = if *b < 0 { a.shl(b.abs()) } else { a.shr(b) };
-                Ok(Value::Pointer(val))
-            }
-            (arg, arg2) => self.error(&format!(
-                "The arguments to _prim_bitshift should be int or ptr and an int, got {} and {}",
-                arg, arg2
-            )),
-        }
-    }
-
-    pub(super) fn prim_bytes_create(&self, args: &[Value]) -> Result<Value> {
-        match (&args[0], &args[1]) {
-            (Value::Integer(n), Value::Integer(v)) => {
-                if *v < 0 || *v > 255 {
-                    return self.error("The second argument to _prim_bytes_create must be an integer between 0-255");
-                }
-                let mut b = Vec::with_capacity(*n as usize);
-                b.resize(*n as usize, *v as u8);
-                Ok(Value::new_bytes(b))
-            }
-            (arg, _) => self.error(&format!(
-                "The first argument to _prim_bytes_create must be an integer, got {}",
-                arg
-            )),
-        }
-    }
-
-    pub(super) fn prim_bytes_ref(&self, args: &[Value]) -> Result<Value> {
-        match (&args[0], &args[1]) {
-            (Value::Bytes(b), Value::Integer(n)) => {
-                let bytes = &mut b.borrow_mut().bytes;
-                if let Some(byte) = bytes.get(*n as usize) {
-                    Ok(Value::Integer(*byte as i64))
-                } else {
-                    self.error("_prim_bytes_ref index out of bounds")
-                }
-            },
-            (arg, arg2,) => self.error(&format!("The arguments to _prim_bytes_ref should be a bytes object and an int, got {} and {}", arg, arg2))
-        }
-    }
-
-    pub(super) fn prim_table_delete(&self, args: &[Value]) -> Result<Value> {
-        match (&args[0], &args[1]) {
-            (Value::Table(tab), Value::Symbol(sym)) => {
-                let table = &mut tab.borrow_mut().table;
-                let res = table.remove(sym).is_some();
-                Ok(Value::Bool(res))
-            },
-            (arg, arg2) => self.error(&format!("The arguments to _prim_table_delete should be a table object and a symbol, got {} and {}", arg, arg2))
-        }
-    }
-
-    pub(super) fn prim_array_set(&self, args: &[Value]) -> Result<Value> {
-        let Value::Array(arr) = &args[0] else {
-            return self.error("First argument to _prim_array_set must be an array");
-        };
-        let Value::Integer(n) = args[1] else {
-            return self.error("Second argument to _prim_array_set must be an integer");
-        };
-        let mut array = arr.borrow_mut();
-        array.array[n as usize] = args[2].clone();
-        Ok(Value::Nil)
-    }
-
-    pub(super) fn prim_bytes_set(&self, args: &[Value]) -> Result<Value> {
-        match(&args[0], &args[1], &args[2]) {
-            (Value::Bytes(b), Value::Integer(n), Value::Integer(v)) => {
-                if *v < 0 || *v > 255 {
-                    return self.error("_prim_bytes_set, value to set is outside 0-255");
-                }
-                let bytes = &mut b.borrow_mut().bytes;
-                bytes[*n as usize] = *v as u8;
-                Ok(Value::Nil)
-            },
-            (arg, arg2, arg3) => self.error(&format!("The arguments to _prim_bytes_set should be a bytes object, an int and an int, got {}, {} and {}", arg, arg2, arg3))
-        }
-    }
-
-    pub(super) fn prim_table_set(&self, args: &[Value]) -> Result<Value> {
-        let Value::Table(tab) = &args[0] else {
-            return self.error("First argument to _prim_table_set must be a table");
-        };
-        let Value::Symbol(sym) = &args[1] else {
-            return self.error("Second argument to _prim_table_set must be a symbol");
-        };
-        let table = &mut tab.borrow_mut().table;
-        table.insert(sym.clone(), args[2].clone());
-        Ok(Value::Nil)
-    }
-
-    pub(super) fn prim_string_sub(&self, args: &[Value]) -> Result<Value> {
-        match (&args[0], &args[1], &args[2]) {
-            (Value::Bytes(b), Value::Integer(start), Value::Integer(stop)) => {
-                let str = self.format_string(&args[0])?;
-                let iter = str.chars();
-                let it = iter.skip(*start as usize).take((stop - start) as usize);
-                let subs = String::from_iter(it);
-                self.make_string(&subs)
-            }
-            _ => self.error(
-                "_prim_string_substring takes a string, an integer and an integer as argument",
-            ),
-        }
-    }
-
     pub(super) fn register_primitives(&mut self) -> Result<()> {
         self.add_global("global", Value::Table(self.globals.clone()));
         self.add_global(
@@ -785,27 +245,27 @@ impl Runtime {
 
     pub(super) fn register_system_constants(&mut self) -> Result<()> {
         self.add_name(
-            &Name::name("system.os"),
+            &Name::from_str("system.os"),
             &self.make_string(std::env::consts::OS)?,
         )?;
         self.add_name(
-            &Name::name("system.os_family"),
+            &Name::from_str("system.os_family"),
             &self.make_string(std::env::consts::FAMILY)?,
         )?;
         self.add_name(
-            &Name::name("system.arch"),
+            &Name::from_str("system.arch"),
             &self.make_string(std::env::consts::ARCH)?,
         )?;
         self.add_name(
-            &Name::name("system.dll_extension"),
+            &Name::from_str("system.dll_extension"),
             &self.make_string(std::env::consts::DLL_EXTENSION)?,
         )?;
         self.add_name(
-            &Name::name("system.dll_prefix"),
+            &Name::from_str("system.dll_prefix"),
             &self.make_string(std::env::consts::DLL_PREFIX)?,
         )?;
         self.add_name(
-            &Name::name("system.exe_extension"),
+            &Name::from_str("system.exe_extension"),
             &self.make_string(std::env::consts::EXE_EXTENSION)?,
         )?;
         Ok(())
@@ -831,12 +291,446 @@ impl Runtime {
     fn register_type(&mut self, table_name: &str, type_name: &str) {
         self.add_global(table_name, Value::new_table());
         let tname = self.make_string(type_name).unwrap();
-        self.add_name(&Name::name(&format!("{}.type_id", table_name)), &tname)
+        self.add_name(&Name::from_str(&format!("{}.type_id", table_name)), &tname)
             .unwrap();
     }
-}
 
-impl Runtime {
+    pub(super) fn prim_to_int(&self, args: &[Value]) -> Result<Value> {
+        match &args[0] {
+            Value::Real(f) => Ok(Value::Integer(*f as i64)),
+            Value::Bool(b) => Ok(Value::Integer(if *b { 1 } else { 0 })),
+            Value::Char(c) => Ok(Value::Integer(*c as i64)),
+            Value::Pointer(p) => Ok(Value::Integer(p.addr() as i64)),
+            _ => self.error("The argument to _prim_to_int must be a float or bool"),
+        }
+    }
+
+    pub(super) fn prim_to_char(&self, args: &[Value]) -> Result<Value> {
+        let cp = u32::try_from(&args[0])?;
+        if let Some(c) = char::from_u32(cp) {
+            Ok(Value::Char(c))
+        } else {
+            Ok(Value::Bool(false))
+        }
+    }
+
+    pub(super) fn prim_table_size(&self, args: &[Value]) -> Result<Value> {
+        let table = &args[0].get_table()?;
+        Ok(Value::from(table.borrow().table.len() as i64))
+    }
+
+    pub(super) fn prim_bitnot(&self, args: &[Value]) -> Result<Value> {
+        match &args[0] {
+            Value::Bool(b) => Ok(Value::Bool(!b)),
+            Value::Integer(a) => Ok(Value::Integer(!a)),
+            _ => self.error("The argument to _prim_bitnot must be an integer or pointer"),
+        }
+    }
+
+    pub(super) fn prim_array_size(&self, args: &[Value]) -> Result<Value> {
+        let array = &args[0].get_array()?;
+        Ok(Value::from(array.borrow().array.len() as i64))
+    }
+
+    pub(super) fn prim_bytes_size(&self, args: &[Value]) -> Result<Value> {
+        let bytes = &args[0].get_bytes()?;
+        Ok(Value::from(bytes.borrow().bytes.len() as i64))
+    }
+
+    pub(super) fn prim_symbol_name(&self, args: &[Value]) -> Result<Value> {
+        match &args[0] {
+            Value::Symbol(sym) => {
+                let name = &sym.symbol_info.borrow().symbol;
+                if !name.is_empty() {
+                    Ok(self.make_string(name)?)
+                } else {
+                    Ok(Value::Bool(false))
+                }
+            }
+            _ => self.error("The argument to _prim_symbol_name must be a symbol"),
+        }
+    }
+
+    pub(super) fn prim_ceiling(&self, args: &[Value]) -> Result<Value> {
+        let f = f64::try_from(&args[0])?;
+        Ok(Value::from(f.ceil()))
+    }
+
+    pub(super) fn prim_floor(&self, args: &[Value]) -> Result<Value> {
+        let f = f64::try_from(&args[0])?;
+        Ok(Value::from(f.floor()))
+    }
+
+    pub(super) fn prim_round(&self, args: &[Value]) -> Result<Value> {
+        let f = f64::try_from(&args[0])?;
+        Ok(Value::from(f.round()))
+    }
+
+    pub(super) fn prim_sin(&self, args: &[Value]) -> Result<Value> {
+        let f = f64::try_from(&args[0])?;
+        Ok(Value::from(f.sin()))
+    }
+
+    pub(super) fn prim_cos(&self, args: &[Value]) -> Result<Value> {
+        let f = f64::try_from(&args[0])?;
+        Ok(Value::from(f.cos()))
+    }
+
+    pub(super) fn prim_tan(&self, args: &[Value]) -> Result<Value> {
+        let f = f64::try_from(&args[0])?;
+        Ok(Value::from(f.tan()))
+    }
+
+    pub(super) fn prim_asin(&self, args: &[Value]) -> Result<Value> {
+        let f = f64::try_from(&args[0])?;
+        Ok(Value::from(f.asin()))
+    }
+
+    pub(super) fn prim_acos(&self, args: &[Value]) -> Result<Value> {
+        match &args[0] {
+            Value::Real(f) => Ok(Value::Real(f.acos())),
+            _ => self.error("The argument to _prim_acos must be a float"),
+        }
+    }
+
+    pub(super) fn prim_atan(&self, args: &[Value]) -> Result<Value> {
+        let f = f64::try_from(&args[0])?;
+        Ok(Value::from(f.acos()))
+    }
+
+    pub(super) fn prim_log(&self, args: &[Value]) -> Result<Value> {
+        let f = f64::try_from(&args[0])?;
+        Ok(Value::from(f.ln()))
+    }
+
+    pub(super) fn prim_exp(&self, args: &[Value]) -> Result<Value> {
+        let f = f64::try_from(&args[0])?;
+        Ok(Value::from(f.exp()))
+    }
+
+    pub(super) fn prim_negate(&self, args: &[Value]) -> Result<Value> {
+        match &args[0] {
+            Value::Integer(n) => Ok(Value::Integer(-n)),
+            Value::Real(f) => Ok(Value::Real(-f)),
+            _ => self.error("The argument to _prim_negate must be an int or a float"),
+        }
+    }
+
+    pub(super) fn prim_string_pack(&self, args: &[Value]) -> Result<Value> {
+        let a = &args[0].get_array()?;
+        let mut chars = Vec::new();
+        for v in &a.borrow().array {
+            chars.push(char::try_from(v)?)
+        }
+        let str = String::from_iter(chars.iter());
+        self.make_string(&str)
+    }
+
+    pub(super) fn prim_string_unpack(&self, args: &[Value]) -> Result<Value> {
+        if self.is_type(&args[0], "string") {
+            let str = self.format_string(&args[0])?;
+            let vals: Vec<Value> = str.chars().map(Value::Char).collect();
+            Ok(Value::new_array(&vals))
+        } else {
+            self.error("The argument to _prim_string_unpack must be a string")
+        }
+    }
+
+    pub(super) fn prim_add(&self, args: &[Value]) -> Result<Value> {
+        match (&args[0], &args[1]) {
+            (Value::Integer(a), Value::Integer(b)) => Ok(Value::Integer(a + b)),
+            (Value::Real(a), Value::Real(b)) => Ok(Value::Real(a + b)),
+            (Value::Integer(a), Value::Real(b)) => Ok(Value::Real(*a as f64 + b)),
+            (Value::Real(a), Value::Integer(b)) => Ok(Value::Real(a + *b as f64)),
+            (arg, arg2) => self.error(&format!("Can't add {} and {}", arg, arg2)),
+        }
+    }
+
+    pub(super) fn prim_sub(&self, args: &[Value]) -> Result<Value> {
+        match (&args[0], &args[1]) {
+            (Value::Integer(a), Value::Integer(b)) => Ok(Value::Integer(a - b)),
+            (Value::Real(a), Value::Real(b)) => Ok(Value::Real(a - b)),
+            (Value::Integer(a), Value::Real(b)) => Ok(Value::Real(*a as f64 - b)),
+            (Value::Real(a), Value::Integer(b)) => Ok(Value::Real(a - *b as f64)),
+            (arg, arg2) => self.error(&format!("Can't subtract {} from {}", arg2, arg)),
+        }
+    }
+
+    pub(super) fn prim_mul(&self, args: &[Value]) -> Result<Value> {
+        match (&args[0], &args[1]) {
+            (Value::Integer(a), Value::Integer(b)) => Ok(Value::Integer(a * b)),
+            (Value::Real(a), Value::Real(b)) => Ok(Value::Real(a * b)),
+            (Value::Integer(a), Value::Real(b)) => Ok(Value::Real(*a as f64 * b)),
+            (Value::Real(a), Value::Integer(b)) => Ok(Value::Real(a * *b as f64)),
+            (arg, arg2) => self.error(&format!("Can't multiply {} and {}", arg, arg2)),
+        }
+    }
+
+    pub(super) fn prim_div(&self, args: &[Value]) -> Result<Value> {
+        match (&args[0], &args[1]) {
+            (Value::Integer(a), Value::Integer(b)) => Ok(Value::Integer(a / b)),
+            (Value::Real(a), Value::Real(b)) => Ok(Value::Real(a / b)),
+            (Value::Integer(a), Value::Real(b)) => Ok(Value::Real(*a as f64 / b)),
+            (Value::Real(a), Value::Integer(b)) => Ok(Value::Real(a / *b as f64)),
+            (arg, arg2) => self.error(&format!("Can't divide {} by {}", arg, arg2)),
+        }
+    }
+
+    pub(super) fn prim_mod(&self, args: &[Value]) -> Result<Value> {
+        let a = i64::try_from(&args[0])?;
+        let b = i64::try_from(&args[1])?;
+        Ok(Value::from(a % b))
+    }
+
+    pub(super) fn prim_gte(&self, args: &[Value]) -> Result<Value> {
+        match (&args[0], &args[1]) {
+            (Value::Integer(a), Value::Integer(b)) => Ok(if a >= b {
+                args[1].clone()
+            } else {
+                Value::Bool(false)
+            }),
+            (Value::Real(a), Value::Real(b)) => Ok(if a >= b {
+                args[1].clone()
+            } else {
+                Value::Bool(false)
+            }),
+            (Value::Integer(a), Value::Real(b)) => Ok(if *a as f64 >= *b {
+                args[1].clone()
+            } else {
+                Value::Bool(false)
+            }),
+            (Value::Real(a), Value::Integer(b)) => Ok(if *a >= *b as f64 {
+                args[1].clone()
+            } else {
+                Value::Bool(false)
+            }),
+            (Value::Char(a), Value::Char(b)) => Ok(if a >= b {
+                args[1].clone()
+            } else {
+                Value::Bool(false)
+            }),
+            (Value::Bool(b), _) => Ok(Value::Bool(false)),
+            (_, Value::Bool(b)) => Ok(Value::Bool(false)),
+            (arg, arg2) => self.error(&format!("Can't compare {} and {}", arg, arg2)),
+        }
+    }
+
+    pub(super) fn prim_gt(&self, args: &[Value]) -> Result<Value> {
+        match (&args[0], &args[1]) {
+            (Value::Integer(a), Value::Integer(b)) => Ok(if a > b {
+                args[1].clone()
+            } else {
+                Value::Bool(false)
+            }),
+            (Value::Real(a), Value::Real(b)) => Ok(if a > b {
+                args[1].clone()
+            } else {
+                Value::Bool(false)
+            }),
+            (Value::Integer(a), Value::Real(b)) => Ok(if *a as f64 > *b {
+                args[1].clone()
+            } else {
+                Value::Bool(false)
+            }),
+            (Value::Real(a), Value::Integer(b)) => Ok(if *a > *b as f64 {
+                args[1].clone()
+            } else {
+                Value::Bool(false)
+            }),
+            (Value::Char(a), Value::Char(b)) => Ok(if a > b {
+                args[1].clone()
+            } else {
+                Value::Bool(false)
+            }),
+            (Value::Bool(b), _) => Ok(Value::Bool(false)),
+            (_, Value::Bool(b)) => Ok(Value::Bool(false)),
+            (arg, arg2) => self.error(&format!("Can't compare {} and {}", arg, arg2)),
+        }
+    }
+
+    pub(super) fn prim_lte(&self, args: &[Value]) -> Result<Value> {
+        match (&args[0], &args[1]) {
+            (Value::Integer(a), Value::Integer(b)) => Ok(if a <= b {
+                args[1].clone()
+            } else {
+                Value::Bool(false)
+            }),
+            (Value::Real(a), Value::Real(b)) => Ok(if a <= b {
+                args[1].clone()
+            } else {
+                Value::Bool(false)
+            }),
+            (Value::Integer(a), Value::Real(b)) => Ok(if *a as f64 <= *b {
+                args[1].clone()
+            } else {
+                Value::Bool(false)
+            }),
+            (Value::Real(a), Value::Integer(b)) => Ok(if *a <= *b as f64 {
+                args[1].clone()
+            } else {
+                Value::Bool(false)
+            }),
+            (Value::Char(a), Value::Char(b)) => Ok(if a <= b {
+                args[1].clone()
+            } else {
+                Value::Bool(false)
+            }),
+            (Value::Bool(b), _) => Ok(Value::Bool(false)),
+            (_, Value::Bool(b)) => Ok(Value::Bool(false)),
+            (arg, arg2) => self.error(&format!("Can't compare {} and {}", arg, arg2)),
+        }
+    }
+
+    pub(super) fn prim_lt(&self, args: &[Value]) -> Result<Value> {
+        match (&args[0], &args[1]) {
+            (Value::Integer(a), Value::Integer(b)) => Ok(if a < b {
+                args[1].clone()
+            } else {
+                Value::Bool(false)
+            }),
+            (Value::Real(a), Value::Real(b)) => Ok(if a < b {
+                args[1].clone()
+            } else {
+                Value::Bool(false)
+            }),
+            (Value::Integer(a), Value::Real(b)) => Ok(if (*a as f64) < *b {
+                args[1].clone()
+            } else {
+                Value::Bool(false)
+            }),
+            (Value::Real(a), Value::Integer(b)) => Ok(if *a < *b as f64 {
+                args[1].clone()
+            } else {
+                Value::Bool(false)
+            }),
+            (Value::Char(a), Value::Char(b)) => Ok(if a < b {
+                args[1].clone()
+            } else {
+                Value::Bool(false)
+            }),
+            (Value::Bool(b), _) => Ok(Value::Bool(false)),
+            (_, Value::Bool(b)) => Ok(Value::Bool(false)),
+            (arg, arg2) => self.error(&format!("Can't compare {} and {}", arg, arg2)),
+        }
+    }
+
+    pub(super) fn prim_eq(&self, args: &[Value]) -> Result<Value> {
+        match (&args[0], &args[1]) {
+            (x, y) if std::mem::discriminant(x) == std::mem::discriminant(y) => {
+                Ok(Value::Bool(x == y))
+            }
+            (Value::Integer(a), Value::Integer(b)) => Ok(Value::Bool(a == b)),
+            (Value::Real(a), Value::Real(b)) => Ok(Value::Bool(a == b)),
+            (arg, arg2) => Ok(Value::Bool(false)),
+        }
+    }
+
+    pub(super) fn prim_array_ref(&self, args: &[Value]) -> Result<Value> {
+        let arr = args[0].get_array()?;
+        let array = &arr.borrow().array;
+        let n = usize::try_from(&args[1])?;
+        if n < array.len() {
+            Ok(array[n].clone())
+        } else {
+            self.error("prim_array_ref index out of bounds")
+        }
+    }
+
+    pub(super) fn prim_bitand(&self, args: &[Value]) -> Result<Value> {
+        let a = i64::try_from(&args[0])?;
+        let b = i64::try_from(&args[1])?;
+        Ok(Value::from(a & b))
+    }
+
+    pub(super) fn prim_bitor(&self, args: &[Value]) -> Result<Value> {
+        let a = i64::try_from(&args[0])?;
+        let b = i64::try_from(&args[1])?;
+        Ok(Value::from(a | b))
+    }
+
+    pub(super) fn prim_bitxor(&self, args: &[Value]) -> Result<Value> {
+        let a = i64::try_from(&args[0])?;
+        let b = i64::try_from(&args[1])?;
+        Ok(Value::from(a | b))
+    }
+
+    pub(super) fn prim_bitshift(&self, args: &[Value]) -> Result<Value> {
+        let a = i64::try_from(&args[0])?;
+        let b = i64::try_from(&args[1])?;
+        let val = if b < 0 { a.shl(b.abs()) } else { a.shr(b) };
+        Ok(Value::from(val))
+    }
+
+    pub(super) fn prim_bytes_create(&self, args: &[Value]) -> Result<Value> {
+        let n = i64::try_from(&args[0])?;
+        let v = u8::try_from(&args[1])?;
+        let mut b = Vec::with_capacity(n as usize);
+        b.resize(n as usize, v);
+        Ok(Value::new_bytes(b))
+    }
+
+    pub(super) fn prim_bytes_ref(&self, args: &[Value]) -> Result<Value> {
+        let b = &args[0].get_bytes()?;
+        let n = i64::try_from(&args[1])? as usize;
+        let bytes = &mut b.borrow_mut().bytes;
+        if let Some(byte) = bytes.get(n) {
+            Ok(Value::from(*byte))
+        } else {
+            self.error("_prim_bytes_ref index out of bounds")
+        }
+    }
+
+    pub(super) fn prim_table_delete(&self, args: &[Value]) -> Result<Value> {
+        let tab = &args[0].get_table()?;
+        let sym = &args[1].get_symbol()?;
+        let table = &mut tab.borrow_mut().table;
+        let res = table.remove(sym).is_some();
+        Ok(Value::from(res))
+    }
+
+    pub(super) fn prim_array_set(&self, args: &[Value]) -> Result<Value> {
+        let arr = &args[0].get_array()?;
+        let n = i64::try_from(&args[1])? as usize;
+        let array = &mut arr.borrow_mut().array;
+        if n < array.len() {
+            array[n] = args[2].clone();
+            Ok(Value::Nil)
+        } else {
+            self.error("index out of bounds in _prim_array set")
+        }
+    }
+
+    pub(super) fn prim_bytes_set(&self, args: &[Value]) -> Result<Value> {
+        let b = &args[0].get_bytes()?;
+        let n = i64::try_from(&args[1])? as usize;
+        let v = u8::try_from(&args[1])?;
+        let bytes = &mut b.borrow_mut().bytes;
+        if n < bytes.len() {
+            bytes[n] = v;
+            Ok(Value::Nil)
+        } else {
+            self.error("index out of bounds in _prim_bytes set")
+        }
+    }
+
+    pub(super) fn prim_table_set(&self, args: &[Value]) -> Result<Value> {
+        let tab = &args[0].get_table()?;
+        let sym = &args[1].get_symbol()?;
+        let table = &mut tab.borrow_mut().table;
+        table.insert(sym.clone(), args[2].clone());
+        Ok(Value::Nil)
+    }
+
+    pub(super) fn prim_string_sub(&self, args: &[Value]) -> Result<Value> {
+        let str = String::try_from(&args[0])?;
+        let start = i64::try_from(&args[1])? as usize;
+        let stop = i64::try_from(&args[2])? as usize;
+        let iter = str.chars();
+        let it = iter.skip(start).take(stop - start);
+        let subs = String::from_iter(it);
+        self.make_string(&subs)
+    }
+
     fn value_printer(&self, args: &[Value]) -> Result<Value> {
         println!("{}", args[0]);
         Ok(Value::Nil)
@@ -852,41 +746,22 @@ impl Runtime {
     }
 
     pub fn format_string(&self, arg: &Value) -> Result<String> {
-        let str = match arg {
-            Value::Bytes(b) if self.is_type(arg, "string") => str::from_utf8(&b.borrow().bytes)
-                .map_err(|_| Error::runtime_error("Invalid string in _prim_string_print"))?
-                .to_owned(),
-            a => format!("{}", a),
+        let str = if self.is_type(arg, "string") {
+            String::try_from(arg)?
+        } else {
+            format!("{}", arg)
         };
         Ok(str)
     }
 
     fn print_string(&self, arg: &[Value]) -> Result<Value> {
-        match &arg[0] {
-            Value::Bytes(bytes) => {
-                let b = &bytes.borrow().bytes;
-                print!(
-                    "{}",
-                    str::from_utf8(b).map_err(|_| Error::runtime_error(
-                        "Invalid string in _prim_string_print"
-                    ))?
-                );
-                Ok(Value::Integer(b.len() as i64))
-            }
-            a => self.error(&format!("_prim_string_print takes a string, got {}", a)),
-        }
+        let str = String::try_from(&arg[0])?;
+        print!("{}", str);
+        Ok(Value::Integer(str.len() as i64))
     }
 
     fn array_create(&self, arg: &[Value]) -> Result<Value> {
-        let size = match &arg[0] {
-            Value::Integer(n) => *n as usize,
-            a => {
-                return self.error(&format!(
-                    "The argument to _prim_array_create should be an integer, got {}",
-                    a
-                ));
-            }
-        };
+        let size = i64::try_from(&arg[0])? as usize;
         let mut v = Vec::with_capacity(size);
         v.resize(size, Value::Nil);
         Ok(Value::new_array(v.as_slice()))
@@ -1031,9 +906,7 @@ impl Runtime {
     }
 
     fn prim_apply(&mut self, args: &[Value]) -> Result<Value> {
-        let Value::Array(arr) = &args[1] else {
-            return self.error("The second argument to _prim_apply must be an array");
-        };
+        let arr = &args[1].get_array()?;
         let mut vals = vec![args[0].clone()];
         for v in &arr.borrow().array {
             vals.push(v.clone());
@@ -1042,18 +915,14 @@ impl Runtime {
     }
 
     fn table_keys(&self, arg: &[Value]) -> Result<Value> {
-        match &arg[0] {
-            Value::Table(tab) => {
-                let mut keys = Vec::new();
-                let table = &tab.borrow().table;
-                for k in table.keys() {
-                    keys.push(Value::Symbol(k.clone()));
-                }
-                // TODO: sort the keys?
-                Ok(Value::new_array(&keys))
-            }
-            _ => self.error("The argument to _prim_table_keys must be a table"),
+        let tab = &arg[0].get_table()?;
+        let mut keys = Vec::new();
+        let table = &tab.borrow().table;
+        for k in table.keys() {
+            keys.push(Value::Symbol(k.clone()));
         }
+        // TODO: sort the keys?
+        Ok(Value::new_array(&keys))
     }
 
     fn nib_panic(&self, msg: &[Value]) -> Result<Value> {
@@ -1062,26 +931,15 @@ impl Runtime {
     }
 
     fn nib_exit(&self, arg: &[Value]) -> Result<Value> {
-        match &arg[0] {
-            Value::Integer(n) => Err(Error::NibExit {
-                exit_code: *n as i32,
-            }),
-            _ => self.error("Argument to _prim_exit must be an int"),
-        }
+        let n = i32::try_from(&arg[0])?;
+        Err(Error::NibExit { exit_code: n })
     }
 
     fn bytes_make(&mut self, args: &[Value]) -> Result<Value> {
         let mut b = Vec::new();
         for a in args {
-            match a {
-                Value::Integer(v) if *v >= 0 && *v < 256 => {
-                    b.push(*v as u8);
-                }
-                _ => {
-                    return self
-                        .error("The arguments to _prim_bytes_make must be ints between 0-255");
-                }
-            }
+            let v = u8::try_from(a)?;
+            b.push(v);
         }
         Ok(Value::new_bytes(b))
     }

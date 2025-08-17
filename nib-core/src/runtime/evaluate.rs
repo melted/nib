@@ -211,7 +211,7 @@ impl Runtime {
     pub(super) fn evaluate_lambda(
         &mut self,
         binding_name: &str,
-        clauses: &Vec<FunClause>,
+        clauses: &[FunClause],
         free: &HashSet<String>,
         env: &mut Environment,
     ) -> Result<Value> {
@@ -240,7 +240,7 @@ impl Runtime {
             }
         }
         Ok(Value::Closure(new_ref(Closure {
-            code: new_ref(Code::Nib(clauses.clone())),
+            code: new_ref(Code::Nib(clauses.to_vec())),
             type_table: None,
             env: lexical_env,
             args: Vec::new(),
