@@ -73,7 +73,7 @@ struct ParserState<'a> {
 
 impl<'a> ParserState<'a> {
     fn new(code: &'a str) -> ParserState<'a> {
-        ParserState {
+        let mut state = ParserState {
             metadata: Metadata::new(None),
             src: code,
             chars: code.char_indices().peekable(),
@@ -84,7 +84,14 @@ impl<'a> ParserState<'a> {
             stashed_token: None,
             on_new_line: true,
             counter: 0,
+        };
+        if code.starts_with("#!") {
+            let start = code.find("\n").unwrap_or(code.len());
+            state.chars = code[start..].char_indices().peekable();
+            state.offset = start;
+            state.metadata.newlines.push(start);
         }
+        state
     }
 
     pub(self) fn new_error(&self, msg: &str) -> Error {

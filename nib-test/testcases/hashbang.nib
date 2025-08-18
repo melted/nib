@@ -1,0 +1,8 @@
+#!/bin/env nibble
+// @Name: Test hashbang parsing
+// @Tags: parser
+_ = print "hello"
+// @Output:
+// hello
+// @EndOutput
+// @ExitCode: 0
