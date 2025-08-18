@@ -1,10 +1,9 @@
 
 #![allow(clippy::not_unsafe_ptr_arg_deref)]
-#![allow(clippy::unpredictable_function_pointer_comparisons)]
 #![allow(clippy::mutable_key_type)]
 
 use std::{
-    cell::RefCell, collections::{BTreeSet, HashMap, HashSet}, ffi::c_void, fmt::{Debug, Display}, fs::read_to_string, hash::Hash, mem, rc::Rc
+    cell::RefCell, collections::{BTreeSet, HashMap, HashSet}, ffi::c_void, fmt::{Debug, Display}, fs::read_to_string, hash::Hash, rc::Rc
 };
 
 use libffi::low::{CodePtr, ffi_cif};
@@ -451,13 +450,13 @@ impl From<bool> for Value {
 
 impl<T> From<*mut T> for Value {
     fn from(value: *mut T) -> Self {
-        unsafe { Value::Pointer(mem::transmute(value)) }
+        Value::Pointer(value as *mut c_void)
     }
 }
 
 impl<T> From<*const T> for Value {
     fn from(value: *const T) -> Self {
-        unsafe { Value::Pointer(mem::transmute(value)) }
+        Value::Pointer(value as *mut c_void)
     }
 }
 

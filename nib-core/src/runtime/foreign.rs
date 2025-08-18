@@ -1,4 +1,4 @@
-use std::{mem, os::raw::c_void, path::PathBuf};
+use std::{os::raw::c_void, path::PathBuf};
 
 use libffi::low::ffi_type;
 use minidl::Library;
@@ -51,7 +51,7 @@ impl Runtime {
         let mut str = self.format_string(&args[1])?;
         str.push('\0');
         unsafe {
-            let Some(lib) = Library::from_ptr(mem::transmute(lib_ptr)) else {
+            let Some(lib) = Library::from_ptr(lib_ptr) else {
                 return self.error("Failed to get library");
             };
             let Some(ptr): Option<*mut c_void> = lib.sym_opt(str) else {

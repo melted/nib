@@ -15,7 +15,7 @@ impl Runtime {
             "_prim_project",
             Value::new_extern_fun(Runtime::project, &Arity::VarArg(2)),
         );
-        self.add_global(
+         self.add_global(
             "_prim_array_make",
             Value::new_extern_mut_fun(|_rt, args| Ok(Value::new_array(args)), &Arity::VarArg(1)),
         );
@@ -245,27 +245,27 @@ impl Runtime {
 
     pub(super) fn register_system_constants(&mut self) -> Result<()> {
         self.add_name(
-            &Name::from_str("system.os"),
+            &Name::str("system.os"),
             &self.make_string(std::env::consts::OS)?,
         )?;
         self.add_name(
-            &Name::from_str("system.os_family"),
+            &Name::str("system.os_family"),
             &self.make_string(std::env::consts::FAMILY)?,
         )?;
         self.add_name(
-            &Name::from_str("system.arch"),
+            &Name::str("system.arch"),
             &self.make_string(std::env::consts::ARCH)?,
         )?;
         self.add_name(
-            &Name::from_str("system.dll_extension"),
+            &Name::str("system.dll_extension"),
             &self.make_string(std::env::consts::DLL_EXTENSION)?,
         )?;
         self.add_name(
-            &Name::from_str("system.dll_prefix"),
+            &Name::str("system.dll_prefix"),
             &self.make_string(std::env::consts::DLL_PREFIX)?,
         )?;
         self.add_name(
-            &Name::from_str("system.exe_extension"),
+            &Name::str("system.exe_extension"),
             &self.make_string(std::env::consts::EXE_EXTENSION)?,
         )?;
         Ok(())
@@ -291,7 +291,7 @@ impl Runtime {
     fn register_type(&mut self, table_name: &str, type_name: &str) {
         self.add_global(table_name, Value::new_table());
         let tname = self.make_string(type_name).unwrap();
-        self.add_name(&Name::from_str(&format!("{}.type_id", table_name)), &tname)
+        self.add_name(&Name::str(&format!("{}.type_id", table_name)), &tname)
             .unwrap();
     }
 

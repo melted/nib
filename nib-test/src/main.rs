@@ -118,7 +118,7 @@ fn run_test(opts: &Options, nib_path: &PathBuf, test: &PathBuf) -> io::Result<bo
             );
         }
         if res && res_error && res_status {
-            println!("{} ... OK", &meta.name);
+            println!("{} [{}] ... OK", &meta.name, &meta.file.to_string_lossy());
         } else if opts.update {
             println!("Updating {}", &meta.name);
             update_test(test, &test_code, out_str, error_str, status_code)?;
@@ -190,7 +190,6 @@ impl Metadata {
 fn extract_metadata(file: &Path, input: &str) -> Metadata {
     let mut meta = Metadata::new();
     meta.file = file.to_path_buf();
-    meta.name = format!("Unnamed test [{}]", file.to_string_lossy());
     let comments: Vec<_> = input
         .lines()
         .filter_map(|l| l.strip_prefix("// "))
@@ -232,6 +231,9 @@ fn extract_metadata(file: &Path, input: &str) -> Metadata {
                 _ => {}
             }
         }
+    }
+    if meta.name.is_empty() {
+        meta.name = "Unnamed test".to_owned();
     }
     meta
 }

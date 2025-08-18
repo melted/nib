@@ -23,7 +23,7 @@ impl<'a> ParserState<'a> {
             }
             TokenValue::Ellipsis(name) => {
                 self.get_next_token()?;
-                self.ellipsis_pattern(name.map(|n| Name::from_str(&n)))
+                self.ellipsis_pattern(name.map(|n| Name::str(&n)))
             }
             TokenValue::LeftBracket => self.parse_array_pattern()?,
             TokenValue::LeftParen => self.parse_custom_pattern()?,
@@ -37,7 +37,7 @@ impl<'a> ParserState<'a> {
                 let TokenValue::Identifier(name) = self.get_next_token()?.value else {
                     return self.error("Expected identifier in alias pattern");
                 };
-                self.alias_pattern(lhs, Name::from_str(&name))
+                self.alias_pattern(lhs, Name::str(&name))
             }
             TokenValue::Colon => {
                 self.get_next_token()?;
