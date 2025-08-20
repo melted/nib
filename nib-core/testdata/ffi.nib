@@ -3,11 +3,12 @@
 
 libc = _prim_load_library "libc.so.6" || { _prim_load_library "msvcrt" }
 
-puts = _prim_foreign_sym libc "puts"
+puts_ptr = _prim_foreign_sym libc "puts"
 
-_ = println puts
+puts = _prim_foreign_import libc "puts" [ffi.ptr] ffi.int32
 
-// @Output:
-// true
-// @EndOutput
-// @ExitCode: 0
+puts2 = _prim_foreign_import libc puts_ptr [ffi.ptr] ffi.int32
+
+a = puts (_prim_to_pointer "hello\0")
+_ = println a
+_ = puts2 (_prim_to_pointer "hello\0")

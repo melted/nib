@@ -1,11 +1,19 @@
 // @Name: Test Foreign Function Interface
 // @Tags: FFI
 
-libc = _prim_load_library "libc.so" || { _prim_load_library "libc.so.6" } || { _prim_load_library "msvcrt" }
+libc = _prim_load_library "libc.so.6" || { _prim_load_library "msvcrt" }
 
-_ = println (libc != false)
+puts_ptr = _prim_foreign_sym libc "puts"
+
+puts = _prim_foreign_import libc "puts" [ffi.ptr] ffi.int32
+
+puts2 = _prim_foreign_import libc puts_ptr [ffi.ptr] ffi.int32
+
+a = puts (_prim_to_pointer "hello\0")
+_ = puts2 (_prim_to_pointer "hello\0")
 
 // @Output:
-// true
+// hello
+// hello
 // @EndOutput
 // @ExitCode: 0

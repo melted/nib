@@ -163,3 +163,23 @@ symbol.match _ = false
 
 function.match v | (type v == function) = [v]
 function.match _ = false
+
+
+ffi.int8 = #cint8
+ffi.int16 = #cint16
+ffi.int32 = #cint32
+ffi.int64 = #cint64
+
+ffi.uint8 = #cuint8
+ffi.uint16 = #cuint16
+ffi.uint32 = #cuint32
+ffi.uint64 = #cuint64
+
+ffi.float32 = #cfloat
+ffi.float64 = #cdouble
+
+ffi.void = #cvoid
+ffi.ptr = #cpointer 
+
+ffi.pointer x = [#cpointer, x]
+ffi.struct ...x = array.concat (array.make #cstruct) x 

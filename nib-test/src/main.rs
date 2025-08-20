@@ -133,7 +133,7 @@ fn run_test(opts: &Options, nib_path: &PathBuf, test: &PathBuf) -> io::Result<bo
 fn compare_output(name: &str, feed: &str, expected: &[String], output: &str) -> bool {
     let mut result = true;
     let empty = String::new();
-    let line = 0;
+    let mut line = 0;
     let mut exp_iter = expected.iter();
     let mut out_iter = output.lines();
     loop {
@@ -151,6 +151,7 @@ fn compare_output(name: &str, feed: &str, expected: &[String], output: &str) -> 
             result = false;
             println!("Line {}: Expected: {} Got: {}", line, exp_line, out_line);
         }
+        line += 1;
     }
     result
 }

@@ -1,7 +1,7 @@
 use std::{
     cmp::max,
     collections::{HashMap, HashSet},
-    ops::Deref,
+    ops::Deref, os::raw::c_void,
 };
 
 use log::info;
@@ -9,8 +9,8 @@ use log::info;
 use crate::{
     ast::Literal,
     common::{Name, Result},
-    core::{Arity, Binder, Binding, Expression, FunClause, Module, Pattern, free_vars},
-    runtime::{Bytes, Closure, Code, Runtime, Value, new_ref},
+    core::{free_vars, Arity, Binder, Binding, Expression, FunClause, Module, Pattern},
+    runtime::{new_ref, Bytes, CType, Closure, Code, Runtime, Value},
 };
 
 impl Runtime {
@@ -193,8 +193,34 @@ impl Runtime {
                     Code::ExternSimple(ext) => ext(&args)?,
                     Code::ExternMut(ext) => ext(self, &args)?,
                     Code::Extern(ext) => ext(self, &args)?,
-                    Code::Foreign(cif, code) => {
-                        todo!()
+                    Code::Foreign(signature, code) => {
+                        let mut cargs = Vec::new();
+                        for (a, t) in args.iter().zip(&signature.arg_types) {
+                            cargs.push(self.get_arg(a, t)?);
+                        }
+                        let ret = match signature.ret_type {
+                            CType::Void => {
+                                unsafe { signature.cif.call::<c_void>(*code, &cargs) };
+                                Value::Nil
+                            }
+                            CType::Float32 => {
+                                let n = unsafe { signature.cif.call::<f32>(*code, &cargs) };
+                                Value::from(n)
+                            }
+                            CType::Float64 => {
+                                let n = unsafe { signature.cif.call::<f64>(*code, &cargs) };
+                                Value::from(n)
+                            }
+                            CType::Pointer => {
+                                let n = unsafe { signature.cif.call::<*mut c_void>(*code, &cargs) };
+                                Value::from(n)
+                            }
+                            _ => {
+                                let n = unsafe { signature.cif.call::<u64>(*code, &cargs) };
+                                Value::from(n)
+                            }
+                        };
+                        ret
                     }
                 };
 

@@ -1,4 +1,5 @@
 use std::ops::{Shl, Shr};
+use std::os::raw::c_void;
 
 use crate::common::{Error, Name, Result};
 use crate::core::Arity;
@@ -239,7 +240,10 @@ impl Runtime {
             "_prim_to_int",
             Value::new_extern_fun(Runtime::prim_to_int, &Arity::Fixed(1)),
         );
-
+        self.add_global(
+            "_prim_to_pointer",
+            Value::new_extern_fun(Runtime::prim_to_pointer, &Arity::Fixed(1)),
+        );
         Ok(())
     }
 
@@ -302,6 +306,20 @@ impl Runtime {
             Value::Char(c) => Ok(Value::Integer(*c as i64)),
             Value::Pointer(p) => Ok(Value::Integer(p.addr() as i64)),
             _ => self.error("The argument to _prim_to_int must be a float or bool"),
+        }
+    }
+
+    pub(super) fn prim_to_pointer(&self, args: &[Value]) -> Result<Value> {
+        match &args[0] {
+            Value::Bytes(b) => {
+                let ptr = b.borrow().bytes.as_ptr();
+                Ok(Value::from(ptr))
+            },
+            Value::Integer(n) => {
+                let u = *n as usize;
+                Ok(Value::Pointer(u as *mut c_void))
+            }
+            _ => self.error("The argument to _prim_to_pointer must be an integer or bytes array"),
         }
     }
 

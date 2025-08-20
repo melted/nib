@@ -6,7 +6,7 @@ use std::{
     cell::RefCell, collections::{BTreeSet, HashMap, HashSet}, ffi::c_void, fmt::{Debug, Display}, fs::read_to_string, hash::Hash, rc::Rc
 };
 
-use libffi::low::{CodePtr, ffi_cif};
+use libffi::middle::{Cif, CodePtr};
 
 use crate::{
     common::{Error, Metadata, Name, Result},
@@ -305,6 +305,10 @@ impl Value {
         Value::Closure(new_ref(Closure::extern_fun(fun, arity)))
     }
 
+    pub fn new_foreign_fun(signature: &Signature, code:CodePtr) -> Self {
+        Value::Closure(new_ref(Closure::foreign_fun( code, signature)))
+    }
+
     pub fn is_complex(&self) -> bool {
         match self {
             Value::Array(_) | Value::Table(_) | Value::Closure(_) => true,
@@ -372,6 +376,13 @@ impl Value {
         match self {
             Value::Symbol(t) => Ok(t.clone()),
             _ => Err(Error::runtime_error("Value not a symbol")),
+        }
+    }
+
+    pub fn get_pointer(&self) -> Result<*mut c_void> {
+        match self {
+            Value::Pointer(t) => Ok(*t),
+            _ => Err(Error::runtime_error("Value not a pointer")),
         }
     }
 }
@@ -750,6 +761,11 @@ impl Symbol {
             symbol_info: new_ref(info),
         }
     }
+
+    pub fn name(&self) -> String {
+        let si = self.symbol_info.borrow();
+        si.symbol.clone()
+    }
 }
 
 #[derive(Clone, PartialEq)]
@@ -871,13 +887,38 @@ impl Bytes {
     }
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum CType {
+    Int8,
+    Int16,
+    Int32,
+    Int64,
+    UInt8,
+    UInt16,
+    UInt32,
+    UInt64,
+    Float32,
+    Float64,
+    Pointer,
+    Void
+}
+
+
+#[derive(Debug, Clone)]
+pub struct Signature {
+    cif: Cif,
+    arg_types:Vec<CType>,
+    ret_type:CType
+}
+
+
 #[derive(Debug, Clone)]
 pub enum Code {
     Nib(Vec<FunClause>),
     Extern(fn(&Runtime, &[Value]) -> Result<Value>),
     ExternMut(fn(&mut Runtime, &[Value]) -> Result<Value>),
     ExternSimple(fn(&[Value]) -> Result<Value>),
-    Foreign(*mut ffi_cif, CodePtr),
+    Foreign(Signature, CodePtr),
 }
 
 impl PartialEq for Code {
@@ -940,14 +981,13 @@ impl Closure {
         }
     }
 
-    pub fn foreign_fun(cif: *mut ffi_cif, ptr: CodePtr) -> Self {
-        let arity = unsafe { (*cif).nargs };
+    pub fn foreign_fun(ptr: CodePtr, sig:&Signature) -> Self {
         Closure {
             type_table: None,
-            code: new_ref(Code::Foreign(cif, ptr)),
+            code: new_ref(Code::Foreign(sig.clone(), ptr)),
             env: Environment::new(),
             args: Vec::new(),
-            arity: Arity::Fixed(arity),
+            arity: Arity::Fixed(sig.arg_types.len() as u32),
         }
     }
 }
