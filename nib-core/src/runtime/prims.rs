@@ -358,7 +358,7 @@ impl Runtime {
     pub(super) fn prim_symbol_name(&self, args: &[Value]) -> Result<Value> {
         match &args[0] {
             Value::Symbol(sym) => {
-                let name = &sym.symbol_info.borrow().symbol;
+                let name = sym.as_str();
                 if !name.is_empty() {
                     Ok(self.make_string(name)?)
                 } else {
@@ -791,9 +791,7 @@ impl Runtime {
         match self.type_query(arg) {
             Ok(Value::Table(type_table)) => {
                 let table = &type_table.borrow().table;
-                let Some(tid) = self.named_symbols.get("type_id").cloned() else {
-                    return false;
-                };
+                let tid = self.get_symbol("type_id");
                 if let Some(Value::Bytes(b)) = table.get(&tid) {
                     str::from_utf8(&b.borrow().bytes).unwrap_or_default() == t
                 } else {
@@ -818,11 +816,7 @@ impl Runtime {
             Value::Char(_) => Ok(self.get_global("char").unwrap()),
             Value::Pointer(_) => Ok(self.get_global("pointer").unwrap()),
             Value::Symbol(sym) => {
-                if let Some(type_table) = &sym.symbol_info.borrow().type_table {
-                    Ok(Value::Table(type_table.clone()))
-                } else {
                     Ok(self.get_global("symbol").unwrap())
-                }
             }
             Value::Array(array) => {
                 if let Some(type_table) = &array.borrow().type_table {
@@ -866,15 +860,11 @@ impl Runtime {
                     let mut bytes = b.borrow_mut();
                     bytes.type_table = Some(t.clone());
                 }
-                Value::Symbol(symb) => {
-                    let mut sym_info = symb.symbol_info.borrow_mut();
-                    sym_info.type_table = Some(t.clone());
-                }
                 Value::Table(table) => {
                     let mut table = table.borrow_mut();
                     table.type_table = Some(t.clone());
                 }
-                _ => return self.error("The first argument to _prime_type_set must be an array, bytes, symbol or table"),
+                _ => return self.error("The first argument to _prime_type_set must be an array, bytes, or table"),
             },
             _ => {
                 return self.error("The second argument to _prime_type_set must be a table");

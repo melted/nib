@@ -116,7 +116,7 @@ impl Runtime {
             Literal::Real(r) => Value::Real(*r),
             Literal::Bytearray(ba) => Value::new_bytes(ba.clone()),
             Literal::Symbol(sym) => {
-                let s = self.get_or_add_named_symbol(sym);
+                let s = self.get_symbol(sym);
                 Value::Symbol(s)
             }
             Literal::String(s) => {

@@ -6,6 +6,7 @@ use std::{
     cell::RefCell, collections::{BTreeSet, HashMap, HashSet}, ffi::c_void, fmt::{Debug, Display}, fs::read_to_string, hash::Hash, rc::Rc
 };
 
+use internment::Intern;
 use libffi::middle::{Cif, CodePtr};
 
 use crate::{
@@ -22,11 +23,12 @@ mod prims;
 pub mod table;
 mod tests;
 
+type Symbol = Intern<String>;
+
 #[derive(Debug, Clone)]
 pub struct Runtime {
     metadata: HashMap<String, Metadata>,
     globals: Rc<RefCell<Table>>,
-    named_symbols: HashMap<String, Symbol>,
     local_module: Option<Rc<RefCell<Table>>>,
     closures_to_check: HashMap<String, HashSet<String>>,
 }
@@ -42,7 +44,6 @@ impl Runtime {
         let mut rt = Runtime {
             metadata: HashMap::new(),
             globals: new_ref(Table::new()),
-            named_symbols: HashMap::new(),
             local_module: None,
             closures_to_check: HashMap::new(),
         };
@@ -88,34 +89,27 @@ impl Runtime {
     }
 
     pub fn delete_global(&mut self, name: &str) {
-        let sym = self.get_or_add_named_symbol(name);
+        let sym = self.get_symbol(name);
         self.globals.borrow_mut().table.remove(&sym);
     }
 
     pub fn add_to_table(&mut self, table: Rc<RefCell<Table>>, name: &str, value: &Value) {
-        let sym = self.get_or_add_named_symbol(name);
+        let sym = self.get_symbol(name);
         table.borrow_mut().table.insert(sym, value.clone());
     }
 
     pub fn get_from_table(&self, table: Rc<RefCell<Table>>, name: &str) -> Option<Value> {
-        let sym = self.get_named_symbol(name)?;
+        let sym = self.get_symbol(name);
         table.borrow().table.get(&sym).cloned()
     }
 
-    pub fn get_or_add_named_symbol(&mut self, name: &str) -> Symbol {
-        self.named_symbols
-            .entry(name.to_owned())
-            .or_insert_with(|| Symbol::named(name))
-            .clone()
-    }
-
-    pub fn get_named_symbol(&self, name: &str) -> Option<Symbol> {
-        self.named_symbols.get(name).cloned()
+    pub fn get_symbol(&self, name: &str) -> Symbol {
+        let sym = Intern::from_ref(name);
+        sym
     }
 
     pub fn get_global(&self, name: &str) -> Option<Value> {
-        let sym = self.named_symbols.get(name)?;
-        self.globals.borrow().table.get(sym).cloned()
+        self.globals.borrow().table.get(&Intern::from_ref(name)).cloned()
     }
 
     pub fn add_name(&mut self, name: &Name, val: &Value) -> Result<()> {
@@ -148,7 +142,7 @@ impl Runtime {
         let mut rest = path;
         let mut table = self.globals.clone();
         while !rest.is_empty() {
-            let sym = self.get_named_symbol(&rest[0])?;
+            let sym = self.get_symbol(&rest[0]);
             table = {
                 let t = &mut table.borrow_mut().table;
                 let v = t.get(&sym);
@@ -168,7 +162,7 @@ impl Runtime {
         let mut rest = path;
         let mut table = self.globals.clone();
         while !rest.is_empty() {
-            let sym = self.get_or_add_named_symbol(&rest[0]);
+            let sym = self.get_symbol(&rest[0]);
             table = {
                 let t = &mut table.borrow_mut().table;
                 let v = t.get(&sym);
@@ -339,7 +333,6 @@ impl Value {
             Value::Closure(c) => c.borrow().type_table.clone(),
             Value::Array(a) => a.borrow().type_table.clone(),
             Value::Table(t) => t.borrow().type_table.clone(),
-            Value::Symbol(s) => s.symbol_info.borrow().type_table.clone(),
             _ => None,
         }
     }
@@ -694,77 +687,6 @@ impl TryFrom<&Value> for String {
             }
             _ => Err(Error::runtime_error("Value not a bytes array")),
         }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct Symbol {
-    symbol_info: Rc<RefCell<SymbolInfo>>,
-}
-
-impl Display for Symbol {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let s = &self.symbol_info.borrow().symbol;
-        if s.is_empty() {
-            write!(
-                f,
-                "#anonymous_symbol({:x})",
-                self.symbol_info.as_ptr().addr()
-            )
-        } else {
-            write!(f, "#{}", s)
-        }
-    }
-}
-
-impl Hash for Symbol {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.symbol_info.as_ptr().hash(state);
-    }
-}
-
-// Symbols are unique objects, so the only way they can be equal is if they are the
-// same object. So let's compare pointers to the info block.
-impl PartialEq for Symbol {
-    fn eq(&self, other: &Self) -> bool {
-        self.symbol_info.as_ptr() == other.symbol_info.as_ptr()
-    }
-}
-
-impl PartialOrd for Symbol {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl Ord for Symbol {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.symbol_info.as_ptr().cmp(&other.symbol_info.as_ptr())
-    }
-}
-
-impl Eq for Symbol {}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct SymbolInfo {
-    type_table: Option<Rc<RefCell<Table>>>,
-    symbol: String,
-}
-
-impl Symbol {
-    pub fn named(s: &str) -> Self {
-        let info = SymbolInfo {
-            type_table: None,
-            symbol: s.to_owned(),
-        };
-        Symbol {
-            symbol_info: new_ref(info),
-        }
-    }
-
-    pub fn name(&self) -> String {
-        let si = self.symbol_info.borrow();
-        si.symbol.clone()
     }
 }
 

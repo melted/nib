@@ -171,7 +171,7 @@ impl Runtime {
         } else {
             Value::get_symbol(arg)?
         };
-        match sym.name().as_str() {
+        match sym.as_str() {
             "cint8" => Ok((Type::i8(), CType::Int8)),
             "cint16" => Ok((Type::i16(), CType::Int16)), 
             "cint32" => Ok((Type::i32(), CType::Int32)),

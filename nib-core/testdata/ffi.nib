@@ -3,6 +3,10 @@
 
 libc = _prim_load_library "libc.so.6" || { _prim_load_library "msvcrt" }
 
+malloc = _prim_foreign_import libc "malloc" [ffi.uint64] ffi.ptr
+free = _prim_foreign_import libc "malloc" [ffi.ptr] ffi.void
+
+
 puts_ptr = _prim_foreign_sym libc "puts"
 
 hello = "hello\0"
@@ -12,12 +16,21 @@ first = _prim_peek ffi.uint8 hello_ptr
 
 _ = println first
 
-_ = _prim_poke ffi.uint8 hello_ptr (first - 1)
+space = malloc 100
+
+_ = () where
+        _ = _prim_poke ffi.uint8 space 104
+        _ = _prim_poke ffi.uint8 (space+1) 101
+        _ = _prim_poke ffi.uint8 (space+2) 106
+        _ = _prim_poke ffi.uint8 (space+3) 0
+
 
 puts = _prim_foreign_import libc "puts" [ffi.ptr] ffi.int32
 
 puts2 = _prim_foreign_import libc puts_ptr [ffi.ptr] ffi.int32
 
-a = puts hello_ptr
-_ = println a
-_ = puts2 (_prim_to_pointer hello)
+_ = println (_prim_peek ffi.uint8 (space+2)) 
+_ = puts space
+_ = println (_prim_to_pointer hello)
+
+_ = free space
