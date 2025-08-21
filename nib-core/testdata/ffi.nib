@@ -5,10 +5,18 @@ libc = _prim_load_library "libc.so.6" || { _prim_load_library "msvcrt" }
 
 puts_ptr = _prim_foreign_sym libc "puts"
 
+hello_ptr = (_prim_to_pointer "hello\0")
+
+first = _prim_peek ffi.uint8 hello_ptr
+
+_ = println first
+
+_ = _prim_poke ffi.uint8 hello_ptr (first - 1)
+
 puts = _prim_foreign_import libc "puts" [ffi.ptr] ffi.int32
 
 puts2 = _prim_foreign_import libc puts_ptr [ffi.ptr] ffi.int32
 
-a = puts (_prim_to_pointer "hello\0")
+a = puts hello_ptr
 _ = println a
 _ = puts2 (_prim_to_pointer "hello\0")

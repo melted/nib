@@ -460,6 +460,7 @@ impl Runtime {
             (Value::Real(a), Value::Real(b)) => Ok(Value::Real(a + b)),
             (Value::Integer(a), Value::Real(b)) => Ok(Value::Real(*a as f64 + b)),
             (Value::Real(a), Value::Integer(b)) => Ok(Value::Real(a + *b as f64)),
+            (Value::Pointer(p), Value::Integer(n)) => unsafe {Ok(Value::Pointer(p.byte_offset(*n as isize)))},
             (arg, arg2) => self.error(&format!("Can't add {} and {}", arg, arg2)),
         }
     }
@@ -470,6 +471,7 @@ impl Runtime {
             (Value::Real(a), Value::Real(b)) => Ok(Value::Real(a - b)),
             (Value::Integer(a), Value::Real(b)) => Ok(Value::Real(*a as f64 - b)),
             (Value::Real(a), Value::Integer(b)) => Ok(Value::Real(a - *b as f64)),
+            (Value::Pointer(p), Value::Integer(n)) => unsafe {Ok(Value::Pointer(p.byte_offset((-*n) as isize)))},
             (arg, arg2) => self.error(&format!("Can't subtract {} from {}", arg2, arg)),
         }
     }

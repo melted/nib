@@ -19,6 +19,14 @@ impl Runtime {
             "_prim_foreign_sym",
             Value::new_extern_mut_fun(Runtime::prim_foreign_sym, &Arity::Fixed(2)),
         );
+        self.add_global(
+            "_prim_peek",
+            Value::new_extern_fun(Runtime::prim_peek, &Arity::Fixed(2)),
+        );
+        self.add_global(
+            "_prim_poke",
+            Value::new_extern_fun(Runtime::prim_poke, &Arity::Fixed(3)),
+        );
         self.add_global("_prim_foreign_import", Value::new_extern_mut_fun(Runtime::prim_foreign_import, &Arity::Fixed(4)));
         Ok(())
     }
@@ -112,29 +120,71 @@ impl Runtime {
         Ok(signature)
     }
 
-    fn get_ffi_type(&mut self, arg: &Value) -> Result<(Type, CType)> {
+    fn prim_peek(&self, args: &[Value]) -> Result<Value> {
+        let (_, t) = self.get_ffi_type(&args[0])?;
+        let ptr = &args[1].get_pointer()?;
+        unsafe {
+            match t {
+                CType::Int8 => Ok(Value::from((*ptr as *mut i8).read())),
+                CType::Int16 => Ok(Value::from((*ptr as *mut i16).read())),
+                CType::Int32 => Ok(Value::from((*ptr as *mut i32).read())),
+                CType::Int64 => Ok(Value::from((*ptr as *mut i64).read())),
+                CType::UInt8 => Ok(Value::from((*ptr as *mut u8).read())),
+                CType::UInt16 => Ok(Value::from((*ptr as *mut u16).read())),
+                CType::UInt32 => Ok(Value::from((*ptr as *mut u32).read())),
+                CType::UInt64 => Ok(Value::from((*ptr as *mut u64).read())),
+                CType::Float32 => Ok(Value::from((*ptr as *mut f32).read())),
+                CType::Float64 => Ok(Value::from((*ptr as *mut f64).read())),
+                CType::Pointer => Ok(Value::from((*ptr as *mut *mut c_void).read())),
+                CType::Void => self.error("_prim_peek needs a concrete type, got void")
+            }
+        }
+    }
+
+    fn prim_poke(&self, args: &[Value]) -> Result<Value> {
+        let (_, t) = self.get_ffi_type(&args[0])?;
+        let ptr = &args[1].get_pointer()?;
+        let value = &args[2];
+        unsafe {
+            match t {
+                CType::Int8 => (*ptr as *mut i8).write(i8::try_from(value)?),
+                CType::Int16 => (*ptr as *mut i16).write(i16::try_from(value)?),
+                CType::Int32 => (*ptr as *mut i32).write(i32::try_from(value)?),
+                CType::Int64 => (*ptr as *mut i64).write(i64::try_from(value)?),
+                CType::UInt8 => (*ptr as *mut u8).write(u8::try_from(value)?),
+                CType::UInt16 => (*ptr as *mut u16).write(u16::try_from(value)?),
+                CType::UInt32 => (*ptr as *mut u32).write(u32::try_from(value)?),
+                CType::UInt64 => (*ptr as *mut u64).write(u64::try_from(value)?),
+                CType::Float32 => (*ptr as *mut f32).write(f32::try_from(value)?),
+                CType::Float64 => (*ptr as *mut f64).write(f64::try_from(value)?),
+                CType::Pointer => (*ptr as *mut *mut c_void).write(value.get_pointer()?),
+                CType::Void => return self.error("prim_poke needs a concrete type, got void")
+            }
+        }
+        Ok(Value::Nil)
+    }
+
+    fn get_ffi_type(&self, arg: &Value) -> Result<(Type, CType)> {
         // TODO: Handle passing struct by value
         let sym = if let Value::Array(arr) = arg {
             Value::get_symbol(&arr.borrow().array[0])?
         } else {
             Value::get_symbol(arg)?
         };
-        unsafe { 
-            match sym.name().as_str() {
-                "cint8" => Ok((Type::i8(), CType::Int8)),
-                "cint16" => Ok((Type::i16(), CType::Int16)), 
-                "cint32" => Ok((Type::i32(), CType::Int32)),
-                "cint64" => Ok((Type::i64(), CType::Int64)),
-                "cuint8" => Ok((Type::u8(), CType::UInt8)),
-                "cuint16" => Ok((Type::u16(), CType::UInt16)),
-                "cuint32" => Ok((Type::u32(), CType::UInt32)),
-                "cuint64" => Ok((Type::u64(), CType::UInt64)),
-                "cfloat" => Ok((Type::f32(), CType::Float32)),
-                "cdouble" => Ok((Type::f64(), CType::Float32)),
-                "cpointer" => Ok((Type::pointer(), CType::Pointer)),
-                "cvoid" => Ok((Type::void(), CType::Void)),
-                _ => self.error(&format!("Invalid ffi type {}", sym))
-            }
+        match sym.name().as_str() {
+            "cint8" => Ok((Type::i8(), CType::Int8)),
+            "cint16" => Ok((Type::i16(), CType::Int16)), 
+            "cint32" => Ok((Type::i32(), CType::Int32)),
+            "cint64" => Ok((Type::i64(), CType::Int64)),
+            "cuint8" => Ok((Type::u8(), CType::UInt8)),
+            "cuint16" => Ok((Type::u16(), CType::UInt16)),
+            "cuint32" => Ok((Type::u32(), CType::UInt32)),
+            "cuint64" => Ok((Type::u64(), CType::UInt64)),
+            "cfloat" => Ok((Type::f32(), CType::Float32)),
+            "cdouble" => Ok((Type::f64(), CType::Float32)),
+            "cpointer" => Ok((Type::pointer(), CType::Pointer)),
+            "cvoid" => Ok((Type::void(), CType::Void)),
+            _ => self.error(&format!("Invalid ffi type {}", sym))
         }
     }
 
@@ -154,4 +204,6 @@ impl Runtime {
             CType::Void => self.error("Can't use void type in argument list")
         }
     }
+
+
 }
