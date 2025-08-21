@@ -88,7 +88,7 @@ impl Runtime {
             Value::Pointer(p) => *p,
             Value::Bytes(b) if self.is_type(fun, "string") => {
                 let name = self.format_string(fun)?;
-                let ptr = self.get_foreign_symbol(&name, lib_ptr)?;
+                let ptr = self.get_foreign_symbol(&name, *lib_ptr)?;
                 if ptr.is_null() {
                     return self.error("Function pointer in prim_foreign_import is null");
                 }
@@ -122,7 +122,7 @@ impl Runtime {
 
     fn prim_peek(&self, args: &[Value]) -> Result<Value> {
         let (_, t) = self.get_ffi_type(&args[0])?;
-        let ptr = &args[1].get_pointer()?;
+        let ptr = args[1].get_pointer()?;
         unsafe {
             match t {
                 CType::Int8 => Ok(Value::from((*ptr as *mut i8).read())),
@@ -143,7 +143,7 @@ impl Runtime {
 
     fn prim_poke(&self, args: &[Value]) -> Result<Value> {
         let (_, t) = self.get_ffi_type(&args[0])?;
-        let ptr = &args[1].get_pointer()?;
+        let ptr = args[1].get_pointer()?;
         let value = &args[2];
         unsafe {
             match t {
@@ -157,7 +157,7 @@ impl Runtime {
                 CType::UInt64 => (*ptr as *mut u64).write(u64::try_from(value)?),
                 CType::Float32 => (*ptr as *mut f32).write(f32::try_from(value)?),
                 CType::Float64 => (*ptr as *mut f64).write(f64::try_from(value)?),
-                CType::Pointer => (*ptr as *mut *mut c_void).write(value.get_pointer()?),
+                CType::Pointer => (*ptr as *mut *mut c_void).write(*value.get_pointer()?),
                 CType::Void => return self.error("prim_poke needs a concrete type, got void")
             }
         }
@@ -201,12 +201,8 @@ impl Runtime {
             CType::Float32 => Ok(arg(&f32::try_from(val)?)),
             CType::Float64 => Ok(arg(&f64::try_from(val)?)),
             CType::Pointer => {
-                match val {
-                    Value::Pointer(p) => {
-                        Ok(arg(p))
-                    },
-                    _ => self.error("Boom")
-                }
+                let p = val.get_pointer()?;
+                Ok(arg(p))
             }
             CType::Void => self.error("Can't use void type in argument list")
         }

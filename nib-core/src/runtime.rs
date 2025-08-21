@@ -56,6 +56,7 @@ impl Runtime {
     }
 
     pub fn load(&mut self, path: &str) -> Result<()> {
+        log::info!("Loading {path}");
         let code = read_to_string(path)?;
         self.add_code(path, &code)
     }
@@ -372,9 +373,9 @@ impl Value {
         }
     }
 
-    pub fn get_pointer(&self) -> Result<*mut c_void> {
+    pub fn get_pointer(&self) -> Result<&*mut c_void> {
         match self {
-            Value::Pointer(t) => Ok(*t),
+            Value::Pointer(t) => Ok(t),
             _ => Err(Error::runtime_error("Value not a pointer")),
         }
     }

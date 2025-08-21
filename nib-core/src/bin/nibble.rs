@@ -14,7 +14,7 @@ fn main() -> io::Result<()> {
     let mut rt = Runtime::new();
     let prelude_code = include_str!("../../lib/prelude.nib");
     if !opts.no_prelude {
-        rt.add_code("prelude", prelude_code)?;
+        rt.add_code("prelude.nib", prelude_code)?;
     }
     let res = if opts.files.is_empty() {
         let mut buffer = String::new();
