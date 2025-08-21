@@ -31,6 +31,7 @@ puts2 = _prim_foreign_import libc puts_ptr [ffi.ptr] ffi.int32
 
 _ = println (_prim_peek ffi.uint8 (space+2)) 
 _ = puts space
-_ = println (_prim_to_pointer hello)
+_ = puts hello_ptr
+_ = println space
 
 _ = free space

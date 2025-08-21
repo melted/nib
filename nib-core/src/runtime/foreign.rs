@@ -200,7 +200,14 @@ impl Runtime {
             CType::UInt64 => Ok(arg(&u64::try_from(val)?)),
             CType::Float32 => Ok(arg(&f32::try_from(val)?)),
             CType::Float64 => Ok(arg(&f64::try_from(val)?)),
-            CType::Pointer => Ok(arg(&val.get_pointer()?)),
+            CType::Pointer => {
+                match val {
+                    Value::Pointer(p) => {
+                        Ok(arg(p))
+                    },
+                    _ => self.error("Boom")
+                }
+            }
             CType::Void => self.error("Can't use void type in argument list")
         }
     }
