@@ -806,7 +806,7 @@ impl Runtime {
         self.type_query(&args[0])
     }
 
-    fn type_query(&self, arg: &Value) -> Result<Value> {
+    pub fn type_query(&self, arg: &Value) -> Result<Value> {
         match arg {
             Value::Nil => Ok(self.get_global("nil_type").unwrap()),
             Value::Undefined => Ok(Value::Nil),

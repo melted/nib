@@ -236,7 +236,7 @@ impl DesugarState {
             ast::Pattern::Literal(lit) => Ok(Pattern::Literal(lit)),
             ast::Pattern::Typed(pat, typ) => {
                 let inner = self.desugar_pattern(*pat)?;
-                Ok(Pattern::Custom(typ, vec![inner]))
+                Ok(Pattern::Type(Box::new(inner), typ))
             }
             ast::Pattern::Var(name) => Ok(Pattern::Bind(name)),
             ast::Pattern::Wildcard => Ok(Pattern::Wildcard),
@@ -509,7 +509,8 @@ pub enum Pattern {
     Literal(ast::Literal), // TODO: Create a binding to it instead?
     Ellipsis(Option<Name>),
     Bind(Name),
-    Custom(Name, Vec<Pattern>), // Subsumes array and typed patterns
+    Custom(Name, Vec<Pattern>),
+    Type(Box<Pattern>, Name),
     Alias(Box<Pattern>, Name),
 }
 
@@ -550,6 +551,7 @@ impl Display for Pattern {
         match self {
             Pattern::Alias(pat, alias) => write!(f, "{}@{}", pat, alias),
             Pattern::Bind(name) => write!(f, "{}", name),
+            Pattern::Type(pattern, name ) => write!(f, "{}:{}", pattern, name),
             Pattern::Custom(name, fields) => {
                 write!(f, "({}", name)?;
                 for field in fields {

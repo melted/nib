@@ -1,4 +1,12 @@
 test a:int = "!!!"
+test b:symbol = "###"
+test c:bytes = "???"
 test _ = "nope"
 
-_ = print (test 2)
+_ = println (test 2)
+
+_ = println (test #sym)
+
+_ = println (test #[1,2,3])
+
+_ = println (test "hello")

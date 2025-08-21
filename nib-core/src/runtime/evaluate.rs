@@ -358,6 +358,17 @@ impl Runtime {
                     }
                 }
             }
+            Pattern::Type(pattern, name) => {
+                let Some(type_table) = self.lookup_name(env, name) else {
+                    return self.error(&format!("Failed to find type table {}", name));
+                };
+                let arg_type = self.type_query(arg)?;
+                if arg_type == type_table {
+                    self.match_pattern(arg, pattern, env)?
+                } else {
+                    None
+                }
+            }
             Pattern::Alias(pattern, name) => {
                 let res = self.match_pattern(arg, pattern, env)?;
                 res.map(|mut vars| {
