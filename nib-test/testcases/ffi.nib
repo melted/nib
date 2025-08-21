@@ -1,6 +1,5 @@
 // @Name: Test Foreign Function Interface
-// @Tags: FFI disabled
-// TODO: Doesn't work on Ubuntu, probably needs a less hacky CString
+// @Tags: FFI
 
 hello = "hello\0"
 
