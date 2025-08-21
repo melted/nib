@@ -129,6 +129,19 @@ array.concat x y = merged where
                         go n = array.set merged n (array.ref y (n - xs)) & go (n + 1)
                         _ = go 0
 
+bytes.create = _prim_bytes_create
+bytes.ref = _prim_bytes_ref
+bytes.set = _prim_bytes_set
+bytes.size = _prim_bytes_size
+bytes.concat x y = merged where
+                        xs = bytes.size x
+                        ys = bytes.size y
+                        cs = xs + ys
+                        merged = bytes.create cs 0
+                        go n | n == cs = ()
+                        go n | n < xs = bytes.set merged n (bytes.ref x n) & go (n + 1)
+                        go n = bytes.set merged n (bytes.ref y (n - xs)) & go (n + 1)
+                        _ = go 0
 
 
 a ++ b = (type a).concat a b

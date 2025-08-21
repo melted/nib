@@ -723,7 +723,7 @@ impl Runtime {
     pub(super) fn prim_bytes_set(&self, args: &[Value]) -> Result<Value> {
         let b = &args[0].get_bytes()?;
         let n = i64::try_from(&args[1])? as usize;
-        let v = u8::try_from(&args[1])?;
+        let v = u8::try_from(&args[2])?;
         let bytes = &mut b.borrow_mut().bytes;
         if n < bytes.len() {
             bytes[n] = v;
