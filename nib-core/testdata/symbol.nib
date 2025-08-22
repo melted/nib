@@ -1,0 +1,6 @@
+
+a = #symbol
+b = _prim_symbol_make "symbol is a sentence"
+
+_ = println (a == b)
+_ = println a

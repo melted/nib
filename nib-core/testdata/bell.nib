@@ -9,7 +9,9 @@ bell n = out where
                 out = array.create (n+1)
                 adders = [0] ++ previous
                 go i acc | i == (n+1) = ()
-                go i acc = array.set out i (acc + array.ref adders i) & go (i+1) (acc + array.ref adders i)
+                go i acc = array.set out i next & go (i+1) next
+                                where
+                                    next = acc + array.ref adders i
                 _ = go 0 first
 
 _ = print (bell 14)

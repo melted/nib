@@ -125,6 +125,10 @@ impl Runtime {
             Value::new_extern_fun(Runtime::prim_symbol_name, &Arity::Fixed(1)),
         );
         self.add_global(
+            "_prim_symbol_make",
+            Value::new_extern_fun(Runtime::prim_symbol_make, &Arity::Fixed(1)),
+        );
+        self.add_global(
             "_prim_apply",
             Value::new_extern_mut_fun(Runtime::prim_apply, &Arity::Fixed(2)),
         );
@@ -367,6 +371,11 @@ impl Runtime {
             }
             _ => self.error("The argument to _prim_symbol_name must be a symbol"),
         }
+    }
+
+    pub(super) fn prim_symbol_make(&self, args: &[Value]) -> Result<Value> {
+        let str = String::try_from(&args[0])?;
+        Ok(Value::Symbol(self.get_symbol(&str)))
     }
 
     pub(super) fn prim_ceiling(&self, args: &[Value]) -> Result<Value> {
