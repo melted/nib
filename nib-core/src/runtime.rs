@@ -187,6 +187,9 @@ impl Runtime {
     pub fn make_string(&self, s: &str) -> Result<Value> {
         let mut b = Bytes::with(s.as_bytes().to_vec());
         b.type_table = self.get_module_path(&["string".to_owned()]);
+        if b.type_table.is_none() {
+            return self.error("trying to make string before string type table exists");
+        }
         Ok(Value::Bytes(new_ref(b)))
     }
 }

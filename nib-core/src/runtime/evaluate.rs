@@ -68,19 +68,19 @@ impl Runtime {
         env: &mut Environment,
     ) -> Result<Value> {
         info!("Evaluating expression {}", expression);
-        let val = match expression {
+        match expression {
             Expression::Var(n, id) => {
                 let Some(v) = self.lookup(env, id) else {
                     return self.error(&format!("couldn't find variable {} in environment", id));
                 };
-                v
+                Ok(v)
             }
-            Expression::App(n, exps) => self.evaluate_application(binding_name, exps, env)?,
-            Expression::Literal(n, lit) => self.evaluate_literal(lit)?,
+            Expression::App(n, exps) => self.evaluate_application(binding_name, exps, env),
+            Expression::Literal(n, lit) => self.evaluate_literal(lit),
             Expression::Lambda(n, clauses) => {
                 let mut free = HashSet::new();
                 free_vars(expression, &mut free)?;
-                self.evaluate_lambda(binding_name, clauses, &free, env)?
+                self.evaluate_lambda(binding_name, clauses, &free, env)
             }
             Expression::Where(n, exp, bindings) => {
                 env.push();
@@ -100,32 +100,23 @@ impl Runtime {
                 let val = self.evaluate_expression(binding_name, exp, env)?;
                 self.closures_to_check = prev_cc;
                 env.pop();
-                val
+                Ok(val)
             }
-        };
-        Ok(val)
+        }
     }
 
     pub(super) fn evaluate_literal(&mut self, literal: &Literal) -> Result<Value> {
         info!("evaluating literal {}", literal);
-        let val = match literal {
-            Literal::Nil => Value::Nil,
-            Literal::Bool(b) => Value::Bool(*b),
-            Literal::Integer(i) => Value::Integer(*i),
-            Literal::Char(c) => Value::Char(*c),
-            Literal::Real(r) => Value::Real(*r),
-            Literal::Bytearray(ba) => Value::new_bytes(ba.clone()),
-            Literal::Symbol(sym) => {
-                let s = self.get_symbol(sym);
-                Value::Symbol(s)
-            }
-            Literal::String(s) => {
-                let mut b = Bytes::with(s.clone().as_bytes().to_vec());
-                b.type_table = Some(self.get_or_create_module_path(&["string".to_owned()])?);
-                Value::Bytes(new_ref(b))
-            }
-        };
-        Ok(val)
+        match literal {
+            Literal::Nil => Ok(Value::Nil),
+            Literal::Bool(b) => Ok(Value::Bool(*b)),
+            Literal::Integer(i) => Ok(Value::Integer(*i)),
+            Literal::Char(c) => Ok(Value::Char(*c)),
+            Literal::Real(r) => Ok(Value::Real(*r)),
+            Literal::Bytearray(ba) => Ok(Value::new_bytes(ba.clone())),
+            Literal::Symbol(sym) => Ok(Value::Symbol(self.get_symbol(sym))),
+            Literal::String(s) => self.make_string(s)
+        }
     }
 
     pub(super) fn evaluate_application(
@@ -182,8 +173,7 @@ impl Runtime {
                                         continue;
                                     }
                                 }
-                                v =
-                                    self.evaluate_expression(binding_name, &clause.rhs, &mut env)?;
+                                v = self.evaluate_expression(binding_name, &clause.rhs, &mut env)?;
                                 env.pop();
                                 break;
                             }
