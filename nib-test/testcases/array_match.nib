@@ -1,0 +1,12 @@
+// @Name: Test Array Match
+// @Tag: array pattern
+
+
+test [a, b, c] = a+b+c
+test _ = false
+
+_ = println (test [1,2,3])
+// @Output:
+// 6
+// @EndOutput
+// @ExitCode: 0

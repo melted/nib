@@ -126,6 +126,9 @@ array.concat x y = merged where
                         go n = array.set merged n (array.ref y (n - xs)) & go (n + 1)
                         _ = go 0
 
+array.match v | type v == array = v
+array.match _ = false
+
 bytes.create = _prim_bytes_create
 bytes.ref = _prim_bytes_ref
 bytes.set = _prim_bytes_set
