@@ -3,7 +3,7 @@ use std::os::raw::c_void;
 
 use crate::common::{Error, Name, Result};
 use crate::core::Arity;
-use crate::runtime::{Runtime, Value};
+use crate::treewalker::{Runtime, Value};
 
 impl Runtime {
     pub(super) fn register_primitives(&mut self) -> Result<()> {

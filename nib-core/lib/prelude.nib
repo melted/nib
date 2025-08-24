@@ -122,8 +122,8 @@ array.concat x y = merged where
                         cs = xs + ys
                         merged = array.create cs
                         go n | n == cs = ()
-                        go n | n < xs = array.set merged n (array.ref x n) & go (n + 1)
-                        go n = array.set merged n (array.ref y (n - xs)) & go (n + 1)
+                        go n | n < xs = go (n + 1) where _ = array.set merged n (array.ref x n)
+                        go n = go (n + 1) where _ = array.set merged n (array.ref y (n - xs))
                         _ = go 0
 
 array.match v | type v == array = v
@@ -139,8 +139,10 @@ bytes.concat x y = merged where
                         cs = xs + ys
                         merged = bytes.create cs 0
                         go n | n == cs = ()
-                        go n | n < xs = bytes.set merged n (bytes.ref x n) & go (n + 1)
-                        go n = bytes.set merged n (bytes.ref y (n - xs)) & go (n + 1)
+                        go n | n < xs =  go (n + 1)
+                                            where _ = bytes.set merged n (bytes.ref x n)
+                        go n = go (n + 1)
+                                    where _ = bytes.set merged n (bytes.ref y (n - xs))
                         _ = go 0
 
 

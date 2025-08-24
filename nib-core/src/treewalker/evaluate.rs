@@ -4,13 +4,14 @@ use std::{
     ops::Deref, os::raw::c_void,
 };
 
+use internment::Intern;
 use log::info;
 
 use crate::{
     ast::Literal,
     common::{Name, Result},
     core::{free_vars, Arity, Binder, Binding, Expression, FunClause, Module, Pattern},
-    runtime::{new_ref, Bytes, CType, Closure, Code, Runtime, Value},
+    treewalker::{new_ref, Bytes, CType, Closure, Code, Runtime, Symbol, Value},
 };
 
 impl Runtime {
@@ -105,7 +106,7 @@ impl Runtime {
         }
     }
 
-    pub(super) fn evaluate_literal(&mut self, literal: &Literal) -> Result<Value> {
+    pub(super) fn evaluate_literal(&self, literal: &Literal) -> Result<Value> {
         info!("evaluating literal {}", literal);
         match literal {
             Literal::Nil => Ok(Value::Nil),
@@ -269,7 +270,7 @@ impl Runtime {
         args: &[Value],
         patterns: &[Pattern],
         env: &Environment,
-    ) -> Result<Option<HashMap<String, Value>>> {
+    ) -> Result<Option<HashMap<Symbol, Value>>> {
         let mut current_arg: usize = 0;
         let mut out = HashMap::new();
         for (i, p) in patterns.iter().enumerate() {
@@ -303,7 +304,7 @@ impl Runtime {
         arg: &Value,
         pattern: &Pattern,
         env: &Environment,
-    ) -> Result<Option<HashMap<String, Value>>> {
+    ) -> Result<Option<HashMap<Symbol, Value>>> {
         let mut out = HashMap::new();
         let val = match pattern {
             Pattern::Wildcard => Some(out),
@@ -312,7 +313,7 @@ impl Runtime {
                 if &v == arg { Some(out) } else { None }
             }
             Pattern::Ellipsis(Some(name)) | Pattern::Bind(name) => {
-                out.insert(name.string(), arg.clone());
+                out.insert(Intern::new(name.string()), arg.clone());
                 Some(out)
             }
             Pattern::Ellipsis(None) => Some(out),
@@ -362,7 +363,7 @@ impl Runtime {
             Pattern::Alias(pattern, name) => {
                 let res = self.match_pattern(arg, pattern, env)?;
                 res.map(|mut vars| {
-                    vars.insert(name.string(), arg.clone());
+                    vars.insert(Intern::new(name.string()), arg.clone());
                     vars
                 })
             }
@@ -412,7 +413,7 @@ pub(super) fn get_arity(patterns: &[Pattern]) -> Arity {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Environment {
-    pub envs: Vec<HashMap<String, Value>>,
+    pub envs: Vec<HashMap<Symbol, Value>>,
 }
 
 impl Default for Environment {
@@ -434,17 +435,17 @@ impl Environment {
         self.envs.pop();
     }
 
-    pub fn push_env(&mut self, env: HashMap<String, Value>) {
+    pub fn push_env(&mut self, env: HashMap<Symbol, Value>) {
         self.envs.push(env);
     }
 
-    pub fn pop_env(&mut self) -> Option<HashMap<String, Value>> {
+    pub fn pop_env(&mut self) -> Option<HashMap<Symbol, Value>> {
         self.envs.pop()
     }
 
     pub fn get(&self, id: &str) -> Option<Value> {
         for e in self.envs.iter().rev() {
-            let v = e.get(id);
+            let v = e.get(&Intern::from_ref(id));
             if v.is_some() {
                 return v.cloned();
             }
@@ -459,6 +460,6 @@ impl Environment {
         } else {
             self.envs.last_mut().unwrap()
         };
-        e.insert(id.to_owned(), value.clone());
+        e.insert(Intern::from_ref(id), value.clone());
     }
 }

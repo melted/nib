@@ -13,7 +13,7 @@ use crate::{
     common::{Error, Metadata, Name, Result},
     core::{Arity, FunClause, desugar, desugar_expression},
     parser::{parse_declarations, parse_expression},
-    runtime::evaluate::Environment,
+    treewalker::evaluate::Environment,
 };
 
 mod evaluate;

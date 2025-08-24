@@ -3,7 +3,7 @@ use std::io::{self, Read, Write, stderr, stdin};
 use std::process::exit;
 
 use nib_core::common::Error;
-use nib_core::runtime::Runtime;
+use nib_core::treewalker::Runtime;
 
 /// Simple runner of Nib code. Anything more elaborate goes into
 /// another crate, where it can pull in dependencies and go wild

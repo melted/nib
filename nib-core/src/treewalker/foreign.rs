@@ -6,7 +6,7 @@ use minidl::Library;
 use crate::{
     common::Result,
     core::Arity,
-    runtime::{CType, Closure, Runtime, Signature, Value},
+    treewalker::{CType, Closure, Runtime, Signature, Value},
 };
 
 impl Runtime {

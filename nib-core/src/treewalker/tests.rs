@@ -1,8 +1,10 @@
 #![cfg(test)]
+use internment::Intern;
+
 use crate::{
     common::{Name, Result},
     core::Pattern,
-    runtime::{Runtime, Value, evaluate::Environment},
+    treewalker::{Runtime, Value, evaluate::Environment},
 };
 
 #[test]
@@ -18,8 +20,8 @@ fn simple_pattern_match() -> Result<()> {
     let res = rt.match_patterns(&args, &pats, &env)?;
     match res {
         Some(map) => {
-            assert!(map["x"] == Value::Integer(3));
-            assert!(matches!(map["xs"], Value::Array(_)));
+            assert!(map[&Intern::from_ref("x")] == Value::Integer(3));
+            assert!(matches!(map[&Intern::from_ref("xs")], Value::Array(_)));
         }
         _ => {
             assert!(false)
