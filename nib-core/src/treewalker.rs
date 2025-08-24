@@ -18,9 +18,7 @@ use crate::{
 
 mod evaluate;
 mod foreign;
-pub mod heap;
 mod prims;
-pub mod table;
 mod tests;
 
 type Symbol = Intern<String>;
