@@ -3,6 +3,14 @@ pub struct Heap {
     memory : Vec<u8>
 }
 
+impl Heap {
+    pub fn new() -> Self {
+        Heap {
+            memory: Vec::with_capacity(1000000)
+        }
+    }
+}
+
 
 pub struct ObjectHeader {
     size: u32,
