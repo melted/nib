@@ -1,16 +1,55 @@
+use region::Allocation;
+
 
 pub struct Heap {
-    memory : Vec<u8>
+    from_space : Space,
+    to_space : Option<Space>
+}
+
+pub struct Space {
+    pub alloc : Allocation,
+    pub size : usize,
+    pub top : usize,
 }
 
 impl Heap {
-    pub fn new() -> Self {
-        Heap {
-            memory: Vec::with_capacity(1000000)
+    pub fn new(size: usize) -> Self {
+        Heap { from_space: Space::new(size), to_space: None }
+    }
+
+    pub fn allocate(&mut self, size: usize) -> *mut ObjectHeader {
+        unsafe {
+            todo!()
         }
+    }
+
+    pub fn collect(&mut self, roots:&[*const ObjectHeader]) {
+        let new_size =   if self.from_space.top > (3*self.from_space.size)/4 { 
+                                    self.from_space.size + usize::min(self.from_space.size/2, 1000000) 
+                                } else { 
+                                    self.from_space.size
+                                };
+        self.to_space = Some(Space::new(new_size));
+        unsafe {
+            self.copy_live(roots);
+        }
+    }
+
+    unsafe fn copy_live<T>(&mut self, roots:&[*const ObjectHeader]) {
+        let mut to_copy = Vec::new();
+        to_copy.append(&mut roots.to_vec());
+
     }
 }
 
+impl Space {
+    pub(super) fn new(size:usize) -> Self {
+        let Ok(alloc) = region::alloc(size, region::Protection::READ_WRITE_EXECUTE) else {
+            panic!("Couldn't allocate {size} bytes!");
+        };
+        Space { alloc, size, top: 0 }
+    }
+}
 
 pub struct ObjectHeader {
     size: u32,
@@ -19,7 +58,19 @@ pub struct ObjectHeader {
     tag:u16
 }
 
-impl ObjectHeader {}
+impl ObjectHeader {
+    pub(super) fn is_forward(&self) -> bool {
+        (self.flags & FORWARD_FLAG) == FORWARD_FLAG
+    }
+}
+
+pub(super) fn forward(from:*mut ObjectHeader, to:*mut ObjectHeader) {
+    unsafe {
+        (*from).flags &= FORWARD_FLAG;
+        let next = from.add(1) as *mut *mut ObjectHeader;
+        *next = to;
+    }
+}
 
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -35,13 +86,16 @@ pub enum ValueRepr {
     Integer,
     Pointer,
     Char,
-    Float,
+    Float, 
     Symbol,
     Array,
     Bytes,
     Table,
-    Closure
+    Closure,
+    Object
 }
+
+const FORWARD_FLAG:u8 = 0x01;
 
 const TAG_MASK:u64 = 0x07;
 const ETAG_MASK:u64 = 0x0f;
@@ -255,6 +309,10 @@ impl Value {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Array {
     ptr : *mut ObjectHeader
+}
+
+impl Array {
+
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

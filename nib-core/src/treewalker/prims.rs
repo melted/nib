@@ -16,7 +16,7 @@ impl Runtime {
             "_prim_project",
             Value::new_extern_fun(Runtime::project, &Arity::VarArg(2)),
         );
-         self.add_global(
+        self.add_global(
             "_prim_array_make",
             Value::new_extern_mut_fun(|_rt, args| Ok(Value::new_array(args)), &Arity::VarArg(1)),
         );
@@ -318,7 +318,7 @@ impl Runtime {
             Value::Bytes(b) => {
                 let ptr = b.borrow().bytes.as_ptr();
                 Ok(Value::from(ptr))
-            },
+            }
             Value::Integer(n) => {
                 let u = *n as usize;
                 Ok(Value::Pointer(u as *mut c_void))
@@ -469,7 +469,9 @@ impl Runtime {
             (Value::Real(a), Value::Real(b)) => Ok(Value::Real(a + b)),
             (Value::Integer(a), Value::Real(b)) => Ok(Value::Real(*a as f64 + b)),
             (Value::Real(a), Value::Integer(b)) => Ok(Value::Real(a + *b as f64)),
-            (Value::Pointer(p), Value::Integer(n)) => unsafe {Ok(Value::Pointer(p.byte_offset(*n as isize)))},
+            (Value::Pointer(p), Value::Integer(n)) => unsafe {
+                Ok(Value::Pointer(p.byte_offset(*n as isize)))
+            },
             (arg, arg2) => self.error(&format!("Can't add {} and {}", arg, arg2)),
         }
     }
@@ -480,7 +482,9 @@ impl Runtime {
             (Value::Real(a), Value::Real(b)) => Ok(Value::Real(a - b)),
             (Value::Integer(a), Value::Real(b)) => Ok(Value::Real(*a as f64 - b)),
             (Value::Real(a), Value::Integer(b)) => Ok(Value::Real(a - *b as f64)),
-            (Value::Pointer(p), Value::Integer(n)) => unsafe {Ok(Value::Pointer(p.byte_offset((-*n) as isize)))},
+            (Value::Pointer(p), Value::Integer(n)) => unsafe {
+                Ok(Value::Pointer(p.byte_offset((-*n) as isize)))
+            },
             (arg, arg2) => self.error(&format!("Can't subtract {} from {}", arg2, arg)),
         }
     }
@@ -824,9 +828,7 @@ impl Runtime {
             Value::Real(_) => Ok(self.get_global("float").unwrap()),
             Value::Char(_) => Ok(self.get_global("char").unwrap()),
             Value::Pointer(_) => Ok(self.get_global("pointer").unwrap()),
-            Value::Symbol(sym) => {
-                    Ok(self.get_global("symbol").unwrap())
-            }
+            Value::Symbol(sym) => Ok(self.get_global("symbol").unwrap()),
             Value::Array(array) => {
                 if let Some(type_table) = &array.borrow().type_table {
                     Ok(Value::Table(type_table.clone()))
@@ -860,21 +862,25 @@ impl Runtime {
 
     fn set_type(&mut self, args: &[Value]) -> Result<Value> {
         match &args[1] {
-            Value::Table(t) => match &args[0] {
-                Value::Array(arr) => {
-                    let mut array = arr.borrow_mut();
-                    array.type_table = Some(t.clone());
+            Value::Table(t) => {
+                match &args[0] {
+                    Value::Array(arr) => {
+                        let mut array = arr.borrow_mut();
+                        array.type_table = Some(t.clone());
+                    }
+                    Value::Bytes(b) => {
+                        let mut bytes = b.borrow_mut();
+                        bytes.type_table = Some(t.clone());
+                    }
+                    Value::Table(table) => {
+                        let mut table = table.borrow_mut();
+                        table.type_table = Some(t.clone());
+                    }
+                    _ => return self.error(
+                        "The first argument to _prime_type_set must be an array, bytes, or table",
+                    ),
                 }
-                Value::Bytes(b) => {
-                    let mut bytes = b.borrow_mut();
-                    bytes.type_table = Some(t.clone());
-                }
-                Value::Table(table) => {
-                    let mut table = table.borrow_mut();
-                    table.type_table = Some(t.clone());
-                }
-                _ => return self.error("The first argument to _prime_type_set must be an array, bytes, or table"),
-            },
+            }
             _ => {
                 return self.error("The second argument to _prime_type_set must be a table");
             }
