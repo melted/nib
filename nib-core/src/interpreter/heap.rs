@@ -1,4 +1,4 @@
-use std::{collections::{HashMap, HashSet}, os::raw::c_void};
+use std::{collections::HashMap, hash::{DefaultHasher, Hasher}, ops::Deref};
 
 use region::Allocation;
 
@@ -98,6 +98,25 @@ pub(super) fn forward(from:*mut ObjectHeader, to:*mut ObjectHeader) {
     }
 }
 
+pub(super) fn get_value(base:*mut ObjectHeader, index:usize) -> Value {
+    unsafe {
+        *get_value_ptr(base, index)
+    }
+}
+
+pub(super) fn set_value(base:*mut ObjectHeader, index:usize, value:Value) {
+    unsafe {
+        *get_value_ptr(base, index) = value;
+    }
+}
+
+pub(super) fn get_value_ptr(base:*mut ObjectHeader, index:usize) -> *mut Value {
+    unsafe {
+        let base_ptr = base.add(1) as *mut Value;
+        let index_ptr = base_ptr.add(index);
+        index_ptr
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Value {
@@ -357,38 +376,32 @@ impl Array {
         let header = ObjectHeader::make(heap, (size*8+16) as u32, ValueRepr::Array);
         let me = Array { ptr: header };
         me.set_type_table(Value::nil());
-        for i in [0..size] {
+        for i in 0..size {
             me.set(i, Value::nil());
         }
         me
     }
 
     pub fn at(&self, index:usize) -> Value {
+        get_value(self.ptr, index+1)
+    }
+
+    pub fn size(&self) -> usize {
         unsafe {
-            let ptr = self.ptr.byte_add(8+index*8) as *mut Value;
-            *ptr
+            (*self.ptr).size as usize/8 - 2
         }
     }
 
     pub fn set(&self, index:usize, value:Value) {
-        unsafe {
-            let ptr = self.ptr.byte_add(8+index*8) as *mut Value;
-            *ptr = value
-        }
+        set_value(self.ptr, index+1, value);
     }
 
     pub fn type_table(&self) -> Value {
-        unsafe {
-            let ptr = self.ptr.byte_add(8) as *mut Value;
-            *ptr
-        }
+        get_value(self.ptr, 0)
     }
 
     pub fn set_type_table(&self, value:Value) {
-        unsafe {
-            let ptr = self.ptr.byte_add(8) as *mut Value;
-            *ptr = value; 
-        }
+        set_value(self.ptr, 0, value);
     }
 }
 
@@ -397,8 +410,59 @@ pub struct Table {
     ptr: *mut ObjectHeader
 }
 
-impl Table {
 
+const SIZE_OFFSET:usize = 16;
+const STORAGE_OFFSET:usize = 24;
+
+impl Table {
+    pub fn make(heap:&mut Heap) -> Self {
+        const INITIAL_SIZE:usize = 16;
+        let header = ObjectHeader::make(heap, 32, ValueRepr::Table);
+        let storage = Array::make(heap, INITIAL_SIZE);
+        set_value(header, 1, Value::integer(0));
+        set_value(header, 2, Value::from(storage));
+        Table { ptr: header }
+    }
+
+    fn resize(&mut self, heap: &mut Heap, new_size:usize) {
+
+    }
+
+    fn storage(&self) -> Array {
+        Array { ptr: get_value(self.ptr, 2).get_object() }
+    }
+
+    pub fn insert(&mut self, heap:&mut Heap, key:Symbol, value:Value) {
+        let storage = self.storage();
+    }
+
+    pub fn delete(&mut self, key:Symbol) {
+        
+    }
+
+    pub fn get(&self, key:Symbol) {
+
+    }
+
+    pub fn keys(&self) -> Value {
+        todo!()
+    }
+
+    pub fn size(&self) -> usize {
+        todo!()
+    } 
+
+    pub fn capacity(&self) -> usize {
+        todo!()
+    }
+
+    pub fn type_table(&self) -> Value {
+        get_value(self.ptr, 0)
+    }
+
+    pub fn set_type_table(&self, value:Value) {
+        set_value(self.ptr, 0, value);
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -407,7 +471,37 @@ pub struct Bytes {
 }
 
 impl Bytes {
+    pub fn make(heap : &mut Heap, size:usize, v:u8) -> Self {
+        let header = ObjectHeader::make(heap, (size+16) as u32, ValueRepr::Bytes);
+        let me = Bytes { ptr: header };
+        me.set_type_table(Value::nil());
+        for i in 0..size {
+            me.set(i, v);
+        }
+        me
+    }
 
+    pub fn at(&self, index:usize) -> u8 {
+        unsafe {
+            let ptr = self.ptr.byte_add(16+index) as *mut u8;
+            *ptr
+        }
+    }
+
+    pub fn set(&self, index:usize, value:u8) {
+        unsafe {
+            let ptr = self.ptr.byte_add(16+index) as *mut u8;
+            *ptr = value
+        }
+    }
+
+    pub fn type_table(&self) -> Value {
+        get_value(self.ptr, 0)
+    }
+
+    pub fn set_type_table(&self, value:Value) {
+        set_value(self.ptr, 0, value);
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -416,7 +510,11 @@ pub struct Symbol {
 }
 
 impl Symbol {
-    
+    pub fn hash(&self) -> usize {
+        let mut hasher = DefaultHasher::new();
+        hasher.write_usize(self.ptr.addr());
+        hasher.finish() as usize
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
