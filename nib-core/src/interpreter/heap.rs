@@ -1,4 +1,4 @@
-use std::{collections::HashMap, hash::{DefaultHasher, Hasher}, ops::Deref};
+use std::{collections::HashMap, hash::{DefaultHasher, Hasher}, ops::Deref, ptr::copy_nonoverlapping};
 
 use region::Allocation;
 
@@ -100,19 +100,19 @@ pub(super) fn forward(from:*mut ObjectHeader, to:*mut ObjectHeader) {
 
 pub(super) fn get_value(base:*mut ObjectHeader, index:usize) -> Value {
     unsafe {
-        *get_value_ptr(base, index)
+        *get_object_ptr(base, index)
     }
 }
 
 pub(super) fn set_value(base:*mut ObjectHeader, index:usize, value:Value) {
     unsafe {
-        *get_value_ptr(base, index) = value;
+        *get_object_ptr(base, index) = value;
     }
 }
 
-pub(super) fn get_value_ptr(base:*mut ObjectHeader, index:usize) -> *mut Value {
+pub(super) fn get_object_ptr<T>(base:*mut ObjectHeader, index:usize) -> *mut T {
     unsafe {
-        let base_ptr = base.add(1) as *mut Value;
+        let base_ptr = base.add(1) as *mut T;
         let index_ptr = base_ptr.add(index);
         index_ptr
     }
@@ -365,6 +365,12 @@ impl From<Bytes> for Value {
     }
 }
 
+impl From<Symbol> for Value {
+    fn from(value: Symbol) -> Self {
+        Self::symbol(value.ptr)
+    }
+}
+
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Array {
@@ -411,21 +417,29 @@ pub struct Table {
 }
 
 
-const SIZE_OFFSET:usize = 16;
-const STORAGE_OFFSET:usize = 24;
+const INITIAL_SIZE:usize = 16;
 
 impl Table {
     pub fn make(heap:&mut Heap) -> Self {
-        const INITIAL_SIZE:usize = 16;
         let header = ObjectHeader::make(heap, 32, ValueRepr::Table);
-        let storage = Array::make(heap, INITIAL_SIZE);
-        set_value(header, 1, Value::integer(0));
-        set_value(header, 2, Value::from(storage));
-        Table { ptr: header }
+        let mut me = Table { ptr: header };
+        me.clear(heap);
+        me
     }
 
-    fn resize(&mut self, heap: &mut Heap, new_size:usize) {
-
+    fn resize(&mut self, heap: &mut Heap) {
+        let new_size = self.capacity()*2;
+        let storage = self.storage();
+        let new_storage = Array::make(heap, new_size*2);
+        for i in 0..self.capacity() {
+            let key = storage.at(i*2);
+            if key.is_symbol() {
+                let value = storage.at(i*2+1);
+                let sym = Symbol { ptr: key.get_object() };
+                Self::store(&new_storage, sym, value);
+            }
+        }
+        set_value(self.ptr, 2, Value::from(new_storage));
     }
 
     fn storage(&self) -> Array {
@@ -433,15 +447,48 @@ impl Table {
     }
 
     pub fn insert(&mut self, heap:&mut Heap, key:Symbol, value:Value) {
+        if 4*self.size() > 3*self.capacity() {
+            self.resize(heap);
+        }
         let storage = self.storage();
+        Self::store(&storage, key, value);
+    }
+
+    fn store(storage:&Array, key:Symbol, value:Value) -> usize {
+        todo!()
+    }
+
+    fn find(&self, key:Symbol) -> Option<usize> {
+        let mut hash_index = (key.hash() % self.capacity())*2;
+        let storage = self.storage();
+        while hash_index < storage.size() && !storage.at(hash_index).is_nil() {
+            if Value::from(key) == storage.at(hash_index) {
+                return Some(hash_index);
+            }
+            hash_index += 2;
+        }
+        None
     }
 
     pub fn delete(&mut self, key:Symbol) {
-        
+        if let Some(index) = self.find(key) {
+            self.storage().set(index, Value::bool(true)); // set a tombstone
+            self.storage().set(index+1, Value::nil());
+        }
     }
 
-    pub fn get(&self, key:Symbol) {
+    pub fn clear(&mut self, heap: &mut Heap) {
+        let storage = Array::make(heap, INITIAL_SIZE);
+        set_value(self.ptr, 1, Value::integer(0));
+        set_value(self.ptr, 2, Value::from(storage));
+    }
 
+    pub fn get(&self, key:Symbol) -> Value {
+        if let Some(index) = self.find(key) {
+            self.storage().at(index + 1)
+        } else {
+            Value::bool(false)
+        }
     }
 
     pub fn keys(&self) -> Value {
@@ -449,11 +496,12 @@ impl Table {
     }
 
     pub fn size(&self) -> usize {
-        todo!()
+        get_value(self.ptr, 1).get_integer() as usize
     } 
 
     pub fn capacity(&self) -> usize {
-        todo!()
+        let storage = self.storage();
+        storage.size()/2
     }
 
     pub fn type_table(&self) -> Value {
@@ -481,19 +529,29 @@ impl Bytes {
         me
     }
 
+    pub fn with(heap : &mut Heap, bytes:&[u8]) -> Self {
+        let header = ObjectHeader::make(heap, (bytes.len()+16) as u32, ValueRepr::Bytes);
+        let me = Bytes { ptr: header };
+        let from = bytes.as_ptr();
+        let to = get_object_ptr::<u8>(me.ptr, 8);
+        me.set_type_table(Value::nil());
+        unsafe { copy_nonoverlapping(from, to, bytes.len()); }
+        me
+    }
+
     pub fn at(&self, index:usize) -> u8 {
         unsafe {
-            let ptr = self.ptr.byte_add(16+index) as *mut u8;
+            let ptr = get_object_ptr(self.ptr, 8+index);
             *ptr
         }
     }
 
     pub fn set(&self, index:usize, value:u8) {
         unsafe {
-            let ptr = self.ptr.byte_add(16+index) as *mut u8;
+            let ptr = get_object_ptr(self.ptr, 8+index);
             *ptr = value
         }
-    }
+    } 
 
     pub fn type_table(&self) -> Value {
         get_value(self.ptr, 0)
@@ -510,10 +568,27 @@ pub struct Symbol {
 }
 
 impl Symbol {
+    pub fn make(heap:&mut Heap, name:&str) -> Self {
+        let header = ObjectHeader::make(heap, 24, ValueRepr::Symbol);
+        let me = Symbol { ptr: header };
+        me.set_type_table(Value::nil());
+        let name_bytes = Bytes::with(heap, name.as_bytes());
+        set_value(header, 1, Value::from(name_bytes));
+        me
+    }
+
     pub fn hash(&self) -> usize {
         let mut hasher = DefaultHasher::new();
         hasher.write_usize(self.ptr.addr());
         hasher.finish() as usize
+    }
+
+    pub fn type_table(&self) -> Value {
+        get_value(self.ptr, 0)
+    }
+
+    pub fn set_type_table(&self, value:Value) {
+        set_value(self.ptr, 0, value);
     }
 }
 
@@ -522,8 +597,16 @@ pub struct Closure {
     ptr: *mut ObjectHeader
 }
 
-impl Closure {
+pub const TYPE_BYTECODE:u16 = 0;
+pub const TYPE_CORE:u16 = 1;
+pub const TYPE_EXTERN:u16 = 2;
+pub const TYPE_FOREIGN:u16 = 3;
 
+impl Closure {
+    fn make(heap:&mut Heap) -> Self {
+        // Make base closure 
+        todo!()
+    }
 }
 
 

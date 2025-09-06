@@ -1,6 +1,6 @@
 #![cfg(test)]
 
-use crate::{common::Result, interpreter::heap::{Space, Value, ValueRepr}};
+use crate::{common::Result, interpreter::heap::{Array, Heap, Space, Value, ValueRepr}};
 
 #[test]
 fn test_data_repr() -> Result<()> {
@@ -41,4 +41,15 @@ fn roundtrip_char() -> Result<()> {
 fn create_space() {
     let space = Space::new(1000);
     assert_eq!(space.size, 1000);
+}
+
+#[test]
+fn make_heap() {
+    let mut heap = Heap::new(10000);
+    let array = Array::make(&mut heap, 5);
+    array.set(2, Value::integer(4));
+    let val = array.at(2);
+    assert_eq!(val.get_integer(), 4);
+    let array2 = Array::make(&mut heap, 100);
+    array.set(3, Value::from(array2));
 }
