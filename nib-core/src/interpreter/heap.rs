@@ -22,6 +22,8 @@ impl Heap {
 
     pub fn allocate<T>(&mut self, size: usize) -> *mut T {
         unsafe {
+            let unaligned = size % 8;
+            let size = size + if unaligned>0 { 8-unaligned } else { 0 };
             if self.from_space.top + size > self.from_space.size {
                 self.collect(size);
             }
@@ -330,6 +332,31 @@ impl Value {
         ptr as *mut ObjectHeader
     }
 
+    pub fn get_array(&self) -> Array {
+        let ptr = self.get_object();
+        Array { ptr }
+    }
+
+    pub fn get_bytes(&self) -> Bytes {
+        let ptr = self.get_object();
+        Bytes { ptr }
+    }
+
+    pub fn get_table(&self) -> Table {
+        let ptr = self.get_object();
+        Table { ptr }
+    }
+
+    pub fn get_symbol(&self) -> Symbol {
+        let ptr = self.get_object();
+        Symbol { ptr }
+    }
+
+    pub fn get_closure(&self) -> Closure {
+        let ptr = self.get_object();
+        Closure { ptr }
+    }
+
     pub fn get_char(&self) -> char {
         unsafe {
             char::from_u32_unchecked((self.val >> 8) as u32)
@@ -455,17 +482,35 @@ impl Table {
     }
 
     fn store(storage:&Array, key:Symbol, value:Value) -> usize {
-        todo!()
+        let hash_index = 2*(key.hash() % (storage.size()/2));
+        let mut offset:usize = 0;
+        let size = storage.size();
+        while offset < size {
+            let pos = (hash_index+offset)%size;
+            let candidate = storage.at(pos);
+            if candidate.is_nil() {
+                storage.set(pos, Value::from(key));
+                storage.set(pos+1, value);
+                return pos;
+            }
+            offset += 2;
+        }
+        panic!("Couldn't find space in table, this should be impossible");
     }
 
     fn find(&self, key:Symbol) -> Option<usize> {
         let mut hash_index = (key.hash() % self.capacity())*2;
+        let mut offset:usize = 0;
         let storage = self.storage();
-        while hash_index < storage.size() && !storage.at(hash_index).is_nil() {
-            if Value::from(key) == storage.at(hash_index) {
+        let size = storage.size();
+        while offset < size {
+            let candidate = storage.at((hash_index+offset)%size);
+            if Value::from(key) == candidate {
                 return Some(hash_index);
+            } else if candidate.is_nil() {
+                return None;
             }
-            hash_index += 2;
+            offset += 2;
         }
         None
     }
@@ -491,8 +536,18 @@ impl Table {
         }
     }
 
-    pub fn keys(&self) -> Value {
-        todo!()
+    pub fn keys(&self, heap:&mut Heap) -> Value {
+        let keys = Array::make(heap, self.size());
+        let mut key_index = 0;
+        let storage = self.storage();
+        for i in 0..self.capacity() {
+            let key = storage.at(i*2);
+            if key.is_symbol() {
+                keys.set(key_index, key);
+                key_index += 1;
+            }
+        }
+        Value::from(keys)
     }
 
     pub fn size(&self) -> usize {

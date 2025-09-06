@@ -1,6 +1,6 @@
 #![cfg(test)]
 
-use crate::{common::Result, interpreter::heap::{Array, Heap, Space, Value, ValueRepr}};
+use crate::{common::Result, interpreter::heap::{Array, Heap, Space, Symbol, Table, Value, ValueRepr}};
 
 #[test]
 fn test_data_repr() -> Result<()> {
@@ -52,4 +52,16 @@ fn make_heap() {
     assert_eq!(val.get_integer(), 4);
     let array2 = Array::make(&mut heap, 100);
     array.set(3, Value::from(array2));
+}
+
+#[test]
+fn make_table() {
+    let mut heap = Heap::new(10000);
+    let mut table = Table::make(&mut heap);
+    let key = Symbol::make(&mut heap, "key");
+    table.insert(&mut heap, key, Value::integer(42));
+    let keys = table.keys(&mut heap);
+    assert_eq!(keys.get_immediate_repr(), ValueRepr::Array);
+    let val = table.get(key);
+    assert_eq!(val, Value::integer(42));
 }
