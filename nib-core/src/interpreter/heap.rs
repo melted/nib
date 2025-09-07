@@ -1,6 +1,10 @@
+use core::slice;
 use std::{collections::HashMap, ffi::c_void, fmt::Debug, hash::{DefaultHasher, Hasher}, ptr::copy_nonoverlapping, slice::from_raw_parts};
 
+use libffi::low::CodePtr;
 use region::Allocation;
+
+use crate::{core::{Arity, Expression, FunClause}, treewalker::Signature};
 
 
 pub struct Heap {
@@ -180,7 +184,7 @@ impl Value {
             },
             ValueRepr::Float => {
                 let f = self.get_float();
-                hasher.write_u64(f.to_bits());
+                hasher.write_u64(f.to_bits()); 
             }
             _ => {
                 hasher.write_u64(self.val);
@@ -200,6 +204,10 @@ impl Value {
     }
 
     pub fn pointer<T>(ptr : *mut T) -> Self {
+        Value { val: (ptr.addr() as u64) << 3 | PTR_TAG }
+    }
+
+    pub fn cpointer<T>(ptr : *const T) -> Self {
         Value { val: (ptr.addr() as u64) << 3 | PTR_TAG }
     }
 
@@ -351,6 +359,13 @@ impl Value {
         ptr as *mut T
     }
 
+    pub fn get_cpointer<T>(&self) -> *const T {
+        // Keep the high bits the same.
+        let high_byte = self.val & (0xff << 56);
+        let ptr = (self.val >> 3) | high_byte;
+        ptr as *const T
+    }
+
     pub fn get_float(&self) -> f64 {
         unsafe {
             let ptr = self.get_object().add(1) as *mut f64;
@@ -478,6 +493,26 @@ impl Array {
 
     pub fn set(&self, index:usize, value:Value) {
         set_value(self.ptr, index+1, value);
+    }
+
+    pub fn values(&self) -> &[Value] {
+        unsafe {
+            let ptr = get_object_ptr(self.ptr, 1) as *const Value;
+            slice::from_raw_parts(ptr, self.size())
+        }
+    }
+
+    pub fn values_mut(&self) -> &[Value] {
+        unsafe {
+            let ptr = get_object_ptr(self.ptr, 1) as *mut Value;
+            slice::from_raw_parts(ptr, self.size())
+        }
+    }
+
+    pub fn fill(&mut self, values : &[Value], from:usize, to:usize) {
+        for (i, v) in (from..to).zip(values) {
+            self.set(i, *v);
+        }
     }
 
     pub fn type_table(&self) -> Value {
@@ -730,20 +765,111 @@ impl Debug for Symbol {
     }
 }
 
+pub enum Code {
+    Bytecode(Vec<u8>),
+    Core(*const Vec<FunClause>),
+    Extern(*const c_void),
+    ExternMut(*const c_void),
+    Foreign(*const Signature, CodePtr)
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Closure {
     ptr: *mut ObjectHeader
 }
 
+pub const TYPE_INCOMPLETE:u16 = 0xffff;
 pub const TYPE_BYTECODE:u16 = 0;
 pub const TYPE_CORE:u16 = 1;
 pub const TYPE_EXTERN:u16 = 2;
-pub const TYPE_FOREIGN:u16 = 3;
+pub const TYPE_EXTERN_MUT:u16 = 3;
+pub const TYPE_FOREIGN:u16 = 4;
 
 impl Closure {
-    fn make(heap:&mut Heap) -> Self {
-        // Make base closure 
-        todo!()
+    fn make(heap:&mut Heap, code:Code, captures:&[Value], arity:usize, vararg:Option<usize>) -> Self {
+        let header = ObjectHeader::make(heap, 48, ValueRepr::Closure);
+        let me = Closure { ptr: header };
+        me.set_type_table(Value::nil());
+
+        let env_size = captures.len() + arity + if vararg.is_some() { 1 } else { 0 };
+        let mut env = Array::make(heap, env_size);
+        env.fill(captures, 0, captures.len());
+        set_value(header, 1, Value::nil());
+        set_value(header, 2, Value::from(env));
+        set_value(header, 3, Value::integer(arity as i64));
+        let var_pos = if let Some(pos) = vararg { Value::integer(pos as i64) } else { Value::bool(false) };
+        set_value(header, 4, var_pos);
+        me
+    }
+
+    pub fn set_tag(&mut self, tag:u16) {
+        unsafe { (*self.ptr).tag = tag; }
+    }
+
+    pub fn get_tag(&self) -> u16 {
+        unsafe { (*self.ptr).tag }
+    }
+
+    pub fn set_code(&mut self, heap:&mut Heap, code: &Code) {
+        match code {
+            Code::Bytecode(items) => {
+                let bc = Bytes::with(heap, &items);
+                self.set_tag(TYPE_BYTECODE);
+                set_value(self.ptr, 1, Value::from(bc));
+            },
+            Code::Core(ptr) => {
+                self.set_tag(TYPE_CORE);
+                set_value(self.ptr, 1, Value::cpointer(ptr));
+            },
+            Code::Extern(ptr) => {
+                self.set_tag(TYPE_EXTERN);
+                set_value(self.ptr, 1, Value::cpointer(ptr));
+            },
+            Code::ExternMut(ptr) => {
+                self.set_tag(TYPE_EXTERN_MUT);
+                set_value(self.ptr, 1, Value::cpointer(ptr));
+            },
+            Code::Foreign(sig_ptr, code_ptr) => {
+                self.set_tag(TYPE_EXTERN_MUT);
+                let arr = Array::make(heap, 2);
+                arr.set(0, Value::cpointer(sig_ptr));
+                arr.set(1, Value::cpointer(code_ptr));
+                set_value(self.ptr, 1, Value::from(arr));
+            },
+        }
+    }
+    
+
+    pub fn get_code(&self) -> Code {
+        let val = get_value(self.ptr, 1);
+        match self.get_tag() {
+            TYPE_BYTECODE => {
+                let bytes = val.get_bytes();
+                Code::Bytecode(bytes.get_slice().to_vec())
+            },
+            TYPE_CORE => {
+                Code::Core(val.get_cpointer())
+            }
+            TYPE_EXTERN => {
+                Code::Extern(val.get_cpointer())
+            }
+            TYPE_EXTERN_MUT => {
+                Code::ExternMut(val.get_cpointer())
+            }
+            TYPE_FOREIGN => {
+                let arr = val.get_array();
+                Code::Foreign(arr.at(0).get_cpointer(), CodePtr::from_ptr(arr.at(1).get_cpointer()))
+            }
+            _ => panic!("Unexpected code type tag in get_code")
+        }
+    }
+
+    pub fn type_table(&self) -> Value {
+        get_value(self.ptr, 0)
+    }
+
+    pub fn set_type_table(&self, value:Value) {
+        set_value(self.ptr, 0, value);
     }
 }
 
