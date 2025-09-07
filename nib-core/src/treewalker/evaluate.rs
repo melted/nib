@@ -1,7 +1,8 @@
 use std::{
     cmp::max,
     collections::{HashMap, HashSet},
-    ops::Deref, os::raw::c_void,
+    ops::Deref,
+    os::raw::c_void,
 };
 
 use internment::Intern;
@@ -10,8 +11,8 @@ use log::info;
 use crate::{
     ast::Literal,
     common::{Name, Result},
-    core::{free_vars, Arity, Binder, Binding, Expression, FunClause, Module, Pattern},
-    treewalker::{new_ref, Bytes, CType, Closure, Code, Runtime, Symbol, Value},
+    core::{Arity, Binder, Binding, Expression, FunClause, Module, Pattern, free_vars},
+    treewalker::{Bytes, CType, Closure, Code, Runtime, Symbol, Value, new_ref},
 };
 
 impl Runtime {
@@ -116,7 +117,7 @@ impl Runtime {
             Literal::Real(r) => Ok(Value::Real(*r)),
             Literal::Bytearray(ba) => Ok(Value::new_bytes(ba.clone())),
             Literal::Symbol(sym) => Ok(Value::Symbol(self.get_symbol(sym))),
-            Literal::String(s) => self.make_string(s)
+            Literal::String(s) => self.make_string(s),
         }
     }
 
@@ -174,7 +175,8 @@ impl Runtime {
                                         continue;
                                     }
                                 }
-                                v = self.evaluate_expression(binding_name, &clause.rhs, &mut env)?;
+                                v =
+                                    self.evaluate_expression(binding_name, &clause.rhs, &mut env)?;
                                 env.pop();
                                 break;
                             }

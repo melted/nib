@@ -1,24 +1,25 @@
 //! Compile a module into a bytecode module
 use crate::common::Result;
 
-
-pub fn compile_core(module : crate::core::Module) -> Result<Module> {
+pub fn compile_core(module: crate::core::Module) -> Result<Module> {
     let mut module = Module::new();
     todo!()
 }
 
-
-
 pub struct Module {
-    bcode : Vec<u8>,
-    scratch_mem_size : usize,
+    bcode: Vec<u8>,
+    scratch_mem_size: usize,
     /// A list of symbols that should be put into the scratch space.
-    want_symbols:Vec<String> 
+    want_symbols: Vec<String>,
 }
 
 impl Module {
     pub fn new() -> Self {
-        Module { bcode: Vec::new(), scratch_mem_size: 0, want_symbols: Vec::new() }
+        Module {
+            bcode: Vec::new(),
+            scratch_mem_size: 0,
+            want_symbols: Vec::new(),
+        }
     }
 }
 

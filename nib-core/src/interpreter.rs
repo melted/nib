@@ -3,7 +3,4 @@
 pub mod heap;
 mod tests;
 
-pub struct Runtime {
-
-}
-
+pub struct Runtime {}

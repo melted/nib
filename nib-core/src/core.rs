@@ -551,7 +551,7 @@ impl Display for Pattern {
         match self {
             Pattern::Alias(pat, alias) => write!(f, "{}@{}", pat, alias),
             Pattern::Bind(name) => write!(f, "{}", name),
-            Pattern::Type(pattern, name ) => write!(f, "{}:{}", pattern, name),
+            Pattern::Type(pattern, name) => write!(f, "{}:{}", pattern, name),
             Pattern::Custom(name, fields) => {
                 write!(f, "({}", name)?;
                 for field in fields {

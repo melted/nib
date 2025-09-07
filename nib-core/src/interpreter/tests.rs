@@ -1,6 +1,9 @@
 #![cfg(test)]
 
-use crate::{common::Result, interpreter::heap::{Array, Heap, Space, Symbol, Table, Value, ValueRepr}};
+use crate::{
+    common::Result,
+    interpreter::heap::{Array, Heap, Space, Symbol, Table, Value, ValueRepr},
+};
 
 #[test]
 fn test_data_repr() -> Result<()> {
@@ -33,7 +36,7 @@ fn roundtrip_char() -> Result<()> {
     let a = 'a';
     let val = Value::char(a);
     let b = val.get_char();
-    assert_eq!(a,b);
+    assert_eq!(a, b);
     Ok(())
 }
 

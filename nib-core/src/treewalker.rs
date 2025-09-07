@@ -1,9 +1,14 @@
-
 #![allow(clippy::not_unsafe_ptr_arg_deref)]
 #![allow(clippy::mutable_key_type)]
 
 use std::{
-    cell::RefCell, collections::{BTreeSet, HashMap, HashSet}, ffi::c_void, fmt::{Debug, Display}, fs::read_to_string, hash::Hash, rc::Rc
+    cell::RefCell,
+    collections::{BTreeSet, HashMap, HashSet},
+    ffi::c_void,
+    fmt::{Debug, Display},
+    fs::read_to_string,
+    hash::Hash,
+    rc::Rc,
 };
 
 use internment::Intern;
@@ -108,7 +113,11 @@ impl Runtime {
     }
 
     pub fn get_global(&self, name: &str) -> Option<Value> {
-        self.globals.borrow().table.get(&Intern::from_ref(name)).cloned()
+        self.globals
+            .borrow()
+            .table
+            .get(&Intern::from_ref(name))
+            .cloned()
     }
 
     pub fn add_name(&mut self, name: &Name, val: &Value) -> Result<()> {
@@ -301,8 +310,8 @@ impl Value {
         Value::Closure(new_ref(Closure::extern_fun(fun, arity)))
     }
 
-    pub fn new_foreign_fun(signature: &Signature, code:CodePtr) -> Self {
-        Value::Closure(new_ref(Closure::foreign_fun( code, signature)))
+    pub fn new_foreign_fun(signature: &Signature, code: CodePtr) -> Self {
+        Value::Closure(new_ref(Closure::foreign_fun(code, signature)))
     }
 
     pub fn is_complex(&self) -> bool {
@@ -824,17 +833,15 @@ pub enum CType {
     Float32,
     Float64,
     Pointer,
-    Void
+    Void,
 }
-
 
 #[derive(Debug, Clone)]
 pub struct Signature {
     cif: Cif,
-    arg_types:Vec<CType>,
-    ret_type:CType
+    arg_types: Vec<CType>,
+    ret_type: CType,
 }
-
 
 #[derive(Debug, Clone)]
 pub enum Code {
@@ -905,7 +912,7 @@ impl Closure {
         }
     }
 
-    pub fn foreign_fun(ptr: CodePtr, sig:&Signature) -> Self {
+    pub fn foreign_fun(ptr: CodePtr, sig: &Signature) -> Self {
         Closure {
             type_table: None,
             code: new_ref(Code::Foreign(sig.clone(), ptr)),
