@@ -52,16 +52,27 @@ fn make_heap() {
     assert_eq!(val.get_integer(), 4);
     let array2 = Array::make(&mut heap, 100);
     array.set(3, Value::from(array2));
+    assert_eq!(array.size(), 5);
+    assert_eq!(array2.size(), 100);
 }
 
 #[test]
 fn make_table() {
     let mut heap = Heap::new(10000);
     let mut table = Table::make(&mut heap);
-    let key = Symbol::make(&mut heap, "key");
+    let key = Value::from(Symbol::make(&mut heap, "key"));
     table.insert(&mut heap, key, Value::integer(42));
     let keys = table.keys(&mut heap);
     assert_eq!(keys.get_immediate_repr(), ValueRepr::Array);
+    assert_eq!(keys.get_array().at(0), Value::from(key));
+    assert_eq!(keys.get_array().size(), 1);
     let val = table.get(key);
     assert_eq!(val, Value::integer(42));
+}
+
+#[test]
+fn alloc_float() {
+    let mut heap = Heap::new(10000);
+    let fl = Value::alloc_float(&mut heap, 1.111);
+    dbg!(fl.get_float());
 }

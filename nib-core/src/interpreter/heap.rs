@@ -1,4 +1,4 @@
-use std::{collections::HashMap, hash::{DefaultHasher, Hasher}, ops::Deref, ptr::copy_nonoverlapping};
+use std::{collections::HashMap, ffi::c_void, fmt::Debug, hash::{DefaultHasher, Hasher}, ptr::copy_nonoverlapping, slice::from_raw_parts};
 
 use region::Allocation;
 
@@ -120,7 +120,7 @@ pub(super) fn get_object_ptr<T>(base:*mut ObjectHeader, index:usize) -> *mut T {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub struct Value {
     pub val: u64,
 }
@@ -167,6 +167,28 @@ const FALSE_BTAG:u64 = 0x26;
 const TRUE_BTAG:u64 = 0x2e;
 
 impl Value {
+    pub fn hash(&self) -> usize {
+        // All values except byte arrays and floats use 
+        // the hash of val, since arrays, tables and closures
+        // better use object identity and symbols should by
+        // definition.
+        let mut hasher = DefaultHasher::new();
+        match self.get_immediate_repr() {
+            ValueRepr::Object if self.is_bytearray() => {
+                let bytes = self.get_bytes();
+                hasher.write(bytes.get_slice());
+            },
+            ValueRepr::Float => {
+                let f = self.get_float();
+                hasher.write_u64(f.to_bits());
+            }
+            _ => {
+                hasher.write_u64(self.val);
+            }
+        }
+        hasher.finish() as usize
+    }
+
     fn check_pointer<T>(ptr : *mut T) {
         if ptr.addr() as u64 & TAG_MASK != 0 {
             panic!("Pointer is not aligned, can't make value");
@@ -181,7 +203,14 @@ impl Value {
         Value { val: (ptr.addr() as u64) << 3 | PTR_TAG }
     }
 
-    pub fn float(flt : *mut f64) -> Self {
+    pub fn alloc_float(heap:&mut Heap, x:f64) -> Self {
+        let object = ObjectHeader::make(heap, 16, ValueRepr::Float);
+        let ptr = get_object_ptr(object, 0) as *mut f64;
+        unsafe { *ptr = x; }
+        Self::float(object)
+    }
+
+    pub fn float(flt : *mut ObjectHeader) -> Self {
         Self::check_pointer(flt);
         Value { val: (flt.addr() as u64) | FLOAT_TAG }
     }
@@ -226,7 +255,7 @@ impl Value {
             PTR_TAG => ValueRepr::Pointer,
             SYM_TAG => ValueRepr::Symbol,
             ARR_TAG => ValueRepr::Array,
-            BOXINT_TAG => ValueRepr::BoxedInteger,
+            BOXINT_TAG => ValueRepr::BoxedInteger, // Reserved, not used ATM
             SMALL_TAG => {
                 match self.val & 0xf7 {
                     CHAR_STAG => ValueRepr::Char,
@@ -322,9 +351,11 @@ impl Value {
         ptr as *mut T
     }
 
-    pub fn get_float(&self) -> *mut f64 {
-        let ptr = (self.val & !TAG_MASK) as usize;
-        ptr as *mut f64
+    pub fn get_float(&self) -> f64 {
+        unsafe {
+            let ptr = self.get_object().add(1) as *mut f64;
+            *ptr
+        }
     }
 
     pub fn get_object(&self) -> *mut ObjectHeader {
@@ -398,6 +429,26 @@ impl From<Symbol> for Value {
     }
 }
 
+impl Debug for Value {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self.get_repr() {
+            ValueRepr::Nil => write!(f, "nil"),
+            ValueRepr::Undefined => write!(f, "undefined"),
+            ValueRepr::Bool => write!(f,"{:?}", self.get_bool()),
+            ValueRepr::Integer => write!(f,"{:?}", self.get_integer()),
+            ValueRepr::Pointer => write!(f,"{:?}", self.get_pointer::<*mut c_void>()),
+            ValueRepr::Char => write!(f,"{:?}", self.get_char()),
+            ValueRepr::Float => write!(f,"{:?}", self.get_float()),
+            ValueRepr::BoxedInteger => todo!(),
+            ValueRepr::Symbol => write!(f,"{:?}", self.get_symbol()),
+            ValueRepr::Array => write!(f,"{:?}", self.get_array()),
+            ValueRepr::Bytes => write!(f,"{:?}", self.get_bytes()),
+            ValueRepr::Table => write!(f,"{:?}", self.get_table()),
+            ValueRepr::Closure => write!(f,"{:?}", self.get_closure()),
+            ValueRepr::Object => write!(f,"{:?}", self.get_object()),
+        }
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Array {
@@ -443,7 +494,6 @@ pub struct Table {
     ptr: *mut ObjectHeader
 }
 
-
 const INITIAL_SIZE:usize = 16;
 
 impl Table {
@@ -460,35 +510,43 @@ impl Table {
         let new_storage = Array::make(heap, new_size*2);
         for i in 0..self.capacity() {
             let key = storage.at(i*2);
-            if key.is_symbol() {
+            if Self::valid_key(key) {
                 let value = storage.at(i*2+1);
-                let sym = Symbol { ptr: key.get_object() };
-                Self::store(&new_storage, sym, value);
+                Self::store(&new_storage, key, value);
             }
         }
         set_value(self.ptr, 2, Value::from(new_storage));
     }
 
     fn storage(&self) -> Array {
-        Array { ptr: get_value(self.ptr, 2).get_object() }
+        get_value(self.ptr, 2).get_array()
     }
 
-    pub fn insert(&mut self, heap:&mut Heap, key:Symbol, value:Value) {
+    fn valid_key(key : Value) -> bool {
+        !(key.is_nil() || key.is_undefined())
+    }
+
+    pub fn insert(&mut self, heap:&mut Heap, key:Value, value:Value) {
+        if !Self::valid_key(key) {
+            return;
+        }
         if 4*self.size() > 3*self.capacity() {
             self.resize(heap);
         }
         let storage = self.storage();
+        let new_size = self.size() + 1;
+        set_value(self.ptr, 1, Value::integer(new_size as i64));
         Self::store(&storage, key, value);
     }
 
-    fn store(storage:&Array, key:Symbol, value:Value) -> usize {
+    fn store(storage:&Array, key:Value, value:Value) -> usize {
         let hash_index = 2*(key.hash() % (storage.size()/2));
         let mut offset:usize = 0;
         let size = storage.size();
         while offset < size {
             let pos = (hash_index+offset)%size;
             let candidate = storage.at(pos);
-            if candidate.is_nil() {
+            if !Self::valid_key(candidate) {
                 storage.set(pos, Value::from(key));
                 storage.set(pos+1, value);
                 return pos;
@@ -498,8 +556,8 @@ impl Table {
         panic!("Couldn't find space in table, this should be impossible");
     }
 
-    fn find(&self, key:Symbol) -> Option<usize> {
-        let mut hash_index = (key.hash() % self.capacity())*2;
+    fn find(&self, key:Value) -> Option<usize> {
+        let hash_index = (key.hash() % self.capacity())*2;
         let mut offset:usize = 0;
         let storage = self.storage();
         let size = storage.size();
@@ -515,10 +573,12 @@ impl Table {
         None
     }
 
-    pub fn delete(&mut self, key:Symbol) {
+    pub fn delete(&mut self, key:Value) {
         if let Some(index) = self.find(key) {
-            self.storage().set(index, Value::bool(true)); // set a tombstone
-            self.storage().set(index+1, Value::nil());
+            self.storage().set(index, Value::undefined()); // set a tombstone
+            self.storage().set(index+1, Value::nil());    
+            let new_size = self.size() - 1;
+            set_value(self.ptr, 1, Value::integer(new_size as i64));
         }
     }
 
@@ -528,7 +588,7 @@ impl Table {
         set_value(self.ptr, 2, Value::from(storage));
     }
 
-    pub fn get(&self, key:Symbol) -> Value {
+    pub fn get(&self, key:Value) -> Value {
         if let Some(index) = self.find(key) {
             self.storage().at(index + 1)
         } else {
@@ -606,7 +666,20 @@ impl Bytes {
             let ptr = get_object_ptr(self.ptr, 8+index);
             *ptr = value
         }
-    } 
+    }
+
+    pub fn size(&self) -> usize {
+        unsafe {
+            ((*self.ptr).size - 16) as usize
+        }
+    }
+
+    pub(super) fn get_slice(&self) -> &[u8] {
+        unsafe {
+            let ptr = self.ptr.byte_add(16) as *const u8;
+            from_raw_parts(ptr, self.size())
+        }
+    }
 
     pub fn type_table(&self) -> Value {
         get_value(self.ptr, 0)
@@ -617,7 +690,7 @@ impl Bytes {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub struct Symbol {
     ptr: *mut ObjectHeader
 }
@@ -632,18 +705,28 @@ impl Symbol {
         me
     }
 
-    pub fn hash(&self) -> usize {
-        let mut hasher = DefaultHasher::new();
-        hasher.write_usize(self.ptr.addr());
-        hasher.finish() as usize
-    }
-
     pub fn type_table(&self) -> Value {
         get_value(self.ptr, 0)
     }
 
     pub fn set_type_table(&self, value:Value) {
         set_value(self.ptr, 0, value);
+    }
+
+    pub fn name(&self) -> Value {
+        get_value(self.ptr, 1)
+    }
+
+    pub fn as_string(&self) -> String {
+        let name_bytes = self.name().get_bytes();
+        let name_str = str::from_utf8(name_bytes.get_slice()).expect("symbols must be utf-8");
+        name_str.to_owned()
+    }
+}
+
+impl Debug for Symbol {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "#({})", self.as_string())
     }
 }
 
