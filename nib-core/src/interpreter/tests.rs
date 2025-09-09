@@ -79,3 +79,16 @@ fn alloc_float() {
     let fl = Value::alloc_float(&mut heap, 1.111);
     dbg!(fl.get_float());
 }
+
+#[test]
+fn hash_stuff() {
+    let mut heap = Heap::new(10000);
+    let mut table = Table::make(&mut heap);
+    let key = Value::from(Symbol::make(&mut heap, "key"));
+    table.insert(&mut heap, key, Value::integer(42));
+    table.insert(&mut heap, Value::integer(12), Value::integer(22));
+    let keys = table.keys(&mut heap);
+    dbg!(key.hash());
+    dbg!(keys.hash());
+    dbg!(Value::from(table).hash());
+}

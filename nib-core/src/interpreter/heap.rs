@@ -1,26 +1,29 @@
 use core::slice;
 use std::{
-    collections::HashMap,
-    ffi::c_void,
-    fmt::Debug,
-    hash::{DefaultHasher, Hasher},
-    ptr::copy_nonoverlapping,
-    slice::from_raw_parts,
+    collections::HashMap, ffi::c_void, fmt::Debug, hash::{DefaultHasher, Hash, Hasher}, io::BufRead, ptr::copy_nonoverlapping, slice::from_raw_parts
 };
 
 use libffi::low::CodePtr;
 use region::Allocation;
 
 use crate::{
-    core::{Arity, Expression, FunClause},
-    treewalker::Signature,
+    common::align_int, core::{Arity, Expression, FunClause}, treewalker::Signature
 };
+
+const BIG_OBJECT_THRESHOLD:usize = 0x3fff;
+
+pub struct BigObject {
+    count:usize,
+    object:Allocation
+}
 
 pub struct Heap {
     from_space: Space,
-    to_space: Option<Space>,
+    to_space: Space,
+    big_objects:HashMap<usize, BigObject>,
     roots: Vec<Value>,
 }
+
 
 pub struct Space {
     pub alloc: Allocation,
@@ -32,23 +35,35 @@ impl Heap {
     pub fn new(size: usize) -> Self {
         Heap {
             from_space: Space::new(size),
-            to_space: None,
+            to_space: Space::new(size),
+            big_objects: HashMap::new(),
             roots: Vec::new(),
         }
     }
 
     pub fn allocate<T>(&mut self, size: usize) -> *mut T {
         unsafe {
-            let unaligned = size % 8;
-            let size = size + if unaligned > 0 { 8 - unaligned } else { 0 };
-            if self.from_space.top + size > self.from_space.size {
-                self.collect(size);
+            let aligned_size = align_int(size, 8);
+            if aligned_size > BIG_OBJECT_THRESHOLD {
+                return self.allocate_big_object(aligned_size);
+            }
+            if self.from_space.top + aligned_size > self.from_space.size {
+                self.collect(aligned_size);
             }
             let base_ptr = self.from_space.alloc.as_mut_ptr() as *mut T;
             let top_ptr = base_ptr.byte_add(self.from_space.top);
-            self.from_space.top += size;
+            self.from_space.top += aligned_size;
             top_ptr
         }
+    }
+
+    pub fn allocate_big_object<T>(&mut self, size:usize) -> *mut T {
+        let Ok(mut alloc) = region::alloc(size, region::Protection::READ_WRITE) else {
+            panic!("Couldn't allocate {size} bytes!");
+        };
+        let ptr = alloc.as_mut_ptr() as *mut T;
+        self.big_objects.insert(ptr.addr(), BigObject { count: 0, object: alloc });
+        ptr
     }
 
     pub fn collect(&mut self, needed: usize) {
@@ -57,20 +72,90 @@ impl Heap {
         } else {
             self.from_space.size
         };
-        let mut to_space = Space::new(new_size);
-        unsafe {
-            self.copy_live(&mut to_space);
+        if new_size > self.to_space.size {
+            self.to_space = Space::new(new_size);
         }
-        self.from_space = to_space;
+        
+        unsafe {
+            self.copy_live();
+        }
+        std::mem::swap(&mut self.to_space, &mut self.from_space);
     }
 
-    unsafe fn copy_live(&mut self, to_space: &mut Space) {
-        let mut to_copy = self.roots.clone();
-        let forwarded_headerless: HashMap<usize, usize> = HashMap::new();
-        while let Some(v) = to_copy.pop() {
-            match v.get_immediate_repr() {
+    unsafe fn copy_live(&mut self) {
+        let mut scan = 0;
+        self.trace_roots();
+        while scan < self.to_space.top {
+            let obj = self.to_space.get_object_at(scan);
+            scan += self.trace_object(obj);
+        }
+    }
+
+    fn trace_roots(&mut self) {
+        let mut new_roots = Vec::new();
+        for root in &self.roots {
+            let new_root = Self::copy_object(*root, &mut self.to_space);
+            new_roots.push(new_root);
+        }
+        self.roots = new_roots;
+    }
+
+    fn trace_object(&mut self, obj:*mut ObjectHeader ) -> usize {
+        unsafe {
+            let repr = (*obj).repr;
+            let size = (*obj).size as usize;
+            match repr {
+                ValueRepr::Array => {
+                    let arr = Array { ptr: obj };
+                    Self::copy_object(arr.type_table(), &mut self.to_space);
+                    for v in arr.values() {
+                        Self::copy_object(*v, &mut self.to_space);
+                    }
+                }
+                ValueRepr::Bytes => {
+                    let bytes = Bytes { ptr: obj };
+                    Self::copy_object(bytes.type_table(), &mut self.to_space);
+                }
+                ValueRepr::Closure => {
+                    let closure = Closure { ptr: obj };
+                    Self::copy_object(closure.type_table(), &mut self.to_space);
+                    Self::copy_object(get_value(obj, 1), &mut self.to_space);
+                    Self::copy_object(closure.env(), &mut self.to_space);
+                }
+                ValueRepr::Symbol => {
+                    let symbol = Symbol { ptr: obj };
+                    Self::copy_object(symbol.type_table(), &mut self.to_space);
+                    Self::copy_object(symbol.name(), &mut self.to_space);
+                }
+                ValueRepr::Table => {
+                    let table = Table { ptr: obj };
+                    Self::copy_object(table.type_table(), &mut self.to_space);
+                    Self::copy_object(Value::from(table.storage()), &mut self.to_space);
+                }
                 _ => {}
             }
+            size
+        }
+    }
+
+    fn copy_object(value:Value, to_space:&mut Space) -> Value {
+        if value.is_immediate() {
+            return value;
+        }
+        unsafe {
+            let obj = value.get_object();
+            if (*obj).flags & FORWARD_FLAG == FORWARD_FLAG {
+                return get_value(obj, 0);
+            }
+            let tag = value.get_tag();
+            let size = (*obj).size as usize;
+            let dst = to_space.get_object_at(to_space.top);
+            copy_nonoverlapping(obj, dst, size);
+            to_space.top += align_int(size, 8);
+            (*obj).flags &= FORWARD_FLAG;
+            let new_value = Value::with_tag(dst, tag);
+            set_value(obj, 0, new_value);
+            new_value
         }
     }
 }
@@ -85,6 +170,10 @@ impl Space {
             size,
             top: 0,
         }
+    }
+
+    pub(super) fn get_object_at(&mut self, pos:usize) -> *mut ObjectHeader {
+        unsafe { self.alloc.as_mut_ptr::<ObjectHeader>().byte_add(pos) }
     }
 }
 
@@ -187,13 +276,14 @@ const TRUE_BTAG: u64 = 0x2e;
 
 impl Value {
     pub fn hash(&self) -> usize {
-        // All values except byte arrays and floats use
-        // the hash of val, since arrays, tables and closures
-        // better use object identity and symbols should by
-        // definition.
         let mut hasher = DefaultHasher::new();
-        match self.get_immediate_repr() {
-            ValueRepr::Object if self.is_bytearray() => {
+        self.add_hash(&mut hasher);
+        hasher.finish() as usize
+    }
+
+    fn add_hash<T:Hasher>(&self, hasher:&mut T) {
+        match self.get_repr() {
+            ValueRepr::Bytes => {
                 let bytes = self.get_bytes();
                 hasher.write(bytes.get_slice());
             }
@@ -201,11 +291,30 @@ impl Value {
                 let f = self.get_float();
                 hasher.write_u64(f.to_bits());
             }
+            ValueRepr::Array => {
+                let arr = self.get_array();
+                for v in arr.values() {
+                    v.add_hash(hasher);
+                }
+            }
+            ValueRepr::Closure => {
+                let closure = self.get_closure();
+                closure.get_code().hash(hasher);
+                closure.env().add_hash(hasher);
+            }
+            ValueRepr::Symbol => {
+                let symbol = self.get_symbol();
+                symbol.name().add_hash(hasher);
+            }
+            ValueRepr::Table => {
+                let table = self.get_table();
+                let content = Value::from(table.storage());
+                content.add_hash(hasher);
+            }
             _ => {
                 hasher.write_u64(self.val);
             }
         }
-        hasher.finish() as usize
     }
 
     fn check_pointer<T>(ptr: *mut T) {
@@ -242,25 +351,24 @@ impl Value {
     }
 
     pub fn float(flt: *mut ObjectHeader) -> Self {
-        Self::check_pointer(flt);
-        Value {
-            val: (flt.addr() as u64) | FLOAT_TAG,
-        }
+        Self::with_tag(flt, FLOAT_TAG)
     }
 
     pub fn symbol(sym: *mut ObjectHeader) -> Self {
-        Self::check_pointer(sym);
-        Value {
-            val: (sym.addr() as u64) | SYM_TAG,
-        }
+        Self::with_tag(sym, SYM_TAG)
     }
 
     pub fn array(arr: *mut ObjectHeader) -> Self {
-        Self::check_pointer(arr);
+        Self::with_tag(arr, ARR_TAG)
+    }
+
+    pub fn with_tag(obj: *mut ObjectHeader, tag:u64) -> Self {
+        Self::check_pointer(obj);
         Value {
-            val: (arr.addr() as u64) | ARR_TAG,
+            val: (obj.addr() as u64) | tag,
         }
     }
+
 
     pub fn bool(b: bool) -> Self {
         let val = if b { TRUE_BTAG } else { FALSE_BTAG };
@@ -327,7 +435,7 @@ impl Value {
         (self.val & TAG_MASK) == INT_TAG
     }
 
-    pub fn is_machine_pointer(&self) -> bool {
+    pub fn is_pointer(&self) -> bool {
         (self.val & TAG_MASK) == PTR_TAG
     }
 
@@ -377,6 +485,11 @@ impl Value {
 
     pub fn is_undefined(&self) -> bool {
         (self.val & STAG_MASK) == UDEF_STAG
+    }
+
+    pub fn is_immediate(&self) -> bool {
+        let tag = self.val & TAG_MASK;
+        tag == INT_TAG || tag == PTR_TAG || tag == SMALL_TAG
     }
 
     pub fn get_integer(&self) -> i64 {
@@ -440,6 +553,10 @@ impl Value {
 
     pub fn get_bool(&self) -> bool {
         (self.val & TRUE_BTAG) > 0
+    }
+
+    pub fn get_tag(&self) -> u64 {
+        self.val & TAG_MASK
     }
 }
 
@@ -792,12 +909,13 @@ impl Debug for Symbol {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Code {
     Bytecode(Vec<u8>),
     Core(*const Vec<FunClause>),
     Extern(*const c_void),
     ExternMut(*const c_void),
-    Foreign(*const Signature, CodePtr),
+    Foreign(*const Signature, *const c_void),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -892,7 +1010,7 @@ impl Closure {
                 let arr = val.get_array();
                 Code::Foreign(
                     arr.at(0).get_cpointer(),
-                    CodePtr::from_ptr(arr.at(1).get_cpointer()),
+                    arr.at(1).get_cpointer(),
                 )
             }
             _ => panic!("Unexpected code type tag in get_code"),
@@ -905,5 +1023,9 @@ impl Closure {
 
     pub fn set_type_table(&mut self, value: Value) {
         set_value(self.ptr, 0, value);
+    }
+
+    pub fn env(&self) -> Value {
+        get_value(self.ptr, 2)
     }
 }

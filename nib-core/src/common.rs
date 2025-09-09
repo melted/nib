@@ -173,3 +173,7 @@ impl Display for Name {
         Ok(())
     }
 }
+
+pub fn align_int(value:usize, alignment:usize) -> usize {
+    (value + (alignment-1)) & !(alignment-1)
+}
