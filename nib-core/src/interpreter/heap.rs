@@ -210,6 +210,8 @@ pub(super) fn forward(from: *mut ObjectHeader, to: *mut ObjectHeader) {
     }
 }
 
+const CELL_SIZE:usize = size_of::<Value>();
+        
 pub(super) fn get_value(base: *mut ObjectHeader, index: usize) -> Value {
     unsafe { *get_object_ptr(base, index) }
 }
@@ -618,12 +620,22 @@ pub struct Array {
 
 impl Array {
     pub fn make(heap: &mut Heap, size: usize) -> Self {
-        let header = ObjectHeader::make(heap, (size * 8 + 16) as u32, ValueRepr::Array);
+        let header = ObjectHeader::make(heap, ((size + 2) * CELL_SIZE) as u32, ValueRepr::Array);
         let me = Array { ptr: header };
         me.set_type_table(Value::nil());
         for i in 0..size {
             me.set(i, Value::nil());
         }
+        me
+    }
+
+    pub fn with(heap: &mut Heap, values: &[Value]) -> Self {
+        let header = ObjectHeader::make(heap, ((values.len() + 2)* CELL_SIZE) as u32, ValueRepr::Array);
+        let me = Array { ptr: header };
+        me.set_type_table(Value::nil());
+        let src = values.as_ptr();
+        let dst = get_object_ptr(header, 1) as *mut Value;
+        unsafe { copy_nonoverlapping(src, dst, values.len()); }
         me
     }
 
