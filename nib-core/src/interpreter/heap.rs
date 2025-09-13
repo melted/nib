@@ -644,7 +644,7 @@ impl Array {
     }
 
     pub fn size(&self) -> usize {
-        unsafe { (*self.ptr).size as usize / 8 - 2 }
+        unsafe { (*self.ptr).size as usize / CELL_SIZE - 2 }
     }
 
     pub fn set(&self, index: usize, value: Value) {
@@ -826,7 +826,7 @@ pub struct Bytes {
 
 impl Bytes {
     pub fn make(heap: &mut Heap, size: usize, v: u8) -> Self {
-        let header = ObjectHeader::make(heap, (size + 16) as u32, ValueRepr::Bytes);
+        let header = ObjectHeader::make(heap, (size + 2*CELL_SIZE) as u32, ValueRepr::Bytes);
         let me = Bytes { ptr: header };
         me.set_type_table(Value::nil());
         for i in 0..size {
@@ -836,10 +836,10 @@ impl Bytes {
     }
 
     pub fn with(heap: &mut Heap, bytes: &[u8]) -> Self {
-        let header = ObjectHeader::make(heap, (bytes.len() + 16) as u32, ValueRepr::Bytes);
+        let header = ObjectHeader::make(heap, (bytes.len() + 2*CELL_SIZE) as u32, ValueRepr::Bytes);
         let me = Bytes { ptr: header };
         let from = bytes.as_ptr();
-        let to = get_object_ptr::<u8>(me.ptr, 8);
+        let to = get_object_ptr::<u8>(me.ptr, CELL_SIZE);
         me.set_type_table(Value::nil());
         unsafe {
             copy_nonoverlapping(from, to, bytes.len());
@@ -849,25 +849,25 @@ impl Bytes {
 
     pub fn at(&self, index: usize) -> u8 {
         unsafe {
-            let ptr = get_object_ptr(self.ptr, 8 + index);
+            let ptr = get_object_ptr(self.ptr, CELL_SIZE + index);
             *ptr
         }
     }
 
     pub fn set(&self, index: usize, value: u8) {
         unsafe {
-            let ptr = get_object_ptr(self.ptr, 8 + index);
+            let ptr = get_object_ptr(self.ptr, CELL_SIZE + index);
             *ptr = value
         }
     }
 
     pub fn size(&self) -> usize {
-        unsafe { ((*self.ptr).size - 16) as usize }
+        unsafe { (*self.ptr).size as usize - 2*CELL_SIZE }
     }
 
     pub(super) fn get_slice(&self) -> &[u8] {
         unsafe {
-            let ptr = self.ptr.byte_add(16) as *const u8;
+            let ptr = self.ptr.byte_add(2*CELL_SIZE) as *const u8;
             from_raw_parts(ptr, self.size())
         }
     }
