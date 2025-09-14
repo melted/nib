@@ -252,6 +252,10 @@ impl PatternNode {
         }
         visitor.on_post_pattern(self);
     }
+
+    pub fn is_ellipsis(&self) -> bool {
+        matches!(self.pattern, Pattern::Ellipsis(_))
+    }
 }
 
 impl Display for PatternNode {

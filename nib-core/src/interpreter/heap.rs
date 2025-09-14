@@ -1,29 +1,30 @@
 use core::slice;
 use std::{
-    collections::HashMap, ffi::c_void, fmt::Debug, hash::{DefaultHasher, Hash, Hasher}, io::BufRead, ptr::copy_nonoverlapping, slice::from_raw_parts
+    collections::HashMap,
+    ffi::c_void,
+    fmt::Debug,
+    hash::{DefaultHasher, Hash, Hasher},
+    ptr::copy_nonoverlapping,
+    slice::from_raw_parts,
 };
 
-use libffi::low::CodePtr;
 use region::Allocation;
 
-use crate::{
-    common::align_int, core::{Arity, Expression, FunClause}, treewalker::Signature
-};
+use crate::{ast::Expression, common::align_int, treewalker::Signature};
 
-const BIG_OBJECT_THRESHOLD:usize = 0x3fff;
+const BIG_OBJECT_THRESHOLD: usize = 0x3fff;
 
 pub struct BigObject {
-    count:usize,
-    object:Allocation
+    count: usize,
+    object: Allocation,
 }
 
 pub struct Heap {
     from_space: Space,
     to_space: Space,
-    big_objects:HashMap<usize, BigObject>,
+    big_objects: HashMap<usize, BigObject>,
     roots: Vec<Value>,
 }
-
 
 pub struct Space {
     pub alloc: Allocation,
@@ -57,12 +58,18 @@ impl Heap {
         }
     }
 
-    pub fn allocate_big_object<T>(&mut self, size:usize) -> *mut T {
+    pub fn allocate_big_object<T>(&mut self, size: usize) -> *mut T {
         let Ok(mut alloc) = region::alloc(size, region::Protection::READ_WRITE) else {
             panic!("Couldn't allocate {size} bytes!");
         };
         let ptr = alloc.as_mut_ptr() as *mut T;
-        self.big_objects.insert(ptr.addr(), BigObject { count: 0, object: alloc });
+        self.big_objects.insert(
+            ptr.addr(),
+            BigObject {
+                count: 0,
+                object: alloc,
+            },
+        );
         ptr
     }
 
@@ -75,7 +82,7 @@ impl Heap {
         if new_size > self.to_space.size {
             self.to_space = Space::new(new_size);
         }
-        
+
         unsafe {
             self.copy_live();
         }
@@ -100,7 +107,7 @@ impl Heap {
         self.roots = new_roots;
     }
 
-    fn trace_object(&mut self, obj:*mut ObjectHeader ) -> usize {
+    fn trace_object(&mut self, obj: *mut ObjectHeader) -> usize {
         unsafe {
             let repr = (*obj).repr;
             let size = (*obj).size as usize;
@@ -138,7 +145,7 @@ impl Heap {
         }
     }
 
-    fn copy_object(value:Value, to_space:&mut Space) -> Value {
+    fn copy_object(value: Value, to_space: &mut Space) -> Value {
         if value.is_immediate() {
             return value;
         }
@@ -172,7 +179,7 @@ impl Space {
         }
     }
 
-    pub(super) fn get_object_at(&mut self, pos:usize) -> *mut ObjectHeader {
+    pub(super) fn get_object_at(&mut self, pos: usize) -> *mut ObjectHeader {
         unsafe { self.alloc.as_mut_ptr::<ObjectHeader>().byte_add(pos) }
     }
 }
@@ -210,8 +217,8 @@ pub(super) fn forward(from: *mut ObjectHeader, to: *mut ObjectHeader) {
     }
 }
 
-const CELL_SIZE:usize = size_of::<Value>();
-        
+const CELL_SIZE: usize = size_of::<Value>();
+
 pub(super) fn get_value(base: *mut ObjectHeader, index: usize) -> Value {
     unsafe { *get_object_ptr(base, index) }
 }
@@ -283,7 +290,7 @@ impl Value {
         hasher.finish() as usize
     }
 
-    fn add_hash<T:Hasher>(&self, hasher:&mut T) {
+    fn add_hash<T: Hasher>(&self, hasher: &mut T) {
         match self.get_repr() {
             ValueRepr::Bytes => {
                 let bytes = self.get_bytes();
@@ -364,13 +371,12 @@ impl Value {
         Self::with_tag(arr, ARR_TAG)
     }
 
-    pub fn with_tag(obj: *mut ObjectHeader, tag:u64) -> Self {
+    pub fn with_tag(obj: *mut ObjectHeader, tag: u64) -> Self {
         Self::check_pointer(obj);
         Value {
             val: (obj.addr() as u64) | tag,
         }
     }
-
 
     pub fn bool(b: bool) -> Self {
         let val = if b { TRUE_BTAG } else { FALSE_BTAG };
@@ -630,12 +636,18 @@ impl Array {
     }
 
     pub fn with(heap: &mut Heap, values: &[Value]) -> Self {
-        let header = ObjectHeader::make(heap, ((values.len() + 2)* CELL_SIZE) as u32, ValueRepr::Array);
+        let header = ObjectHeader::make(
+            heap,
+            ((values.len() + 2) * CELL_SIZE) as u32,
+            ValueRepr::Array,
+        );
         let me = Array { ptr: header };
         me.set_type_table(Value::nil());
         let src = values.as_ptr();
         let dst = get_object_ptr(header, 1) as *mut Value;
-        unsafe { copy_nonoverlapping(src, dst, values.len()); }
+        unsafe {
+            copy_nonoverlapping(src, dst, values.len());
+        }
         me
     }
 
@@ -826,7 +838,7 @@ pub struct Bytes {
 
 impl Bytes {
     pub fn make(heap: &mut Heap, size: usize, v: u8) -> Self {
-        let header = ObjectHeader::make(heap, (size + 2*CELL_SIZE) as u32, ValueRepr::Bytes);
+        let header = ObjectHeader::make(heap, (size + 2 * CELL_SIZE) as u32, ValueRepr::Bytes);
         let me = Bytes { ptr: header };
         me.set_type_table(Value::nil());
         for i in 0..size {
@@ -836,7 +848,8 @@ impl Bytes {
     }
 
     pub fn with(heap: &mut Heap, bytes: &[u8]) -> Self {
-        let header = ObjectHeader::make(heap, (bytes.len() + 2*CELL_SIZE) as u32, ValueRepr::Bytes);
+        let header =
+            ObjectHeader::make(heap, (bytes.len() + 2 * CELL_SIZE) as u32, ValueRepr::Bytes);
         let me = Bytes { ptr: header };
         let from = bytes.as_ptr();
         let to = get_object_ptr::<u8>(me.ptr, CELL_SIZE);
@@ -862,12 +875,12 @@ impl Bytes {
     }
 
     pub fn size(&self) -> usize {
-        unsafe { (*self.ptr).size as usize - 2*CELL_SIZE }
+        unsafe { (*self.ptr).size as usize - 2 * CELL_SIZE }
     }
 
     pub(super) fn get_slice(&self) -> &[u8] {
         unsafe {
-            let ptr = self.ptr.byte_add(2*CELL_SIZE) as *const u8;
+            let ptr = self.ptr.byte_add(2 * CELL_SIZE) as *const u8;
             from_raw_parts(ptr, self.size())
         }
     }
@@ -924,7 +937,7 @@ impl Debug for Symbol {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Code {
     Bytecode(Vec<u8>),
-    Core(*const Vec<FunClause>),
+    Core(*const Vec<Expression>),
     Extern(*const c_void),
     ExternMut(*const c_void),
     Foreign(*const Signature, *const c_void),
@@ -1020,10 +1033,7 @@ impl Closure {
             TYPE_EXTERN_MUT => Code::ExternMut(val.get_cpointer()),
             TYPE_FOREIGN => {
                 let arr = val.get_array();
-                Code::Foreign(
-                    arr.at(0).get_cpointer(),
-                    arr.at(1).get_cpointer(),
-                )
+                Code::Foreign(arr.at(0).get_cpointer(), arr.at(1).get_cpointer())
             }
             _ => panic!("Unexpected code type tag in get_code"),
         }

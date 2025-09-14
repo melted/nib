@@ -14,11 +14,11 @@ impl Runtime {
         );
         self.add_global(
             "_prim_project",
-            Value::new_extern_fun(Runtime::project, &Arity::VarArg(2)),
+            Value::new_extern_fun(Runtime::project, &Arity::VarArg(2, 1)),
         );
         self.add_global(
             "_prim_array_make",
-            Value::new_extern_mut_fun(|_rt, args| Ok(Value::new_array(args)), &Arity::VarArg(1)),
+            Value::new_extern_mut_fun(|_rt, args| Ok(Value::new_array(args)), &Arity::VarArg(1, 0)),
         );
         self.add_global(
             "_prim_type",
@@ -142,7 +142,7 @@ impl Runtime {
         );
         self.add_global(
             "_prim_bytes_make",
-            Value::new_extern_mut_fun(Runtime::bytes_make, &Arity::VarArg(1)),
+            Value::new_extern_mut_fun(Runtime::bytes_make, &Arity::VarArg(1, 0)),
         );
         self.add_global(
             "_prim_bytes_create",

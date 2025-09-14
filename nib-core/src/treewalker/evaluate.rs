@@ -1,5 +1,4 @@
 use std::{
-    cmp::max,
     collections::{HashMap, HashSet},
     ops::Deref,
     os::raw::c_void,
@@ -11,8 +10,8 @@ use log::info;
 use crate::{
     ast::Literal,
     common::{Name, Result},
-    core::{Arity, Binder, Binding, Expression, FunClause, Module, Pattern, free_vars},
-    treewalker::{Bytes, CType, Closure, Code, Runtime, Symbol, Value, new_ref},
+    core::{Arity, Binder, Binding, Expression, Lambda, Module, free_vars},
+    treewalker::{CType, Closure, Code, Runtime, Symbol, Value, new_ref},
 };
 
 impl Runtime {
@@ -82,7 +81,13 @@ impl Runtime {
             Expression::Lambda(n, clauses) => {
                 let mut free = HashSet::new();
                 free_vars(expression, &mut free)?;
-                self.evaluate_lambda(binding_name, clauses, &free, env)
+                todo!()
+            }
+            Expression::Cond(_, cond) => {
+                todo!()
+            }
+            Expression::Let(_, bind) => {
+                todo!()
             }
             Expression::Where(n, exp, bindings) => {
                 env.push();
@@ -158,30 +163,13 @@ impl Runtime {
 
                 let mut remaining = match arity {
                     Arity::Fixed(n) => args.split_off(n as usize),
-                    Arity::VarArg(_) => Vec::new(),
+                    Arity::VarArg(_, _) => Vec::new(),
                 };
 
                 let mut ret = match code.borrow().deref() {
-                    Code::Nib(clauses) => {
+                    Code::Nib(lam) => {
                         let mut v: Value = Value::Nil;
-                        for clause in clauses.iter() {
-                            if let Some(binds) = self.match_patterns(&args, &clause.args, &env)? {
-                                env.push_env(binds);
-                                if let Some(guard) = &clause.guard {
-                                    let guard =
-                                        self.evaluate_expression(binding_name, guard, &mut env)?;
-                                    if guard == Value::Bool(false) {
-                                        env.pop();
-                                        continue;
-                                    }
-                                }
-                                v =
-                                    self.evaluate_expression(binding_name, &clause.rhs, &mut env)?;
-                                env.pop();
-                                break;
-                            }
-                        }
-                        v
+                        todo!()
                     }
                     Code::ExternSimple(ext) => ext(&args)?,
                     Code::ExternMut(ext) => ext(self, &args)?,
@@ -230,7 +218,7 @@ impl Runtime {
     pub(super) fn evaluate_lambda(
         &mut self,
         binding_name: &str,
-        clauses: &[FunClause],
+        lam: &Lambda,
         free: &HashSet<String>,
         env: &mut Environment,
     ) -> Result<Value> {
@@ -245,132 +233,14 @@ impl Runtime {
             }
             lexical_env.add(v, &val);
         }
-        let mut arity = get_arity(&clauses[0].args);
-        for c in clauses[1..].iter() {
-            let next = get_arity(&c.args);
-            match (&arity, &next) {
-                (Arity::Fixed(n), Arity::Fixed(m)) if n == m => {}
-                (Arity::VarArg(n), Arity::VarArg(m)) => {
-                    arity = Arity::VarArg(max(*n, *m));
-                }
-                _ => {
-                    return self.error("Function clauses must have same arity");
-                }
-            }
-        }
+        let arity = lam.arity.clone();
         Ok(Value::Closure(new_ref(Closure {
-            code: new_ref(Code::Nib(clauses.to_vec())),
+            code: new_ref(Code::Nib(Box::new(lam.clone()))),
             type_table: None,
             env: lexical_env,
             args: Vec::new(),
             arity,
         })))
-    }
-
-    pub(super) fn match_patterns(
-        &mut self,
-        args: &[Value],
-        patterns: &[Pattern],
-        env: &Environment,
-    ) -> Result<Option<HashMap<Symbol, Value>>> {
-        let mut current_arg: usize = 0;
-        let mut out = HashMap::new();
-        for (i, p) in patterns.iter().enumerate() {
-            if current_arg == args.len() {
-                return Ok(None);
-            }
-            let res = if let Pattern::Ellipsis(_) = p {
-                let trailing = patterns.len() - i - 1;
-                let ellipsis = Value::new_array(&args[current_arg..args.len() - trailing]);
-                let r = self.match_pattern(&ellipsis, p, env)?;
-                current_arg = args.len() - trailing;
-                r
-            } else {
-                let r = self.match_pattern(&args[current_arg], p, env)?;
-                current_arg += 1;
-                r
-            };
-            if let Some(vars) = res {
-                vars.into_iter().for_each(|(k, v)| {
-                    out.insert(k, v);
-                });
-            } else {
-                return Ok(None);
-            }
-        }
-        Ok(Some(out))
-    }
-
-    pub(super) fn match_pattern(
-        &mut self,
-        arg: &Value,
-        pattern: &Pattern,
-        env: &Environment,
-    ) -> Result<Option<HashMap<Symbol, Value>>> {
-        let mut out = HashMap::new();
-        let val = match pattern {
-            Pattern::Wildcard => Some(out),
-            Pattern::Literal(literal) => {
-                let v = self.evaluate_literal(literal)?;
-                if &v == arg { Some(out) } else { None }
-            }
-            Pattern::Ellipsis(Some(name)) | Pattern::Bind(name) => {
-                out.insert(Intern::new(name.string()), arg.clone());
-                Some(out)
-            }
-            Pattern::Ellipsis(None) => Some(out),
-            Pattern::Custom(name, patterns) => {
-                let Some(handler) = self.lookup_name(env, name) else {
-                    return self.error(&format!("Failed to find custom pattern handler {}", name));
-                };
-                let fun = match handler {
-                    Value::Closure(_) => handler,
-                    Value::Table(t) => {
-                        let Some(val @ Value::Closure(_)) = self.get_from_table(t, "match") else {
-                            return self.error("No match function in table used in custom pattern");
-                        };
-                        val
-                    }
-                    _ => {
-                        return self.error("Custom pattern handler must be a function or a table with a match function");
-                    }
-                };
-                let call = vec![fun, arg.clone()];
-                let res = self.apply_values(&name.string(), &call)?;
-                match res {
-                    Value::Array(array) => {
-                        let vals = &array.borrow().array;
-                        self.match_patterns(vals, patterns, env)?
-                    }
-                    Value::Bool(false) => None,
-                    _ => {
-                        return self.error(&format!(
-                            "Custom pattern handler {} didn't return an array or false",
-                            name.string()
-                        ));
-                    }
-                }
-            }
-            Pattern::Type(pattern, name) => {
-                let Some(type_table) = self.lookup_name(env, name) else {
-                    return self.error(&format!("Failed to find type table {}", name));
-                };
-                let arg_type = self.type_query(arg)?;
-                if arg_type == type_table {
-                    self.match_pattern(arg, pattern, env)?
-                } else {
-                    None
-                }
-            }
-            Pattern::Alias(pattern, name) => {
-                let res = self.match_pattern(arg, pattern, env)?;
-                res.map(|mut vars| {
-                    vars.insert(Intern::new(name.string()), arg.clone());
-                    vars
-                })
-            }
-        };
-        Ok(val)
     }
 
     pub(super) fn lookup(&self, env: &Environment, id: &str) -> Option<Value> {
@@ -400,16 +270,6 @@ impl Runtime {
                 env.add(&k, &v);
             }
         }
-    }
-}
-
-pub(super) fn get_arity(patterns: &[Pattern]) -> Arity {
-    let vararg = patterns.iter().any(|p| p.is_ellipsis());
-    let len = patterns.len() as u32;
-    if vararg {
-        Arity::VarArg(len - 1)
-    } else {
-        Arity::Fixed(len)
     }
 }
 

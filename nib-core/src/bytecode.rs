@@ -1,7 +1,7 @@
 //! Compile a module into a bytecode module
 use crate::common::Result;
 
-pub fn compile_core(module: crate::core::Module) -> Result<Module> {
+pub fn compile(module: crate::core::Module) -> Result<Module> {
     let mut module = Module::new();
     todo!()
 }

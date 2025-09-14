@@ -1,50 +1,6 @@
 #![cfg(test)]
-use internment::Intern;
 
-use crate::{
-    common::{Name, Result},
-    core::Pattern,
-    treewalker::{Runtime, Value, evaluate::Environment},
-};
-
-#[test]
-fn simple_pattern_match() -> Result<()> {
-    let pats = vec![
-        Pattern::Wildcard,
-        Pattern::Ellipsis(Some(Name::str("xs"))),
-        Pattern::Bind(Name::str("x")),
-    ];
-    let args = vec![Value::Integer(1), Value::Integer(2), Value::Integer(3)];
-    let mut rt = Runtime::new();
-    let env = Environment::new();
-    let res = rt.match_patterns(&args, &pats, &env)?;
-    match res {
-        Some(map) => {
-            assert!(map[&Intern::from_ref("x")] == Value::Integer(3));
-            assert!(matches!(map[&Intern::from_ref("xs")], Value::Array(_)));
-        }
-        _ => {
-            assert!(false)
-        }
-    }
-    Ok(())
-}
-
-#[test]
-fn pattern_arity_fail() -> Result<()> {
-    let pats = vec![
-        Pattern::Wildcard,
-        Pattern::Bind(Name::str("x")),
-        Pattern::Wildcard,
-        Pattern::Wildcard,
-    ];
-    let args = vec![Value::Integer(1), Value::Integer(2), Value::Integer(3)];
-    let mut rt = Runtime::new();
-    let env = Environment::new();
-    let res = rt.match_patterns(&args, &pats, &env)?;
-    assert!(res.is_none());
-    Ok(())
-}
+use crate::{common::Result, treewalker::Value};
 
 #[test]
 fn equality_of_values() -> Result<()> {

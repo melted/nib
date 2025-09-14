@@ -1,9 +1,11 @@
 use std::{collections::HashSet, fmt::Display};
 
 use crate::{
-    ast::{self},
+    ast::{self, Literal, PatternNode},
     common::{Error, Metadata, Name, Node, Result},
 };
+
+mod tests;
 
 pub fn desugar(module: ast::Module) -> Result<Module> {
     let mut state = DesugarState::new(module.metadata);
@@ -17,7 +19,7 @@ pub fn desugar(module: ast::Module) -> Result<Module> {
                 state.module_name = Some(md.name);
             }
             ast::Declaration::Binding(bind) => {
-                let mut b = state.desugar_binding(bind, false)?;
+                let mut b = state.desugar_binding(&bind, false)?;
                 state.bindings.append(&mut b);
             }
         }
@@ -31,7 +33,7 @@ pub fn desugar(module: ast::Module) -> Result<Module> {
 pub fn desugar_expression(expr: ast::ExpressionNode) -> Result<Expression> {
     let meta = Metadata::new(None);
     let mut state = DesugarState::new(meta);
-    state.desugar_expression(expr)
+    state.desugar_expression(&expr)
 }
 
 struct DesugarState {
@@ -59,7 +61,7 @@ impl DesugarState {
 }
 
 impl DesugarState {
-    fn desugar_binding(&mut self, binding: ast::Binding, is_local: bool) -> Result<Vec<Binding>> {
+    fn desugar_binding(&mut self, binding: &ast::Binding, is_local: bool) -> Result<Vec<Binding>> {
         match binding {
             ast::Binding::FunBinding(fb) => self.desugar_funbinding(fb, is_local),
             ast::Binding::OpBinding(ob) => self.desugar_opbinding(ob, is_local),
@@ -69,7 +71,7 @@ impl DesugarState {
 
     fn desugar_funbinding(
         &mut self,
-        ast_binding: ast::FunBinding,
+        ast_binding: &ast::FunBinding,
         is_local: bool,
     ) -> Result<Vec<Binding>> {
         let binder = if is_local {
@@ -77,56 +79,24 @@ impl DesugarState {
         } else {
             Binder::Public(self.desugar_binding_name(&ast_binding.name)?)
         };
-        let mut core_clauses = Vec::new();
-        for clause in ast_binding.clauses {
-            let exp = self.desugar_expression(clause.body)?;
-            let guard = clause
-                .guard
-                .map(|g| self.desugar_expression(g))
-                .transpose()?;
-            let mut args = Vec::new();
-            for a in clause.args {
-                args.push(self.desugar_pattern(a)?);
-            }
-            core_clauses.push(FunClause {
-                id: clause.id,
-                args,
-                guard,
-                rhs: Box::new(exp),
-            });
-        }
         self.metadata.last_id += 1;
-        Ok(vec![Binding::binding(
-            ast_binding.id,
-            binder,
-            Expression::Lambda(self.metadata.last_id, core_clauses),
-        )])
+        let result = self.desugar_funclauses(self.metadata.last_id, &ast_binding.clauses)?;
+        Ok(vec![Binding::binding(ast_binding.id, binder, result)])
     }
 
     fn desugar_opbinding(
         &mut self,
-        ast_binding: ast::OpBinding,
+        ast_binding: &ast::OpBinding,
         is_local: bool,
     ) -> Result<Vec<Binding>> {
         let name = ast_binding.op.to_name(); // No desugar. Operators can't be used qualified,
-        // making them always global is pretty ugly though
-        let mut core_clauses = Vec::new();
-        for clause in ast_binding.clauses {
-            let exp = self.desugar_expression(clause.body)?;
-            let guard = clause
-                .guard
-                .map(|g| self.desugar_expression(g))
-                .transpose()?;
-            let lpat = self.desugar_pattern(clause.lpat)?;
-            let rpat = self.desugar_pattern(clause.rpat)?;
-            core_clauses.push(FunClause {
-                id: clause.id,
-                args: vec![lpat, rpat],
-                guard,
-                rhs: Box::new(exp),
-            });
-        }
+        let funclauses: Vec<_> = ast_binding
+            .clauses
+            .iter()
+            .map(|oc| to_funclause(oc))
+            .collect();
         self.metadata.last_id += 1;
+        let result = self.desugar_funclauses(self.metadata.last_id, &funclauses)?;
         Ok(vec![Binding::binding(
             ast_binding.id,
             if is_local {
@@ -134,18 +104,18 @@ impl DesugarState {
             } else {
                 Binder::Public(name)
             },
-            Expression::Lambda(self.metadata.last_id, core_clauses),
+            result,
         )])
     }
 
     fn desugar_varbinding(
         &mut self,
-        ast_binding: ast::VarBinding,
+        ast_binding: &ast::VarBinding,
         is_local: bool,
     ) -> Result<Vec<Binding>> {
-        let pat = ast_binding.lhs;
-        let rhs = self.desugar_expression(ast_binding.rhs)?;
-        match pat.pattern {
+        let pat = &ast_binding.lhs;
+        let rhs = self.desugar_expression(&ast_binding.rhs)?;
+        match &pat.pattern {
             ast::Pattern::Var(v) => {
                 let binder = if is_local {
                     Binder::Local(v.string())
@@ -168,16 +138,9 @@ impl DesugarState {
                 let mut arr_mk = vec![self.named_var("_prim_array_mk")];
                 arr_mk.append(&mut v);
                 let lam_rhs = Expression::App(self.new_id(), arr_mk);
-                let npat = self.desugar_pattern(pat)?;
-                let lam = Expression::Lambda(
-                    self.new_id(),
-                    vec![FunClause {
-                        id: self.new_id(),
-                        args: vec![npat],
-                        guard: None,
-                        rhs: Box::new(lam_rhs),
-                    }],
-                );
+                let npat: Vec<String> = names.iter().map(|n| n.string()).collect();
+                let arity = Arity::Fixed(npat.len() as u32);
+                let lam = Expression::Lambda(self.new_id(), Box::new(Lambda::new(arity, lam_rhs)));
                 let body = Expression::App(self.new_id(), vec![lam, rhs]);
                 let nam_arr = self.next_local();
                 let binding =
@@ -212,43 +175,79 @@ impl DesugarState {
         }
     }
 
-    fn desugar_pattern(&mut self, pattern: ast::PatternNode) -> Result<Pattern> {
-        match pattern.pattern {
+    fn desugar_pattern(
+        &mut self,
+        pattern: &ast::PatternNode,
+        expr: &Expression,
+    ) -> Result<Vec<PatternParts>> {
+        match &pattern.pattern {
             ast::Pattern::Alias(pat, alias) => {
-                let inner = self.desugar_pattern(*pat)?;
-                Ok(Pattern::Alias(Box::new(inner), alias))
+                let name = alias.string();
+                let mut parts = Vec::new();
+                parts.push(PatternParts::Bind(name.clone(), expr.to_owned()));
+                let mut inner = self.desugar_pattern(&pat, &Expression::Var(0, name))?;
+                parts.append(&mut inner);
+                Ok(parts)
             }
             ast::Pattern::Custom(name, fields) => {
-                let mut args = Vec::new();
+                let mut parts = Vec::new();
+                let var = self.next_local();
+                parts.push(PatternParts::Bind(
+                    var.clone(),
+                    Expression::App(
+                        pattern.id,
+                        vec![Expression::Var(0, name.string()), expr.clone()],
+                    ),
+                ));
+                let refer = Expression::Var(0, var.clone());
                 for f in fields {
-                    args.push(self.desugar_pattern(f)?);
+                    let mut field = self.desugar_pattern(&f, &refer)?;
+                    parts.append(&mut field);
                 }
-                Ok(Pattern::Custom(name, args))
+                Ok(parts)
             }
-            ast::Pattern::Array(fields) => {
-                let mut args = Vec::new();
-                for f in fields {
-                    args.push(self.desugar_pattern(f)?);
+            ast::Pattern::Array(fields) => self.desugar_pattern(
+                &PatternNode {
+                    id: 0,
+                    pattern: ast::Pattern::Custom(Name::str("array"), fields.to_vec()),
+                },
+                expr,
+            ),
+            ast::Pattern::Ellipsis(name) => {
+                if let Some(    n) = name {
+                    Ok(vec![PatternParts::Bind(n.string(), expr.clone())])
+                } else {
+                    Ok(vec![])
                 }
-                Ok(Pattern::Custom(Name::str("array"), args))
             }
-            ast::Pattern::Ellipsis(name) => Ok(Pattern::Ellipsis(name)),
-            ast::Pattern::Literal(lit) => Ok(Pattern::Literal(lit)),
+            ast::Pattern::Literal(lit) => {
+                let check = app(&vec![var("_prim_eq"), expr.clone(), literal(lit)]);
+                Ok(vec![PatternParts::Check(check)])
+            }
             ast::Pattern::Typed(pat, typ) => {
-                let inner = self.desugar_pattern(*pat)?;
-                Ok(Pattern::Type(Box::new(inner), typ))
+                let mut inner = self.desugar_pattern(&pat, expr)?;
+                let mut val = expr.clone();
+                if let Some(PatternParts::Bind(name, exp)) = inner.last() {
+                    if exp == expr {
+                        val = var(name);
+                    }
+                }
+                let get_type = app(&vec![var("_prim_type"), val]);
+                let check = app(&vec![var("_prim_eq"), get_type, var(&typ.string())]);
+                inner.push(PatternParts::Check(check));
+                Ok(inner)
             }
-            ast::Pattern::Var(name) => Ok(Pattern::Bind(name)),
-            ast::Pattern::Wildcard => Ok(Pattern::Wildcard),
+            ast::Pattern::Var(name) => Ok(vec![PatternParts::Bind(name.string(), expr.clone())]),
+            ast::Pattern::Wildcard => Ok(vec![]),
         }
     }
 
-    fn desugar_expression(&mut self, expression: ast::ExpressionNode) -> Result<Expression> {
-        match expression.expr {
+    fn desugar_expression(&mut self, expression: &ast::ExpressionNode) -> Result<Expression> {
+        match &expression.expr {
             ast::Expression::App(x) => {
                 let mut args = Vec::new();
                 for a in x {
-                    args.push(self.desugar_expression(a)?);
+                    args.push(self.desugar_expression(&a)?);
                 }
                 Ok(Expression::App(expression.id, args))
             }
@@ -256,71 +255,41 @@ impl DesugarState {
                 let mut args = Vec::new();
                 args.push(self.named_var("_prim_array_make"));
                 for a in v {
-                    args.push(self.desugar_expression(a)?);
+                    args.push(self.desugar_expression(&a)?);
                 }
                 Ok(Expression::App(expression.id, args))
             }
             ast::Expression::Binop(ast::Binop { op, lhs, rhs }) => {
                 let mut args = Vec::new();
                 args.push(self.var(op.to_name()));
-                args.push(self.desugar_expression(*lhs)?);
-                args.push(self.desugar_expression(*rhs)?);
+                args.push(self.desugar_expression(&lhs)?);
+                args.push(self.desugar_expression(&rhs)?);
                 Ok(Expression::App(expression.id, args))
             }
             ast::Expression::Cond(cond) => {
-                let mut clauses = Vec::new();
-                let mut next = cond;
-                loop {
-                    let guard = self.desugar_expression(*next.pred)?;
-                    let rhs = Box::new(self.desugar_expression(*next.on_true)?);
-                    let clause = FunClause {
-                        id: self.new_id(),
-                        args: vec![Pattern::Wildcard],
-                        guard: Some(guard),
-                        rhs,
-                    };
-                    clauses.push(clause);
-                    if let ast::Expression::Cond(c) = next.on_false.expr {
-                        next = c;
-                    } else {
-                        let exp = self.desugar_expression(*next.on_false)?;
-                        let last = FunClause {
-                            id: self.new_id(),
-                            args: vec![Pattern::Wildcard],
-                            guard: None,
-                            rhs: Box::new(exp),
-                        };
-                        clauses.push(last);
-                        break;
-                    }
-                }
-                Ok(Expression::App(
+                let pred = self.desugar_expression(&cond.pred)?;
+                let if_true = self.desugar_expression(&cond.on_true)?;
+                let if_false = self.desugar_expression(&cond.on_false)?;
+                Ok(Expression::Cond(
                     expression.id,
-                    vec![
-                        Expression::Lambda(self.new_id(), clauses),
-                        Expression::Literal(self.new_id(), ast::Literal::Nil),
-                    ],
+                    Box::new(Cond::new(pred, if_true, if_false)),
                 ))
             }
             ast::Expression::Lambda(funs) => {
-                let mut clauses = Vec::new();
-                for f in funs {
-                    clauses.push(self.desugar_funclause(f)?);
-                }
-                Ok(Expression::Lambda(expression.id, clauses))
+                self.desugar_funclauses(expression.id, funs)
             }
-            ast::Expression::Literal(lit) => Ok(Expression::Literal(expression.id, lit)),
+            ast::Expression::Literal(lit) => Ok(Expression::Literal(expression.id, lit.clone())),
             ast::Expression::Projection(projs) => {
                 let mut args = Vec::new();
                 args.push(self.named_var("_prim_project"));
                 for a in projs {
-                    args.push(self.desugar_expression(a)?);
+                    args.push(self.desugar_expression(&a)?);
                 }
                 Ok(Expression::App(expression.id, args))
             }
-            ast::Expression::Var(Name::Plain(n)) => Ok(Expression::Var(expression.id, n)),
+            ast::Expression::Var(Name::Plain(n)) => Ok(Expression::Var(expression.id, n.clone())),
             ast::Expression::Where(exp, ast_bindings) => {
-                let lhs = self.desugar_expression(*exp)?;
+                let lhs = self.desugar_expression(&exp)?;
                 let mut binds = Vec::new();
                 for binding in ast_bindings {
                     let mut b = self.desugar_binding(binding, true)?;
@@ -332,22 +301,27 @@ impl DesugarState {
         }
     }
 
-    fn desugar_funclause(&mut self, clause: ast::FunClause) -> Result<FunClause> {
-        let exp = self.desugar_expression(clause.body)?;
-        let mut args = Vec::new();
-        for a in clause.args {
-            args.push(self.desugar_pattern(a)?);
+    fn no_match_expression() -> Expression {
+        app(&vec![var("_prim_panic"), literal(&Literal::String("No matching pattern".to_owned()))])
+    }
+
+    fn desugar_funclauses(&mut self, id: Node, clauses: &[ast::FunClause]) -> Result<Expression> {
+        let arity = verify_arity(clauses)?;
+        let on_fail = Self::no_match_expression();
+        let mut exp = on_fail;
+        for c in clauses.into_iter().rev() {
+            exp = self.desugar_funclause(c, &exp)?;
         }
-        let guard = clause
-            .guard
-            .map(|g| self.desugar_expression(g))
-            .transpose()?;
-        Ok(FunClause {
-            id: clause.id,
-            args,
-            guard,
-            rhs: Box::new(exp),
-        })
+        Ok(Expression::Lambda(id, Box::new(Lambda::new(arity, exp))))
+    }
+
+    fn desugar_funclause(
+        &mut self,
+        clause: &ast::FunClause,
+        on_fail: &Expression,
+    ) -> Result<Expression> {
+        let body = self.desugar_expression(&clause.body)?;
+        todo!()
     }
 
     fn next_local(&mut self) -> String {
@@ -373,6 +347,45 @@ impl DesugarState {
             msg: msg.to_owned(),
             loc: None,
         })
+    }
+}
+
+fn to_funclause(op_clause: &ast::OpClause) -> ast::FunClause {
+    ast::FunClause {
+        id: op_clause.id,
+        args: vec![op_clause.lpat.clone(), op_clause.rpat.clone()],
+        guard: op_clause.guard.clone(),
+        body: op_clause.body.clone(),
+    }
+}
+
+fn verify_arity(clauses: &[ast::FunClause]) -> Result<Arity> {
+    let arity = get_arity(&clauses[0].args);
+    for c in clauses[1..].iter() {
+        let next = get_arity(&c.args);
+        if arity != next {
+            return Err(Error::runtime_error(
+                "Function clauses must have same arity",
+            ));
+        }
+    }
+    Ok(arity)
+}
+
+pub fn get_arity(patterns: &[ast::PatternNode]) -> Arity {
+    let mut vararg = false;
+    let mut index = 0;
+    for (i, p) in patterns.iter().enumerate() {
+        if p.is_ellipsis() {
+            vararg = true;
+            index = i;
+        }
+    }
+    let len = patterns.len() as u32;
+    if vararg {
+        Arity::VarArg(len - 1, index as u32)
+    } else {
+        Arity::Fixed(len)
     }
 }
 
@@ -440,10 +453,54 @@ impl Display for Binder {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub struct Cond {
+    pub pred: Expression,
+    pub if_true: Expression,
+    pub if_false: Expression,
+}
+
+impl Cond {
+    pub fn new(pred: Expression, if_true: Expression, if_false: Expression) -> Self {
+        Cond {
+            pred,
+            if_true,
+            if_false,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Let {
+    pub var: String,
+    pub expr: Expression,
+    pub body: Expression,
+}
+
+impl Let {
+    pub fn new(var: String, expr: Expression, body: Expression) -> Self {
+        Let { var, expr, body }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Lambda {
+    pub arity: Arity,
+    pub body: Expression,
+}
+
+impl Lambda {
+    pub fn new(arity: Arity, body: Expression) -> Self {
+        Lambda { arity, body }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub enum Expression {
     Literal(Node, ast::Literal),
     Var(Node, String),
-    Lambda(Node, Vec<FunClause>),
+    Lambda(Node, Box<Lambda>),
+    Let(Node, Box<Let>),
+    Cond(Node, Box<Cond>),
     App(Node, Vec<Expression>),
     Where(Node, Box<Expression>, Vec<Binding>),
 }
@@ -458,11 +515,16 @@ impl Display for Expression {
                 }
                 write!(f, ")")?;
             }
-            Expression::Lambda(_, clauses) => {
+            Expression::Cond(_, cond) => {
+                write!(f, "({} => {} ; {})", cond.pred, cond.if_true, cond.if_false)?;
+            }
+            Expression::Let(_, bind) => {
+                write!(f, "(let {} = {} in {})", bind.var, bind.expr, bind.body)?;
+            }
+            Expression::Lambda(_, lam) => {
                 write!(f, "{{ ")?;
-                for c in clauses {
-                    write!(f, "{};", c)?;
-                }
+                write!(f, "{} ", lam.arity)?;
+                write!(f, "-> {}", lam.body)?;
                 write!(f, " }}")?;
             }
             Expression::Literal(_, lit) => {
@@ -483,48 +545,35 @@ impl Display for Expression {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub struct FunClause {
-    pub id: Node,
-    pub args: Vec<Pattern>,
-    pub guard: Option<Expression>,
-    pub rhs: Box<Expression>,
+fn var(s: &str) -> Expression {
+    Expression::Var(0, s.to_owned())
 }
 
-impl Display for FunClause {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        for a in &self.args {
-            write!(f, "{} ", a)?;
-        }
-        if let Some(guard) = &self.guard {
-            write!(f, "| {} ", guard)?;
-        }
-        write!(f, "-> {}", self.rhs)
-    }
+fn app(exps: &[Expression]) -> Expression {
+    Expression::App(0, exps.to_vec())
+}
+
+fn literal(lit: &Literal) -> Expression {
+    Expression::Literal(0, lit.clone())
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum Pattern {
-    Wildcard,
-    Literal(ast::Literal), // TODO: Create a binding to it instead?
-    Ellipsis(Option<Name>),
-    Bind(Name),
-    Custom(Name, Vec<Pattern>),
-    Type(Box<Pattern>, Name),
-    Alias(Box<Pattern>, Name),
+pub enum PatternParts {
+    Check(Expression),
+    Bind(String, Expression),
 }
 
 #[derive(Debug, Clone, PartialEq, PartialOrd, Hash)]
 pub enum Arity {
     Fixed(u32),
-    VarArg(u32),
+    VarArg(u32, u32),
 }
 
 impl Display for Arity {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Arity::Fixed(n) => write!(f, "{}", n),
-            Arity::VarArg(n) => write!(f, "{}+", n),
+            Arity::VarArg(n, m) => write!(f, "{}({})+", n, m),
         }
     }
 }
@@ -532,44 +581,59 @@ impl Display for Arity {
 impl Arity {
     pub fn min_arity(&self) -> u32 {
         match self {
-            Arity::Fixed(n) | Arity::VarArg(n) => *n,
+            Arity::Fixed(n) | Arity::VarArg(n, _) => *n,
         }
     }
 }
 
-impl Pattern {
-    pub fn is_ellipsis(&self) -> bool {
-        match self {
-            Pattern::Ellipsis(_) => true,
-            _ => false,
+pub fn rename(expr: &mut Expression, old_name: &str, new_name: &str) {
+    match expr {
+        Expression::Var(_, v) if v == old_name => {
+            v.clear();
+            v.push_str(&new_name);
         }
+        Expression::App(_, exps) => {
+            for e in exps {
+                rename(e, old_name, new_name);
+            }
+        }
+        Expression::Cond(_, cond) => {
+            rename(&mut cond.pred, old_name, new_name);
+            rename(&mut cond.if_true, old_name, new_name);
+            rename(&mut cond.if_false, old_name, new_name);
+        }
+        Expression::Lambda(_, lam) => {
+            rename(&mut lam.body, old_name, new_name);
+        }
+        Expression::Let(_, bind) => {
+            rename(&mut bind.expr, old_name, new_name);
+            if bind.var != old_name {
+                rename(&mut bind.body, old_name, new_name);
+            }
+        }
+        Expression::Where(_, exp, defs) => {
+            let mut shadowed = false;
+            for b in defs {
+                rename(&mut b.body, old_name, new_name);
+                if b.name == old_name {
+                    shadowed = true;
+                    break;
+                }
+            }
+            if !shadowed {
+                rename(&mut *exp, old_name, new_name);
+            }
+        }
+        _ => {}
     }
 }
 
-impl Display for Pattern {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Pattern::Alias(pat, alias) => write!(f, "{}@{}", pat, alias),
-            Pattern::Bind(name) => write!(f, "{}", name),
-            Pattern::Type(pattern, name) => write!(f, "{}:{}", pattern, name),
-            Pattern::Custom(name, fields) => {
-                write!(f, "({}", name)?;
-                for field in fields {
-                    write!(f, " {}", field)?;
-                }
-                write!(f, ")")
-            }
-            Pattern::Ellipsis(name) => {
-                write!(f, "...")?;
-                if let Some(n) = name {
-                    write!(f, "{}", n)?;
-                }
-                Ok(())
-            }
-            Pattern::Literal(lit) => write!(f, "{}", lit),
-            Pattern::Wildcard => write!(f, "_"),
-        }
+pub fn free_vars_iter<'a, T>(iter : &'a mut T) -> Result<HashSet<String>> where T:Iterator<Item = &'a Expression> {
+    let mut vars = HashSet::new();
+    for exp in iter {
+        free_vars(exp, &mut vars)?;
     }
+    Ok(vars)
 }
 
 pub fn free_vars(expr: &Expression, vars: &mut HashSet<String>) -> Result<()> {
@@ -578,21 +642,26 @@ pub fn free_vars(expr: &Expression, vars: &mut HashSet<String>) -> Result<()> {
         Expression::Var(_, var) => {
             vars.insert(var.to_owned());
         }
-        Expression::Lambda(_, fun_clauses) => {
-            for c in fun_clauses {
-                let mut used = HashSet::new();
-                let mut bound = HashSet::new();
-                if let Some(g) = &c.guard {
-                    free_vars(g, &mut used)?;
-                }
-                free_vars(&c.rhs, &mut used)?;
-                for p in &c.args {
-                    bound_vars(p, &mut bound)?;
-                }
+        Expression::Let(_, clause) => {
+            let shadowed = vars.contains(&clause.var);
+            free_vars(&clause.expr, vars)?;
+            free_vars(&clause.body, vars)?;
+            if !shadowed {
+                vars.remove(&clause.var);
+            }
+        }
+        Expression::Cond(_, cond) => {
+            free_vars(&cond.pred, vars)?;
+            free_vars(&cond.if_false, vars)?;
+            free_vars(&cond.if_true, vars)?;
+        }
+        Expression::Lambda(_, lam) => {
+            let mut used = HashSet::new();
+            let mut bound = HashSet::new();
+            free_vars(&lam.body, &mut used)?;
 
-                for v in used.difference(&bound) {
-                    vars.insert(v.to_owned());
-                }
+            for v in used.difference(&bound) {
+                vars.insert(v.to_owned());
             }
         }
         Expression::App(_, expressions) => {
@@ -620,39 +689,6 @@ pub fn free_vars(expr: &Expression, vars: &mut HashSet<String>) -> Result<()> {
                 vars.insert(v.to_owned());
             }
         }
-    }
-    Ok(())
-}
-
-pub fn bound_vars(pat: &Pattern, vars: &mut HashSet<String>) -> Result<()> {
-    match pat {
-        Pattern::Ellipsis(Some(name)) | Pattern::Bind(name) => {
-            let n = name.string();
-            if vars.contains(&n) {
-                return Err(Error::runtime_error(&format!(
-                    "Multiple bindings of {} in pattern",
-                    n
-                )));
-            }
-            vars.insert(name.string());
-        }
-        Pattern::Custom(name, patterns) => {
-            for p in patterns {
-                bound_vars(p, vars)?;
-            }
-        }
-        Pattern::Alias(pattern, name) => {
-            bound_vars(pattern, vars)?;
-            let n = name.string();
-            if vars.contains(&n) {
-                return Err(Error::runtime_error(&format!(
-                    "Multiple bindings of {} in pattern",
-                    n
-                )));
-            }
-            vars.insert(name.string());
-        }
-        _ => {}
     }
     Ok(())
 }

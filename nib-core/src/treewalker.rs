@@ -7,7 +7,6 @@ use std::{
     ffi::c_void,
     fmt::{Debug, Display},
     fs::read_to_string,
-    hash::Hash,
     rc::Rc,
 };
 
@@ -16,7 +15,7 @@ use libffi::middle::{Cif, CodePtr};
 
 use crate::{
     common::{Error, Metadata, Name, Result},
-    core::{Arity, FunClause, desugar, desugar_expression},
+    core::{Arity, Lambda, desugar, desugar_expression},
     parser::{parse_declarations, parse_expression},
     treewalker::evaluate::Environment,
 };
@@ -845,7 +844,7 @@ pub struct Signature {
 
 #[derive(Debug, Clone)]
 pub enum Code {
-    Nib(Vec<FunClause>),
+    Nib(Box<Lambda>),
     Extern(fn(&Runtime, &[Value]) -> Result<Value>),
     ExternMut(fn(&mut Runtime, &[Value]) -> Result<Value>),
     ExternSimple(fn(&[Value]) -> Result<Value>),

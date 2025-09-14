@@ -174,6 +174,6 @@ impl Display for Name {
     }
 }
 
-pub fn align_int(value:usize, alignment:usize) -> usize {
-    (value + (alignment-1)) & !(alignment-1)
+pub fn align_int(value: usize, alignment: usize) -> usize {
+    (value + (alignment - 1)) & !(alignment - 1)
 }
