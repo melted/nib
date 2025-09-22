@@ -76,6 +76,9 @@ impl Runtime {
                 };
                 Ok(v)
             }
+            Expression::Arg(n) => {
+                todo!()
+            }
             Expression::App(n, exps) => self.evaluate_application(binding_name, exps, env),
             Expression::Literal(n, lit) => self.evaluate_literal(lit),
             Expression::Lambda(n, clauses) => {

@@ -498,6 +498,7 @@ impl Lambda {
 pub enum Expression {
     Literal(Node, ast::Literal),
     Var(Node, String),
+    Arg(u32),
     Lambda(Node, Box<Lambda>),
     Let(Node, Box<Let>),
     Cond(Node, Box<Cond>),
@@ -514,6 +515,9 @@ impl Display for Expression {
                     write!(f, "{} ", e)?;
                 }
                 write!(f, ")")?;
+            }
+            Expression::Arg(n) => {
+                write!(f, "arg{}", n);
             }
             Expression::Cond(_, cond) => {
                 write!(f, "({} => {} ; {})", cond.pred, cond.if_true, cond.if_false)?;
@@ -639,6 +643,7 @@ pub fn free_vars_iter<'a, T>(iter : &'a mut T) -> Result<HashSet<String>> where 
 pub fn free_vars(expr: &Expression, vars: &mut HashSet<String>) -> Result<()> {
     match expr {
         Expression::Literal(_, literal) => {}
+        Expression::Arg(_) => {}
         Expression::Var(_, var) => {
             vars.insert(var.to_owned());
         }
