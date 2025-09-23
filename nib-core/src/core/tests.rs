@@ -11,3 +11,11 @@ fn desugar_simple() -> Result<()> {
     assert_eq!(co.bindings.len(), 1);
     Ok(())
 }
+
+#[test]
+fn desugar_pattern() -> Result<()> {
+    let t = parse_declarations(None, "[a, b] = [1, 2]")?;
+    let co = desugar(t)?;
+    dbg!(co);
+    Ok(())
+}

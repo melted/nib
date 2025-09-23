@@ -185,21 +185,21 @@ impl DesugarState {
                 let name = alias.string();
                 let mut parts = Vec::new();
                 parts.push(PatternParts::Bind(name.clone(), expr.to_owned()));
-                let mut inner = self.desugar_pattern(&pat, &Expression::Var(0, name))?;
+                let mut inner = self.desugar_pattern(&pat, &var(&name))?;
                 parts.append(&mut inner);
                 Ok(parts)
             }
             ast::Pattern::Custom(name, fields) => {
                 let mut parts = Vec::new();
-                let var = self.next_local();
+                let loc = self.next_local();
                 parts.push(PatternParts::Bind(
-                    var.clone(),
+                    loc.clone(),
                     Expression::App(
                         pattern.id,
-                        vec![Expression::Var(0, name.string()), expr.clone()],
+                        vec![var(&loc), expr.clone()],
                     ),
                 ));
-                let refer = Expression::Var(0, var.clone());
+                let refer = var(&loc);
                 for f in fields {
                     let mut field = self.desugar_pattern(&f, &refer)?;
                     parts.append(&mut field);
@@ -287,7 +287,7 @@ impl DesugarState {
                 }
                 Ok(Expression::App(expression.id, args))
             }
-            ast::Expression::Var(Name::Plain(n)) => Ok(Expression::Var(expression.id, n.clone())),
+            ast::Expression::Var(Name::Plain(n)) => Ok(var(&n)),
             ast::Expression::Where(exp, ast_bindings) => {
                 let lhs = self.desugar_expression(&exp)?;
                 let mut binds = Vec::new();
@@ -335,11 +335,11 @@ impl DesugarState {
     }
 
     fn named_var(&mut self, name: &str) -> Expression {
-        Expression::Var(self.new_id(), name.to_string())
+        Expression::Var(self.new_id(), Var::Named(name.to_owned()))
     }
 
     fn var(&mut self, name: Name) -> Expression {
-        Expression::Var(self.new_id(), name.string())
+        Expression::Var(self.new_id(), Var::Named(name.string()))
     }
 
     fn error<T>(&self, msg: &str) -> Result<T> {
@@ -471,13 +471,13 @@ impl Cond {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Let {
-    pub var: String,
+    pub var: Var,
     pub expr: Expression,
     pub body: Expression,
 }
 
 impl Let {
-    pub fn new(var: String, expr: Expression, body: Expression) -> Self {
+    pub fn new(var: Var, expr: Expression, body: Expression) -> Self {
         Let { var, expr, body }
     }
 }
@@ -494,11 +494,35 @@ impl Lambda {
     }
 }
 
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum Var {
+    Named(String),
+    Arg(u32),
+    Env(u32),
+    Local(u32)
+}
+
+impl Var {
+
+}
+
+impl Display for Var {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Var::Named(s) => write!(f, "{}", s),
+            Var::Arg(n) => write!(f, "$arg{}", n),
+            Var::Env(n) => write!(f, "$env{}", n),
+            Var::Local(n) => write!(f, "$loc{}", n),
+        }
+    }
+}
+
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum Expression {
     Literal(Node, ast::Literal),
-    Var(Node, String),
-    Arg(u32),
+    Var(Node, Var),
     Lambda(Node, Box<Lambda>),
     Let(Node, Box<Let>),
     Cond(Node, Box<Cond>),
@@ -515,9 +539,6 @@ impl Display for Expression {
                     write!(f, "{} ", e)?;
                 }
                 write!(f, ")")?;
-            }
-            Expression::Arg(n) => {
-                write!(f, "arg{}", n);
             }
             Expression::Cond(_, cond) => {
                 write!(f, "({} => {} ; {})", cond.pred, cond.if_true, cond.if_false)?;
@@ -550,7 +571,19 @@ impl Display for Expression {
 }
 
 fn var(s: &str) -> Expression {
-    Expression::Var(0, s.to_owned())
+    Expression::Var(0, Var::Named(s.to_owned()))
+}
+
+fn arg(n : u32) -> Expression {
+    Expression::Var(0, Var::Arg(n))
+}
+
+fn env(n : u32) -> Expression {
+    Expression::Var(0, Var::Env(n))
+}
+
+fn local(n : u32) -> Expression {
+    Expression::Var(0, Var::Local(n))
 }
 
 fn app(exps: &[Expression]) -> Expression {
@@ -590,45 +623,64 @@ impl Arity {
     }
 }
 
-pub fn rename(expr: &mut Expression, old_name: &str, new_name: &str) {
+pub fn rename(expr: &Expression, old_name: &Var, new_name: &Var) -> Expression {
     match expr {
-        Expression::Var(_, v) if v == old_name => {
-            v.clear();
-            v.push_str(&new_name);
+        Expression::Var(n, v) if v == old_name => {
+            Expression::Var(*n, new_name.clone())
         }
-        Expression::App(_, exps) => {
+        Expression::App(n, exps) => {
+            let mut new_exps = Vec::new();
             for e in exps {
-                rename(e, old_name, new_name);
+                new_exps.push(rename(e, old_name, new_name));
             }
+            Expression::App(*n, new_exps)
         }
-        Expression::Cond(_, cond) => {
-            rename(&mut cond.pred, old_name, new_name);
-            rename(&mut cond.if_true, old_name, new_name);
-            rename(&mut cond.if_false, old_name, new_name);
+        Expression::Cond(n, cond) => {
+            let new_cond = Cond::new(
+                rename(&cond.pred, old_name, new_name),
+            rename(&cond.if_true, old_name, new_name),
+            rename(&cond.if_false, old_name, new_name));
+            Expression::Cond(*n, Box::new(new_cond))
         }
-        Expression::Lambda(_, lam) => {
-            rename(&mut lam.body, old_name, new_name);
+        Expression::Lambda(n, lam) => {
+            let new_lambda = Lambda::new(lam.arity.clone(),
+                            rename(&lam.body, old_name, new_name));
+            Expression::Lambda(*n, Box::new(new_lambda))
         }
-        Expression::Let(_, bind) => {
-            rename(&mut bind.expr, old_name, new_name);
-            if bind.var != old_name {
-                rename(&mut bind.body, old_name, new_name);
-            }
+        Expression::Let(n, bind) => {
+            let new_expr = rename(&bind.expr, old_name, new_name);
+            let new_body = if bind.var != *old_name {
+                                    rename(&bind.body, old_name, new_name)
+                                } else {
+                                    bind.body.clone()
+                                };
+            let new_bind = Let::new(bind.var.clone(), new_expr, new_body);
+            Expression::Let(*n, Box::new(new_bind))
         }
-        Expression::Where(_, exp, defs) => {
+        Expression::Where(n, exp, defs) => {
             let mut shadowed = false;
+            let mut new_defs = Vec::new();
             for b in defs {
-                rename(&mut b.body, old_name, new_name);
-                if b.name == old_name {
+                let new_body = if !shadowed {
+                    rename(&b.body, old_name, new_name)
+                } else {
+                    b.body.clone()
+                };
+                let mut new_binding = b.clone();
+                new_binding.body = new_body;
+                new_defs.push(new_binding);
+                if let Var::Named(n) = old_name && n == &b.name {
                     shadowed = true;
-                    break;
                 }
             }
-            if !shadowed {
-                rename(&mut *exp, old_name, new_name);
-            }
-        }
-        _ => {}
+            let new_exp = if !shadowed {
+                Box::new(rename(exp, old_name, new_name))
+            } else {
+                exp.clone()
+            };
+            Expression::Where(*n, new_exp, new_defs)
+        },
+        x => x.clone()
     }
 }
 
@@ -643,16 +695,20 @@ pub fn free_vars_iter<'a, T>(iter : &'a mut T) -> Result<HashSet<String>> where 
 pub fn free_vars(expr: &Expression, vars: &mut HashSet<String>) -> Result<()> {
     match expr {
         Expression::Literal(_, literal) => {}
-        Expression::Arg(_) => {}
-        Expression::Var(_, var) => {
+        Expression::Var(_, Var::Named(var)) => {
             vars.insert(var.to_owned());
         }
         Expression::Let(_, clause) => {
-            let shadowed = vars.contains(&clause.var);
+            let name = if let Var::Named(var) = &clause.var {
+                var.clone()
+            } else {
+                "".to_owned()
+            };
             free_vars(&clause.expr, vars)?;
+            let shadowed = vars.contains(&name);
             free_vars(&clause.body, vars)?;
             if !shadowed {
-                vars.remove(&clause.var);
+                vars.remove(&name);
             }
         }
         Expression::Cond(_, cond) => {
@@ -661,13 +717,7 @@ pub fn free_vars(expr: &Expression, vars: &mut HashSet<String>) -> Result<()> {
             free_vars(&cond.if_true, vars)?;
         }
         Expression::Lambda(_, lam) => {
-            let mut used = HashSet::new();
-            let mut bound = HashSet::new();
-            free_vars(&lam.body, &mut used)?;
-
-            for v in used.difference(&bound) {
-                vars.insert(v.to_owned());
-            }
+            free_vars(&lam.body, vars)?;
         }
         Expression::App(_, expressions) => {
             for e in expressions {
@@ -694,6 +744,7 @@ pub fn free_vars(expr: &Expression, vars: &mut HashSet<String>) -> Result<()> {
                 vars.insert(v.to_owned());
             }
         }
+        _ => {}
     }
     Ok(())
 }

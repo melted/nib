@@ -10,8 +10,8 @@ use log::info;
 use crate::{
     ast::Literal,
     common::{Name, Result},
-    core::{Arity, Binder, Binding, Expression, Lambda, Module, free_vars},
-    treewalker::{CType, Closure, Code, Runtime, Symbol, Value, new_ref},
+    core::{free_vars, Arity, Binder, Binding, Expression, Lambda, Module, Var},
+    treewalker::{new_ref, CType, Closure, Code, Runtime, Symbol, Value},
 };
 
 impl Runtime {
@@ -70,13 +70,13 @@ impl Runtime {
     ) -> Result<Value> {
         info!("Evaluating expression {}", expression);
         match expression {
-            Expression::Var(n, id) => {
+            Expression::Var(n, Var::Named(id)) => {
                 let Some(v) = self.lookup(env, id) else {
                     return self.error(&format!("couldn't find variable {} in environment", id));
                 };
                 Ok(v)
             }
-            Expression::Arg(n) => {
+            Expression::Var(n, ver) => {
                 todo!()
             }
             Expression::App(n, exps) => self.evaluate_application(binding_name, exps, env),
