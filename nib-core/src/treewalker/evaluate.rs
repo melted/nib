@@ -10,8 +10,8 @@ use log::info;
 use crate::{
     ast::Literal,
     common::{Name, Result},
-    core::{free_vars, Arity, Binder, Binding, Expression, Lambda, Module, Var},
-    treewalker::{new_ref, CType, Closure, Code, Runtime, Symbol, Value},
+    core::{Arity, Binder, Binding, Expression, Lambda, Module, Var, free_vars},
+    treewalker::{CType, Closure, Code, Runtime, Symbol, Value, new_ref},
 };
 
 impl Runtime {

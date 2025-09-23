@@ -194,10 +194,7 @@ impl DesugarState {
                 let loc = self.next_local();
                 parts.push(PatternParts::Bind(
                     loc.clone(),
-                    Expression::App(
-                        pattern.id,
-                        vec![var(&loc), expr.clone()],
-                    ),
+                    Expression::App(pattern.id, vec![var(&loc), expr.clone()]),
                 ));
                 let refer = var(&loc);
                 for f in fields {
@@ -214,7 +211,7 @@ impl DesugarState {
                 expr,
             ),
             ast::Pattern::Ellipsis(name) => {
-                if let Some(    n) = name {
+                if let Some(n) = name {
                     Ok(vec![PatternParts::Bind(n.string(), expr.clone())])
                 } else {
                     Ok(vec![])
@@ -275,9 +272,7 @@ impl DesugarState {
                     Box::new(Cond::new(pred, if_true, if_false)),
                 ))
             }
-            ast::Expression::Lambda(funs) => {
-                self.desugar_funclauses(expression.id, funs)
-            }
+            ast::Expression::Lambda(funs) => self.desugar_funclauses(expression.id, funs),
             ast::Expression::Literal(lit) => Ok(Expression::Literal(expression.id, lit.clone())),
             ast::Expression::Projection(projs) => {
                 let mut args = Vec::new();
@@ -302,7 +297,10 @@ impl DesugarState {
     }
 
     fn no_match_expression() -> Expression {
-        app(&vec![var("_prim_panic"), literal(&Literal::String("No matching pattern".to_owned()))])
+        app(&vec![
+            var("_prim_panic"),
+            literal(&Literal::String("No matching pattern".to_owned())),
+        ])
     }
 
     fn desugar_funclauses(&mut self, id: Node, clauses: &[ast::FunClause]) -> Result<Expression> {
@@ -494,18 +492,15 @@ impl Lambda {
     }
 }
 
-
 #[derive(Debug, Clone, PartialEq)]
 pub enum Var {
     Named(String),
     Arg(u32),
     Env(u32),
-    Local(u32)
+    Local(u32),
 }
 
-impl Var {
-
-}
+impl Var {}
 
 impl Display for Var {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -517,7 +512,6 @@ impl Display for Var {
         }
     }
 }
-
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Expression {
@@ -574,15 +568,15 @@ fn var(s: &str) -> Expression {
     Expression::Var(0, Var::Named(s.to_owned()))
 }
 
-fn arg(n : u32) -> Expression {
+fn arg(n: u32) -> Expression {
     Expression::Var(0, Var::Arg(n))
 }
 
-fn env(n : u32) -> Expression {
+fn env(n: u32) -> Expression {
     Expression::Var(0, Var::Env(n))
 }
 
-fn local(n : u32) -> Expression {
+fn local(n: u32) -> Expression {
     Expression::Var(0, Var::Local(n))
 }
 
@@ -625,9 +619,7 @@ impl Arity {
 
 pub fn rename(expr: &Expression, old_name: &Var, new_name: &Var) -> Expression {
     match expr {
-        Expression::Var(n, v) if v == old_name => {
-            Expression::Var(*n, new_name.clone())
-        }
+        Expression::Var(n, v) if v == old_name => Expression::Var(*n, new_name.clone()),
         Expression::App(n, exps) => {
             let mut new_exps = Vec::new();
             for e in exps {
@@ -638,22 +630,22 @@ pub fn rename(expr: &Expression, old_name: &Var, new_name: &Var) -> Expression {
         Expression::Cond(n, cond) => {
             let new_cond = Cond::new(
                 rename(&cond.pred, old_name, new_name),
-            rename(&cond.if_true, old_name, new_name),
-            rename(&cond.if_false, old_name, new_name));
+                rename(&cond.if_true, old_name, new_name),
+                rename(&cond.if_false, old_name, new_name),
+            );
             Expression::Cond(*n, Box::new(new_cond))
         }
         Expression::Lambda(n, lam) => {
-            let new_lambda = Lambda::new(lam.arity.clone(),
-                            rename(&lam.body, old_name, new_name));
+            let new_lambda = Lambda::new(lam.arity.clone(), rename(&lam.body, old_name, new_name));
             Expression::Lambda(*n, Box::new(new_lambda))
         }
         Expression::Let(n, bind) => {
             let new_expr = rename(&bind.expr, old_name, new_name);
             let new_body = if bind.var != *old_name {
-                                    rename(&bind.body, old_name, new_name)
-                                } else {
-                                    bind.body.clone()
-                                };
+                rename(&bind.body, old_name, new_name)
+            } else {
+                bind.body.clone()
+            };
             let new_bind = Let::new(bind.var.clone(), new_expr, new_body);
             Expression::Let(*n, Box::new(new_bind))
         }
@@ -669,7 +661,9 @@ pub fn rename(expr: &Expression, old_name: &Var, new_name: &Var) -> Expression {
                 let mut new_binding = b.clone();
                 new_binding.body = new_body;
                 new_defs.push(new_binding);
-                if let Var::Named(n) = old_name && n == &b.name {
+                if let Var::Named(n) = old_name
+                    && n == &b.name
+                {
                     shadowed = true;
                 }
             }
@@ -679,12 +673,15 @@ pub fn rename(expr: &Expression, old_name: &Var, new_name: &Var) -> Expression {
                 exp.clone()
             };
             Expression::Where(*n, new_exp, new_defs)
-        },
-        x => x.clone()
+        }
+        x => x.clone(),
     }
 }
 
-pub fn free_vars_iter<'a, T>(iter : &'a mut T) -> Result<HashSet<String>> where T:Iterator<Item = &'a Expression> {
+pub fn free_vars_iter<'a, T>(iter: &'a mut T) -> Result<HashSet<String>>
+where
+    T: Iterator<Item = &'a Expression>,
+{
     let mut vars = HashSet::new();
     for exp in iter {
         free_vars(exp, &mut vars)?;
