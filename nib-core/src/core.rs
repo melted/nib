@@ -218,6 +218,7 @@ impl DesugarState {
                 }
             }
             ast::Pattern::Literal(lit) => {
+                // TODO: Generate appropriate check for each literal type
                 let check = app(&vec![var("_prim_eq"), expr.clone(), literal(lit)]);
                 Ok(vec![PatternParts::Check(check)])
             }
@@ -343,7 +344,6 @@ impl DesugarState {
         }
         let is_irrefutable = all_parts.iter().all(|p| !matches!(p, PatternParts::Check(_)));
         let mut exp = self.desugar_expression(&clause.body)?;
-        dbg!(&all_parts);
         for p in all_parts.iter().rev() {
             match p {
                 PatternParts::Check(pred) => {
@@ -535,16 +535,20 @@ pub enum Var {
     Local(u32),
 }
 
-impl Var {}
+impl Var {
+    pub fn name(&self) -> String {
+        match self {
+            Var::Named(s) => s.clone(),
+            Var::Arg(n) => format!("$arg{}", n),
+            Var::Env(n) => format!("$env{}", n),
+            Var::Local(n) => format!("$loc{}", n),
+        }
+    }
+}
 
 impl Display for Var {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Var::Named(s) => write!(f, "{}", s),
-            Var::Arg(n) => write!(f, "$arg{}", n),
-            Var::Env(n) => write!(f, "$env{}", n),
-            Var::Local(n) => write!(f, "$loc{}", n),
-        }
+        write!(f, "{}", self.name())
     }
 }
 

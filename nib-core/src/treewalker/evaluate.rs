@@ -70,27 +70,34 @@ impl Runtime {
     ) -> Result<Value> {
         info!("Evaluating expression {}", expression);
         match expression {
-            Expression::Var(n, Var::Named(id)) => {
-                let Some(v) = self.lookup(env, id) else {
-                    return self.error(&format!("couldn't find variable {} in environment", id));
+            Expression::Var(n, var) => {
+                let Some(v) = self.lookup(env, &var.name()) else {
+                    return self.error(&format!("couldn't find variable {} in environment", &var.name()));
                 };
                 Ok(v)
             }
-            Expression::Var(n, ver) => {
-                todo!()
-            }
             Expression::App(n, exps) => self.evaluate_application(binding_name, exps, env),
             Expression::Literal(n, lit) => self.evaluate_literal(lit),
-            Expression::Lambda(n, clauses) => {
+            Expression::Lambda(n, lambda) => {
                 let mut free = HashSet::new();
                 free_vars(expression, &mut free)?;
-                todo!()
+                self.evaluate_lambda(binding_name, lambda, &free, env)
             }
             Expression::Cond(_, cond) => {
-                todo!()
+                let pred_res = self.evaluate_expression(binding_name, &cond.pred, env)?;
+                if pred_res == Value::Bool(false) {
+                    self.evaluate_expression(binding_name, &cond.if_false, env)
+                } else {
+                    self.evaluate_expression(binding_name, &cond.if_true, env)
+                }
             }
             Expression::Let(_, bind) => {
-                todo!()
+                let val = self.evaluate_expression(binding_name, &bind.expr, env)?;
+                env.push();
+                env.add(&bind.var.name(), &val);
+                let res = self.evaluate_expression(binding_name, &bind.body, env)?;
+                env.pop();
+                Ok(res)
             }
             Expression::Where(n, exp, bindings) => {
                 env.push();
@@ -171,8 +178,19 @@ impl Runtime {
 
                 let mut ret = match code.borrow().deref() {
                     Code::Nib(lam) => {
-                        let mut v: Value = Value::Nil;
-                        todo!()
+                        if let Arity::VarArg(i,n ) = lam.arity {
+                            let num = args.len() - i as usize;
+                            let array = {
+                                let vars = args.drain((i as usize)..(i as usize + num));
+                                 Value::new_array(vars.as_slice())
+                            };
+                            args.insert(i as usize, array);
+                        }
+                        for (i, v) in args.iter().enumerate() {
+                            let arg_name = Var::Arg(i as u32).name();
+                            env.add(&arg_name, v);
+                        }
+                        self.evaluate_expression(binding_name, &lam.body, &mut env)?
                     }
                     Code::ExternSimple(ext) => ext(&args)?,
                     Code::ExternMut(ext) => ext(self, &args)?,
@@ -329,6 +347,11 @@ impl Environment {
     }
 
     pub fn remove(&mut self, id: &str) {
-        
+        for e in self.envs.iter_mut().rev() {
+            let v = e.get(&Intern::from_ref(id));
+            if v.is_some() {
+                e.remove(&Intern::from_ref(id));
+            }
+        }
     }
 }
