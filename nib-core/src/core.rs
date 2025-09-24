@@ -305,21 +305,56 @@ impl DesugarState {
 
     fn desugar_funclauses(&mut self, id: Node, clauses: &[ast::FunClause]) -> Result<Expression> {
         let arity = verify_arity(clauses)?;
-        let on_fail = Self::no_match_expression();
-        let mut exp = on_fail;
-        for c in clauses.into_iter().rev() {
-            exp = self.desugar_funclause(c, &exp)?;
+        let mut exp = None;
+        for (i, c) in clauses.into_iter().enumerate() {
+            let fail_exp = if i + 1 < clauses.len() {
+                app(&vec![local((i+1) as u32), nil()])
+            } else {
+                Self::no_match_expression()
+            };
+            let (is_irrefutable, next_exp) = self.desugar_funclause(c, &fail_exp)?;
+            if let Some(e) = exp {
+                exp = Some(letexp(&Var::Local(i as u32), &lambda(&Arity::Fixed(1), &next_exp), &e));
+            } else {
+                exp = Some(next_exp)
+            }
+            if is_irrefutable {
+                break;
+            }
         }
-        Ok(Expression::Lambda(id, Box::new(Lambda::new(arity, exp))))
+        Ok(exp.unwrap())
     }
 
     fn desugar_funclause(
         &mut self,
         clause: &ast::FunClause,
         on_fail: &Expression,
-    ) -> Result<Expression> {
+    ) -> Result<(bool, Expression)> {
         let body = self.desugar_expression(&clause.body)?;
-        todo!()
+        let mut all_parts = Vec::new();
+        for (i, p) in clause.args.iter().enumerate() {
+            let arg_exp = arg(i as u32);
+            let mut parts = self.desugar_pattern(p, &arg_exp)?;
+            all_parts.append(&mut parts);
+        }
+        if let Some(guard) = &clause.guard {
+            let guard_exp = self.desugar_expression(&guard)?;
+            all_parts.push(PatternParts::Check(guard_exp));
+        }
+        let is_irrefutable = all_parts.iter().all(|p| !matches!(p, PatternParts::Check(_)));
+        let mut exp = self.desugar_expression(&clause.body)?;
+        dbg!(&all_parts);
+        for p in all_parts.iter().rev() {
+            match p {
+                PatternParts::Check(pred) => {
+                    exp = cond(pred, &exp, &on_fail);
+                },
+                PatternParts::Bind(var, expression) => {
+                    exp = letexp(&Var::Named(var.clone()), expression, &exp);
+                },
+            }
+        }
+        Ok((is_irrefutable, exp))
     }
 
     fn next_local(&mut self) -> String {
@@ -586,6 +621,24 @@ fn app(exps: &[Expression]) -> Expression {
 
 fn literal(lit: &Literal) -> Expression {
     Expression::Literal(0, lit.clone())
+}
+
+fn nil() -> Expression {
+    literal(&Literal::Nil)
+}
+
+fn letexp(var:&Var, exp:&Expression, body:&Expression) -> Expression {
+    let bind = Let::new(var.clone(), exp.clone(), body.clone());
+    Expression::Let(0, Box::new(bind))
+}
+
+fn cond(pred:&Expression, if_true:&Expression, if_false:&Expression) -> Expression {
+    let cond = Cond::new(pred.clone(), if_true.clone(), if_false.clone());
+    Expression::Cond(0, Box::new(cond))
+}
+
+fn lambda(arity:&Arity, body:&Expression) -> Expression {
+    Expression::Lambda(0, Box::new(Lambda::new(arity.clone(), body.clone())))
 }
 
 #[derive(Debug, Clone, PartialEq)]

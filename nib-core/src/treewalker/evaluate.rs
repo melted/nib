@@ -327,4 +327,8 @@ impl Environment {
         };
         e.insert(Intern::from_ref(id), value.clone());
     }
+
+    pub fn remove(&mut self, id: &str) {
+        
+    }
 }
