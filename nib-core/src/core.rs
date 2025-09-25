@@ -323,7 +323,7 @@ impl DesugarState {
                 break;
             }
         }
-        Ok(exp.unwrap())
+        Ok(lambda(&arity,&exp.unwrap()))
     }
 
     fn desugar_funclause(
