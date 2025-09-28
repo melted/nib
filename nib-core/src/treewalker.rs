@@ -599,7 +599,9 @@ impl TryFrom<&Value> for usize {
     fn try_from(value: &Value) -> std::result::Result<Self, Self::Error> {
         match value {
             Value::Integer(i) => Ok(*i as usize),
-            _ => Err(Error::runtime_error("Value not an usize")),
+            _ => {
+                Err(Error::runtime_error("Value not an usize"))
+            },
         }
     }
 }

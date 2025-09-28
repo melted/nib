@@ -41,6 +41,7 @@ struct DesugarState {
     bindings: Vec<Binding>,
     metadata: Metadata,
     last_local: u32,
+    last_arg: u32,
 }
 
 impl DesugarState {
@@ -50,6 +51,7 @@ impl DesugarState {
             bindings: Vec::new(),
             metadata,
             last_local: 0,
+            last_arg: 0,
         }
     }
 
@@ -140,7 +142,8 @@ impl DesugarState {
                 let lam_rhs = Expression::App(self.new_id(), arr_mk);
                 let npat: Vec<String> = names.iter().map(|n| n.string()).collect();
                 let arity = Arity::Fixed(npat.len() as u32);
-                let lam = Expression::Lambda(self.new_id(), Box::new(Lambda::new(arity, lam_rhs)));
+                let args:Vec<Var> = npat.iter().map(|x| self.next_arg()).collect();
+                let lam = Expression::Lambda(self.new_id(), Box::new(Lambda::new(args, arity, lam_rhs)));
                 let body = Expression::App(self.new_id(), vec![lam, rhs]);
                 let nam_arr = self.next_local();
                 let binding =
@@ -307,15 +310,16 @@ impl DesugarState {
     fn desugar_funclauses(&mut self, id: Node, clauses: &[ast::FunClause]) -> Result<Expression> {
         let arity = verify_arity(clauses)?;
         let mut exp = None;
+        let args = self.args(&arity);
         for (i, c) in clauses.into_iter().enumerate() {
             let fail_exp = if i + 1 < clauses.len() {
-                app(&vec![local((i+1) as u32), nil()])
+                app(&vec![local((i+1) as u32)])
             } else {
                 Self::no_match_expression()
             };
-            let (is_irrefutable, next_exp) = self.desugar_funclause(c, &fail_exp)?;
+            let (is_irrefutable, next_exp) = self.desugar_funclause(c, &args, &fail_exp)?;
             if let Some(e) = exp {
-                exp = Some(letexp(&Var::Local(i as u32), &lambda(&Arity::Fixed(1), &next_exp), &e));
+                exp = Some(letexp(&Var::Local(i as u32), &lambda(vec![], &Arity::Fixed(0), &next_exp), &e));
             } else {
                 exp = Some(next_exp)
             }
@@ -323,18 +327,19 @@ impl DesugarState {
                 break;
             }
         }
-        Ok(lambda(&arity,&exp.unwrap()))
+        Ok(lambda(args, &arity,&exp.unwrap()))
     }
 
     fn desugar_funclause(
         &mut self,
         clause: &ast::FunClause,
+        args: &[Var],
         on_fail: &Expression,
     ) -> Result<(bool, Expression)> {
         let body = self.desugar_expression(&clause.body)?;
         let mut all_parts = Vec::new();
-        for (i, p) in clause.args.iter().enumerate() {
-            let arg_exp = arg(i as u32);
+        for (p, v) in clause.args.iter().zip(args.iter()) {
+            let arg_exp = Expression::Var(0, v.clone());
             let mut parts = self.desugar_pattern(p, &arg_exp)?;
             all_parts.append(&mut parts);
         }
@@ -362,6 +367,26 @@ impl DesugarState {
         format!("local.l{}", self.last_local)
     }
 
+    fn next_arg(&mut self) -> Var {
+        self.last_arg += 1;
+        Var::Arg(self.last_arg)
+    }
+
+    fn args(&mut self, arity: &Arity) -> Vec<Var> {
+        let n = match arity {
+            Arity::Fixed(n) => {
+                *n as usize
+            }
+            Arity::VarArg(n,_ ) => {
+                (*n + 1) as usize
+            }
+        };
+        let mut args = Vec::new();
+        for i in 0..n {
+            args.push(self.next_arg());
+        }
+        args
+    }
     fn new_id(&mut self) -> u32 {
         self.metadata.last_id += 1;
         self.metadata.last_id
@@ -517,13 +542,14 @@ impl Let {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Lambda {
+    pub args: Vec<Var>,
     pub arity: Arity,
     pub body: Expression,
 }
 
 impl Lambda {
-    pub fn new(arity: Arity, body: Expression) -> Self {
-        Lambda { arity, body }
+    pub fn new(args: Vec<Var>, arity: Arity, body: Expression) -> Self {
+        Lambda { args, arity, body }
     }
 }
 
@@ -641,8 +667,8 @@ fn cond(pred:&Expression, if_true:&Expression, if_false:&Expression) -> Expressi
     Expression::Cond(0, Box::new(cond))
 }
 
-fn lambda(arity:&Arity, body:&Expression) -> Expression {
-    Expression::Lambda(0, Box::new(Lambda::new(arity.clone(), body.clone())))
+fn lambda(args: Vec<Var>, arity:&Arity, body:&Expression) -> Expression {
+    Expression::Lambda(0, Box::new(Lambda::new(args, arity.clone(), body.clone())))
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -693,7 +719,7 @@ pub fn rename(expr: &Expression, old_name: &Var, new_name: &Var) -> Expression {
             Expression::Cond(*n, Box::new(new_cond))
         }
         Expression::Lambda(n, lam) => {
-            let new_lambda = Lambda::new(lam.arity.clone(), rename(&lam.body, old_name, new_name));
+            let new_lambda = Lambda::new(lam.args.clone(),lam.arity.clone(), rename(&lam.body, old_name, new_name));
             Expression::Lambda(*n, Box::new(new_lambda))
         }
         Expression::Let(n, bind) => {

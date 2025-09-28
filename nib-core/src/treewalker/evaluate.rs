@@ -142,9 +142,6 @@ impl Runtime {
         exps: &Vec<Expression>,
         env: &mut Environment,
     ) -> Result<Value> {
-        if exps.len() < 2 {
-            return self.error("application requires at least two expressions");
-        }
         let mut vals = Vec::new();
         for e in exps {
             vals.push(self.evaluate_expression(binding_name, e, env)?);
@@ -186,9 +183,8 @@ impl Runtime {
                             };
                             args.insert(i as usize, array);
                         }
-                        for (i, v) in args.iter().enumerate() {
-                            let arg_name = Var::Arg(i as u32).name();
-                            env.add(&arg_name, v);
+                        for (v, i) in args.iter().zip(lam.args.iter()) {
+                            env.add(&i.name(), v);
                         }
                         self.evaluate_expression(binding_name, &lam.body, &mut env)?
                     }

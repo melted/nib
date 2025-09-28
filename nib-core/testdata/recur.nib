@@ -1,0 +1,6 @@
+// Can be used with --no-prelude
+
+sum 0 = 0
+sum n = _prim_add n (sum (_prim_sub n 1))
+
+_ = _prim_print_representation (sum 3)
