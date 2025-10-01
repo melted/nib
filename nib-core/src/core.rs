@@ -194,13 +194,19 @@ impl DesugarState {
             }
             ast::Pattern::Custom(name, fields) => {
                 let mut parts = Vec::new();
-                let loc = self.next_local();
+                let loc = self.non_shadowed_var(&expr).name();
                 parts.push(PatternParts::Bind(
                     loc.clone(),
-                    Expression::App(pattern.id, vec![var(&loc), expr.clone()]),
+                    Expression::App(pattern.id, vec![var(&name.string()), expr.clone()]),
                 ));
-                let refer = var(&loc);
-                for f in fields {
+                let failed = app(&vec![var("_prim_eq"), var(&loc), literal(&Literal::Bool(false))]);
+                let success = app(&vec![var("_prim_bitnot"), failed]);
+                parts.push(PatternParts::Check(success));
+                let size = app(&vec![var("_prim_array_size"), var(&loc)]);
+                let size_check = app(&vec![var("_prim_eq"), size, literal(&Literal::Integer(fields.len() as i64))]);
+                parts.push(PatternParts::Check(size_check));
+                for (i, f) in fields.iter().enumerate() {
+                    let refer = app(&vec![var("_prim_array_ref"), var(&loc), literal(&Literal::Integer(i as i64))]);
                     let mut field = self.desugar_pattern(&f, &refer)?;
                     parts.append(&mut field);
                 }
@@ -209,7 +215,7 @@ impl DesugarState {
             ast::Pattern::Array(fields) => self.desugar_pattern(
                 &PatternNode {
                     id: 0,
-                    pattern: ast::Pattern::Custom(Name::str("array"), fields.to_vec()),
+                    pattern: ast::Pattern::Custom(Name::str("_prim_array_match"), fields.to_vec()),
                 },
                 expr,
             ),
@@ -370,6 +376,19 @@ impl DesugarState {
     fn next_arg(&mut self) -> Var {
         self.last_arg += 1;
         Var::Arg(self.last_arg)
+    }
+
+    fn non_shadowed_var(&mut self, exp:&Expression) -> Var {
+        let mut vars = HashSet::new();
+        free_vars(exp, &mut vars);
+        let mut counter = 0;
+        loop {
+            let next = format!("x{}", counter);
+            if !vars.contains(&next) {
+                return Var::Named(next);
+            }
+            counter += 1;
+        }
     }
 
     fn args(&mut self, arity: &Arity) -> Vec<Var> {
@@ -767,16 +786,16 @@ where
 {
     let mut vars = HashSet::new();
     for exp in iter {
-        free_vars(exp, &mut vars)?;
+        free_vars(exp, &mut vars);
     }
     Ok(vars)
 }
 
-pub fn free_vars(expr: &Expression, vars: &mut HashSet<String>) -> Result<()> {
+pub fn free_vars(expr: &Expression, vars: &mut HashSet<String>) {
     match expr {
         Expression::Literal(_, literal) => {}
-        Expression::Var(_, Var::Named(var)) => {
-            vars.insert(var.to_owned());
+        Expression::Var(_, v) => {
+            vars.insert(v.name());
         }
         Expression::Let(_, clause) => {
             let name = if let Var::Named(var) = &clause.var {
@@ -784,31 +803,31 @@ pub fn free_vars(expr: &Expression, vars: &mut HashSet<String>) -> Result<()> {
             } else {
                 "".to_owned()
             };
-            free_vars(&clause.expr, vars)?;
+            free_vars(&clause.expr, vars);
             let shadowed = vars.contains(&name);
-            free_vars(&clause.body, vars)?;
+            free_vars(&clause.body, vars);
             if !shadowed {
                 vars.remove(&name);
             }
         }
         Expression::Cond(_, cond) => {
-            free_vars(&cond.pred, vars)?;
-            free_vars(&cond.if_false, vars)?;
-            free_vars(&cond.if_true, vars)?;
+            free_vars(&cond.pred, vars);
+            free_vars(&cond.if_false, vars);
+            free_vars(&cond.if_true, vars);
         }
         Expression::Lambda(_, lam) => {
-            free_vars(&lam.body, vars)?;
+            free_vars(&lam.body, vars);
         }
         Expression::App(_, expressions) => {
             for e in expressions {
-                free_vars(e, vars)?;
+                free_vars(e, vars);
             }
         }
         Expression::Where(_, expression, bindings) => {
             let mut used = HashSet::new();
             let mut bound = HashSet::new();
             for b in bindings {
-                free_vars(&b.body, &mut used)?;
+                free_vars(&b.body, &mut used);
                 match &b.binder {
                     Binder::Local(n) => {
                         bound.insert(n.to_owned());
@@ -819,14 +838,13 @@ pub fn free_vars(expr: &Expression, vars: &mut HashSet<String>) -> Result<()> {
                     _ => {}
                 };
             }
-            free_vars(expression, &mut used)?;
+            free_vars(expression, &mut used);
             for v in used.difference(&bound) {
                 vars.insert(v.to_owned());
             }
         }
         _ => {}
     }
-    Ok(())
 }
 
 #[derive(Debug)]

@@ -80,7 +80,7 @@ impl Runtime {
             Expression::Literal(n, lit) => self.evaluate_literal(lit),
             Expression::Lambda(n, lambda) => {
                 let mut free = HashSet::new();
-                free_vars(expression, &mut free)?;
+                free_vars(expression, &mut free);
                 self.evaluate_lambda(binding_name, lambda, &free, env)
             }
             Expression::Cond(_, cond) => {
@@ -142,6 +142,7 @@ impl Runtime {
         exps: &Vec<Expression>,
         env: &mut Environment,
     ) -> Result<Value> {
+        info!("Apply: Evaluate arguments");
         let mut vals = Vec::new();
         for e in exps {
             vals.push(self.evaluate_expression(binding_name, e, env)?);
@@ -221,7 +222,6 @@ impl Runtime {
                         ret
                     }
                 };
-
                 if !remaining.is_empty() {
                     remaining.insert(0, ret);
                     ret = self.apply_values(binding_name, &remaining)?;

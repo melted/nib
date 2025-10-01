@@ -109,6 +109,10 @@ impl Runtime {
             Value::new_extern_fun(Runtime::prim_array_size, &Arity::Fixed(1)),
         );
         self.add_global(
+            "_prim_array_match",
+            Value::new_extern_fun(Runtime::prim_array_match, &Arity::Fixed(1)),
+        );
+        self.add_global(
             "_prim_string_print",
             Value::new_extern_fun(Runtime::print_string, &Arity::Fixed(1)),
         );
@@ -730,6 +734,15 @@ impl Runtime {
             Ok(Value::Nil)
         } else {
             self.error("index out of bounds in _prim_array set")
+        }
+    }
+
+    pub(super) fn prim_array_match(&self, args: &[Value]) -> Result<Value> {
+        let arr = &args[0];
+        if matches!(arr, &Value::Array(_)) {
+            Ok(arr.clone())
+        } else {
+            Ok(Value::Bool(false))
         }
     }
 
