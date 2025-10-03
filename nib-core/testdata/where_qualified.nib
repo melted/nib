@@ -1,0 +1,6 @@
+
+t = tab where
+            tab.a = 1
+            tab.b = 2
+
+_ = print t 

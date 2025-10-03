@@ -122,7 +122,7 @@ impl Runtime {
     pub fn add_name(&mut self, name: &Name, val: &Value) -> Result<()> {
         match name {
             Name::Qualified(path, name) => {
-                let t = self.get_or_create_module_path(path)?;
+                let t = self.get_or_create_module_path(path, self.globals.clone())?;
                 self.add_to_table(t, name, val);
             }
             Name::Plain(name) => {
@@ -165,9 +165,9 @@ impl Runtime {
         Some(table)
     }
 
-    pub fn get_or_create_module_path(&mut self, path: &[String]) -> Result<Rc<RefCell<Table>>> {
+    pub fn get_or_create_module_path(&mut self, path: &[String], start:Rc<RefCell<Table>>) -> Result<Rc<RefCell<Table>>> {
         let mut rest = path;
-        let mut table = self.globals.clone();
+        let mut table = start;
         while !rest.is_empty() {
             let sym = self.get_symbol(&rest[0]);
             table = {

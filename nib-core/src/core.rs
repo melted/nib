@@ -77,7 +77,7 @@ impl DesugarState {
         is_local: bool,
     ) -> Result<Vec<Binding>> {
         let binder = if is_local {
-            Binder::Local(ast_binding.name.string())
+            Binder::Local(ast_binding.name.clone())
         } else {
             Binder::Public(self.desugar_binding_name(&ast_binding.name)?)
         };
@@ -102,7 +102,7 @@ impl DesugarState {
         Ok(vec![Binding::binding(
             ast_binding.id,
             if is_local {
-                Binder::Local(name.string())
+                Binder::Local(name)
             } else {
                 Binder::Public(name)
             },
@@ -120,7 +120,7 @@ impl DesugarState {
         match &pat.pattern {
             ast::Pattern::Var(v) => {
                 let binder = if is_local {
-                    Binder::Local(v.string())
+                    Binder::Local(v.clone())
                 } else {
                     Binder::Public(self.desugar_binding_name(&v)?)
                 };
@@ -154,12 +154,12 @@ impl DesugarState {
                         self.new_id(),
                         vec![
                             self.named_var("_prim_array_ref"),
-                            self.named_var(&nam_arr),
+                            self.named_var(&nam_arr.string()),
                             Expression::Literal(self.new_id(), ast::Literal::Integer(i as i64)),
                         ],
                     );
                     let binder = if is_local {
-                        Binder::Local(n.string())
+                        Binder::Local(n)
                     } else {
                         Binder::Public(self.desugar_binding_name(&n)?)
                     };
@@ -368,9 +368,10 @@ impl DesugarState {
         Ok((is_irrefutable, exp))
     }
 
-    fn next_local(&mut self) -> String {
+    fn next_local(&mut self) -> Name {
         self.last_local += 1;
-        format!("local.l{}", self.last_local)
+        let id = format!("$local{}", self.last_local);
+        Name::Plain(id)
     }
 
     fn next_arg(&mut self) -> Var {
@@ -494,7 +495,7 @@ impl Binding {
     pub fn binding(id: Node, binder: Binder, body: Expression) -> Self {
         let name = match &binder {
             Binder::Public(name) => name.string(),
-            Binder::Local(s) => s.clone(),
+            Binder::Local(s) => s.string(),
             Binder::Unbound => "".to_string(),
         };
         Binding {
@@ -509,7 +510,7 @@ impl Binding {
 #[derive(Debug, Clone, PartialEq)]
 pub enum Binder {
     Public(Name),
-    Local(String),
+    Local(Name),
     Unbound,
 }
 
@@ -830,7 +831,7 @@ pub fn free_vars(expr: &Expression, vars: &mut HashSet<String>) {
                 free_vars(&b.body, &mut used);
                 match &b.binder {
                     Binder::Local(n) => {
-                        bound.insert(n.to_owned());
+                        bound.insert(n.string());
                     }
                     Binder::Public(n) => {
                         bound.insert(n.string());

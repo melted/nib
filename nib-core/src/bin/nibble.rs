@@ -9,10 +9,15 @@ use nib_core::treewalker::Runtime;
 /// another crate, where it can pull in dependencies and go wild
 /// in general.
 fn main() -> io::Result<()> {
-    simple_logger::init_with_level(log::Level::Error).unwrap();
     let opts = parse_options();
     let mut rt = Runtime::new();
     let prelude_code = include_str!("../../lib/prelude.nib");
+    let level = if opts.verbose {
+        log::Level::Info
+    } else {
+        log::Level::Error
+    };
+    simple_logger::init_with_level(level).unwrap();
     if !opts.no_prelude {
         rt.add_code("prelude", prelude_code)?;
     }
@@ -46,6 +51,7 @@ fn main() -> io::Result<()> {
 
 pub struct Options {
     pub no_prelude: bool,
+    pub verbose: bool,
     pub files: Vec<String>,
 }
 
@@ -53,6 +59,7 @@ impl Options {
     fn new() -> Self {
         Options {
             no_prelude: false,
+            verbose:false,
             files: Vec::new(),
         }
     }
@@ -64,6 +71,9 @@ fn parse_options() -> Options {
         match arg {
             _ if arg == "--no-prelude" => {
                 opts.no_prelude = true;
+            },
+            _ if arg == "--verbose" => {
+                opts.verbose = true;
             }
             file => {
                 opts.files.push(file);

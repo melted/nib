@@ -41,21 +41,28 @@ impl Runtime {
         let val = self.evaluate_expression(&binding.name, &binding.body, env)?;
         let is_closure = matches!(val, Value::Closure(_));
         match &binding.binder {
-            Binder::Public(name) if local => {
-                match name {
-                    Name::Plain(s) => {
-                        env.add(s, &val);
-                    }
-                    Name::Qualified(_, _) => {
-                        return self.error(&format!("Qualified name {} in where clause", name));
-                    }
-                };
-            }
             Binder::Public(name) => {
                 self.add_name(name, &val)?;
             }
             Binder::Local(name) => {
-                env.add(name, &val);
+                match name {
+                    Name::Plain(s) => {
+                        env.add(s, &val);
+                    }
+                    Name::Qualified(path, id) => {
+                        let start = &path[0];
+                        let rest = &path[1..];
+                        let first = if let Some(v) = env.get(start) {
+                            v.get_table()?
+                        } else {
+                            let nt = Value::new_table();
+                            env.add(start, &nt);
+                            nt.get_table()?
+                        };
+                        let tab = self.get_or_create_module_path(rest, first)?;
+                        self.add_to_table(tab, &id, &val);
+                    }
+                };
             }
             Binder::Unbound => {}
         }
