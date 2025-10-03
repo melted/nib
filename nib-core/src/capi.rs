@@ -1,6 +1,7 @@
 // This file defines the C API for Nib, it should be kept in sync with the corresponding 
 // C header file.
 
+use log::error;
 use std::ffi::{c_char, c_int, CStr};
 
 use crate::{ast::Module, parser::parse_declarations, treewalker::Runtime};
@@ -10,8 +11,10 @@ const NIB_ERROR:c_int = 1;
 
 #[unsafe(no_mangle)]
 pub extern "C" fn nib_parse(source: *const c_char, mod_ptr: *mut *mut Module)  -> c_int {
-    let c_str = unsafe { CStr::from_ptr(source) };
-    let res = parse_declarations(None, c_str.to_str().unwrap());
+    let Ok(c_str) = unsafe { CStr::from_ptr(source) }.to_str() else {
+        return NIB_ERROR;
+    };
+    let res = parse_declarations(None, c_str);
     match res {
         Ok(module) => {
             let mod_box = Box::new(module);
@@ -28,6 +31,29 @@ pub extern "C" fn nib_parse(source: *const c_char, mod_ptr: *mut *mut Module)  -
 pub extern "C" fn nib_init() -> *mut Runtime {
     let rt = Box::new(Runtime::new());
     Box::into_raw(rt)
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn nib_add_code(rt: *mut Runtime, name: *const c_char, source: *const c_char) -> c_int {
+    let Some(runtime) = (unsafe { rt.as_mut() }) else {
+        error!("nib_add_code: Invalid runtime pointer");
+        return NIB_ERROR;
+    };
+    let Ok(name_str) = unsafe { CStr::from_ptr(name) }.to_str() else {
+        error!("nib_add_code: Invalid name string");
+        return NIB_ERROR;
+    };
+    let Ok(code) = unsafe { CStr::from_ptr(source) }.to_str() else {
+        error!("nib_add_code: Invalid source string");
+        return NIB_ERROR;
+    };
+    let res = runtime.add_code(name_str, code);
+    if let Err(e) = res {
+        error!("nib_add_code: {}", e);
+        NIB_ERROR
+    } else {
+        NIB_SUCCESS
+    }
 }
 
 #[unsafe(no_mangle)]
