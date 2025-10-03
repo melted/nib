@@ -5,6 +5,7 @@
 
 pub mod ast;
 pub mod bytecode;
+pub mod capi;
 pub mod common;
 pub mod core;
 pub mod interpreter;

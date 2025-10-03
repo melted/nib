@@ -14,3 +14,6 @@ minidl = "0.1.6"
 simple_logger = "5.0.0"
 internment = { version = "0.8.6", features = ["arena"] }
 region = "3.0.2"
+
+[lib]
+crate-type = ["lib", "staticlib", "cdylib"]
