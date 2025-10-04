@@ -87,7 +87,8 @@ impl Runtime {
             Expression::Literal(n, lit) => self.evaluate_literal(lit),
             Expression::Lambda(n, lambda) => {
                 let mut free = HashSet::new();
-                free_vars(expression, &mut free);
+                let mut locals = HashMap::new();
+                free_vars(expression, &mut free, &mut locals);
                 self.evaluate_lambda(binding_name, lambda, &free, env)
             }
             Expression::Cond(_, cond) => {

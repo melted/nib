@@ -1,4 +1,4 @@
-use std::{collections::HashSet, fmt::Display};
+use std::{collections::{HashMap, HashSet}, fmt::Display};
 
 use crate::{
     ast::{self, Literal, PatternNode},
@@ -381,7 +381,8 @@ impl DesugarState {
 
     fn non_shadowed_var(&mut self, exp:&Expression) -> Var {
         let mut vars = HashSet::new();
-        free_vars(exp, &mut vars);
+        let mut locals = HashMap::new();
+        free_vars(exp, &mut vars, &mut locals);
         let mut counter = 0;
         loop {
             let next = format!("x{}", counter);
@@ -786,61 +787,85 @@ where
     T: Iterator<Item = &'a Expression>,
 {
     let mut vars = HashSet::new();
+    let mut locals = HashMap::new();
     for exp in iter {
-        free_vars(exp, &mut vars);
+        free_vars(exp, &mut vars, &mut locals);
     }
     Ok(vars)
 }
 
-pub fn free_vars(expr: &Expression, vars: &mut HashSet<String>) {
+fn add_local(locals: &mut  HashMap<String, i32>, var:&Var) {
+    locals.insert(var.name(), locals.get(&var.name()).unwrap_or(&0) + 1);
+}
+
+fn remove_local(locals: &mut HashMap<String, i32>, var:&Var) {
+    if let Some(v) = locals.get_mut(&var.name()) {
+            *v -= 1;
+            if *v == 0 {
+                locals.remove(&var.name());
+            }
+    }
+}
+
+fn add_locals(locals: &mut  HashMap<String, i32>, vars:&[Var]) {
+    for v in vars {
+        add_local(locals, v);
+    }
+}
+
+fn remove_locals(locals: &mut  HashMap<String, i32>, vars:&[Var]) {
+    for v in vars {
+        remove_local(locals, v);
+    }
+}
+
+pub fn free_vars(expr: &Expression, vars: &mut HashSet<String>, locals: &mut HashMap<String, i32>) {
     match expr {
         Expression::Literal(_, literal) => {}
         Expression::Var(_, v) => {
-            vars.insert(v.name());
-        }
-        Expression::Let(_, clause) => {
-            let name = if let Var::Named(var) = &clause.var {
-                var.clone()
-            } else {
-                "".to_owned()
-            };
-            free_vars(&clause.expr, vars);
-            let shadowed = vars.contains(&name);
-            free_vars(&clause.body, vars);
-            if !shadowed {
-                vars.remove(&name);
+            if locals.get(&v.name()).is_none() {
+                vars.insert(v.name());
             }
         }
+        Expression::Let(_, clause) => {
+
+            free_vars(&clause.expr, vars, locals);
+            add_local(locals, &clause.var);
+            free_vars(&clause.body, vars, locals);
+            remove_local(locals, &clause.var);
+        }
         Expression::Cond(_, cond) => {
-            free_vars(&cond.pred, vars);
-            free_vars(&cond.if_false, vars);
-            free_vars(&cond.if_true, vars);
+            free_vars(&cond.pred, vars, locals);
+            free_vars(&cond.if_false, vars, locals);
+            free_vars(&cond.if_true, vars, locals);
         }
         Expression::Lambda(_, lam) => {
-            free_vars(&lam.body, vars);
+            add_locals(locals, &lam.args);
+            free_vars(&lam.body, vars, locals);
+            remove_locals(locals, &lam.args);
         }
         Expression::App(_, expressions) => {
             for e in expressions {
-                free_vars(e, vars);
+                free_vars(e, vars, locals);
             }
         }
         Expression::Where(_, expression, bindings) => {
             let mut used = HashSet::new();
-            let mut bound = HashSet::new();
+            let mut bound = Vec::new();
             for b in bindings {
-                free_vars(&b.body, &mut used);
+                free_vars(&b.body, &mut used, locals);
                 match &b.binder {
-                    Binder::Local(n) => {
-                        bound.insert(n.string());
-                    }
-                    Binder::Public(n) => {
-                        bound.insert(n.string());
+                    Binder::Local(n) | Binder::Public(n) => {
+                        let var = Var::Named(n.top());
+                        bound.push(var.clone());
+                        add_local(locals, &var);
                     }
                     _ => {}
                 };
             }
-            free_vars(expression, &mut used);
-            for v in used.difference(&bound) {
+            free_vars(expression, &mut used, locals);
+            remove_locals(locals, &bound);
+            for v in used {
                 vars.insert(v.to_owned());
             }
         }

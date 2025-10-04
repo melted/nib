@@ -142,6 +142,13 @@ impl Name {
         }
     }
 
+    pub fn top(&self) -> String {
+        match self {
+            Name::Qualified(items, n) => items.first().unwrap_or(n).clone(),
+            Name::Plain(n) => n.clone(),
+        }
+    }
+
     pub fn append(path: &Name, base: &Name) -> Result<Name> {
         match (path, base) {
             (Name::Qualified(path, last), Name::Plain(b)) => {

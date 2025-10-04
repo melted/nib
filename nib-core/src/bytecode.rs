@@ -1,17 +1,18 @@
 //! Compile a module into a bytecode module
-use crate::common::Result;
+use crate::common::{Metadata, Result};
 
 mod tests;
 
-pub fn compile(module: crate::core::Module) -> Result<Module> {
+pub fn compile(from: crate::core::Module) -> Result<Module> {
     let mut module = Module::new();
-    todo!()
+    let mut compilation = Compilation::new(from);
+    compilation.compile()?;
+    Ok(compilation.module)
 }
-
-
 
 #[derive(Debug, Clone)]
 pub struct Module {
+    metadata:Option<Metadata>,
     bcode: Vec<u8>,
     scratch_mem_size: usize,
     /// A list of symbols that should be put into the scratch space.
@@ -21,6 +22,7 @@ pub struct Module {
 impl Module {
     pub fn new() -> Self {
         Module {
+            metadata: None,
             bcode: Vec::new(),
             scratch_mem_size: 0,
             want_symbols: Vec::new(),
@@ -30,13 +32,18 @@ impl Module {
 
 #[derive(Debug, Clone)]
 struct Compilation {
-    module:Module
+    module:Module,
+    from: crate::core::Module
 }
 
 impl Compilation {
-    fn new() -> Self {
-        Compilation { module: Module::new() }
-    } 
+    fn new(from: crate::core::Module) -> Self {
+        Compilation { module: Module::new(), from }
+    }
+
+    fn compile(&mut self) -> Result<()> {
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
