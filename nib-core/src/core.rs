@@ -844,7 +844,6 @@ pub fn free_vars(expr: &Expression, vars: &mut HashSet<String>) {
                 vars.insert(v.to_owned());
             }
         }
-        _ => {}
     }
 }
 

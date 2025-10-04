@@ -1,11 +1,16 @@
 //! Compile a module into a bytecode module
 use crate::common::Result;
 
+mod tests;
+
 pub fn compile(module: crate::core::Module) -> Result<Module> {
     let mut module = Module::new();
     todo!()
 }
 
+
+
+#[derive(Debug, Clone)]
 pub struct Module {
     bcode: Vec<u8>,
     scratch_mem_size: usize,
@@ -23,6 +28,18 @@ impl Module {
     }
 }
 
+#[derive(Debug, Clone)]
+struct Compilation {
+    module:Module
+}
+
+impl Compilation {
+    fn new() -> Self {
+        Compilation { module: Module::new() }
+    } 
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 #[repr(u8)]
 pub enum Instruction {
     Add = 33,

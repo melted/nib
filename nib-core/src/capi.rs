@@ -34,22 +34,22 @@ pub extern "C" fn nib_init() -> *mut Runtime {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn nib_add_code(rt: *mut Runtime, name: *const c_char, source: *const c_char) -> c_int {
+pub extern "C" fn nib_execute(rt: *mut Runtime, name: *const c_char, source: *const c_char) -> c_int {
     let Some(runtime) = (unsafe { rt.as_mut() }) else {
-        error!("nib_add_code: Invalid runtime pointer");
+        error!("nib_execute: Invalid runtime pointer");
         return NIB_ERROR;
     };
     let Ok(name_str) = unsafe { CStr::from_ptr(name) }.to_str() else {
-        error!("nib_add_code: Invalid name string");
+        error!("nib_execute: Invalid name string");
         return NIB_ERROR;
     };
     let Ok(code) = unsafe { CStr::from_ptr(source) }.to_str() else {
-        error!("nib_add_code: Invalid source string");
+        error!("nib_execute: Invalid source string");
         return NIB_ERROR;
     };
     let res = runtime.add_code(name_str, code);
     if let Err(e) = res {
-        error!("nib_add_code: {}", e);
+        error!("nib_execute: {}", e);
         NIB_ERROR
     } else {
         NIB_SUCCESS
@@ -59,6 +59,6 @@ pub extern "C" fn nib_add_code(rt: *mut Runtime, name: *const c_char, source: *c
 #[unsafe(no_mangle)]
 pub extern "C" fn nib_free(rt: *mut Runtime) {
     let runtime = unsafe { Box::from_raw(rt) };
-    drop(runtime);
+    drop(runtime); // Not really needed, but make it clear.
 }
 

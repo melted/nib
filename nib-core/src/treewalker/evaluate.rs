@@ -10,7 +10,7 @@ use log::info;
 use crate::{
     ast::Literal,
     common::{Name, Result},
-    core::{Arity, Binder, Binding, Expression, Lambda, Module, Var, free_vars},
+    core::{Arity, Binder, Binding, Expression, Lambda, Module, free_vars},
     treewalker::{CType, Closure, Code, Runtime, Symbol, Value, new_ref},
 };
 
