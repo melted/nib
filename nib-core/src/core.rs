@@ -178,7 +178,7 @@ impl DesugarState {
         }
     }
 
-    fn desugar_pattern(
+    fn desugar_arg_pattern(
         &mut self,
         pattern: &ast::PatternNode,
         expr: &Expression,
@@ -188,7 +188,7 @@ impl DesugarState {
                 let name = alias.string();
                 let mut parts = Vec::new();
                 parts.push(PatternParts::Bind(name.clone(), expr.to_owned()));
-                let mut inner = self.desugar_pattern(&pat, &var(&name))?;
+                let mut inner = self.desugar_arg_pattern(&pat, &var(&name))?;
                 parts.append(&mut inner);
                 Ok(parts)
             }
@@ -197,7 +197,7 @@ impl DesugarState {
                 let loc = self.non_shadowed_var(&expr).name();
                 parts.push(PatternParts::Bind(
                     loc.clone(),
-                    Expression::App(pattern.id, vec![var(&name.string()), expr.clone()]),
+                    Expression::App(pattern.id, vec![name_expr(name), expr.clone()]),
                 ));
                 let failed = app(&vec![var("_prim_eq"), var(&loc), literal(&Literal::Bool(false))]);
                 let success = app(&vec![var("_prim_bitnot"), failed]);
@@ -207,12 +207,12 @@ impl DesugarState {
                 parts.push(PatternParts::Check(size_check));
                 for (i, f) in fields.iter().enumerate() {
                     let refer = app(&vec![var("_prim_array_ref"), var(&loc), literal(&Literal::Integer(i as i64))]);
-                    let mut field = self.desugar_pattern(&f, &refer)?;
+                    let mut field = self.desugar_arg_pattern(&f, &refer)?;
                     parts.append(&mut field);
                 }
                 Ok(parts)
             }
-            ast::Pattern::Array(fields) => self.desugar_pattern(
+            ast::Pattern::Array(fields) => self.desugar_arg_pattern(
                 &PatternNode {
                     id: 0,
                     pattern: ast::Pattern::Custom(Name::str("_prim_array_match"), fields.to_vec()),
@@ -232,7 +232,7 @@ impl DesugarState {
                 Ok(vec![PatternParts::Check(check)])
             }
             ast::Pattern::Typed(pat, typ) => {
-                let mut inner = self.desugar_pattern(&pat, expr)?;
+                let mut inner = self.desugar_arg_pattern(&pat, expr)?;
                 let mut val = expr.clone();
                 if let Some(PatternParts::Bind(name, exp)) = inner.last() {
                     if exp == expr {
@@ -240,7 +240,7 @@ impl DesugarState {
                     }
                 }
                 let get_type = app(&vec![var("_prim_type"), val]);
-                let check = app(&vec![var("_prim_eq"), get_type, var(&typ.string())]);
+                let check = app(&vec![var("_prim_eq"), get_type, name_expr(typ)]);
                 inner.push(PatternParts::Check(check));
                 Ok(inner)
             }
@@ -346,7 +346,7 @@ impl DesugarState {
         let mut all_parts = Vec::new();
         for (p, v) in clause.args.iter().zip(args.iter()) {
             let arg_exp = Expression::Var(0, v.clone());
-            let mut parts = self.desugar_pattern(p, &arg_exp)?;
+            let mut parts = self.desugar_arg_pattern(p, &arg_exp)?;
             all_parts.append(&mut parts);
         }
         if let Some(guard) = &clause.guard {
@@ -652,6 +652,23 @@ impl Display for Expression {
 
 fn var(s: &str) -> Expression {
     Expression::Var(0, Var::Named(s.to_owned()))
+}
+
+fn name_expr(n: &Name) -> Expression {
+    match n {
+        Name::Plain(s) =>  {
+            var(s)
+        }
+        Name::Qualified(p, s) => {
+            let t = n.top();
+            let rest = p[1..].iter().chain(vec![s]);
+            let mut args = vec![var("project"), var(&t)];
+            for a in rest {
+                args.push(literal(&Literal::Symbol(a.clone())));
+            }
+            app(&args)
+        }
+    }
 }
 
 fn arg(n: u32) -> Expression {

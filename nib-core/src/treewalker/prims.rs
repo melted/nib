@@ -3,7 +3,7 @@ use std::os::raw::c_void;
 
 use crate::common::{Error, Name, Result};
 use crate::core::Arity;
-use crate::treewalker::{Runtime, Value};
+use crate::treewalker::{Runtime, Symbol, Value};
 
 impl Runtime {
     pub(super) fn register_primitives(&mut self) -> Result<()> {
@@ -111,6 +111,10 @@ impl Runtime {
         self.add_global(
             "_prim_array_match",
             Value::new_extern_fun(Runtime::prim_array_match, &Arity::Fixed(1)),
+        );
+        self.add_global(
+            "_prim_match",
+            Value::new_extern_fun(Runtime::prim_match, &Arity::Fixed(1)),
         );
         self.add_global(
             "_prim_string_print",
@@ -745,6 +749,30 @@ impl Runtime {
             Ok(Value::Bool(false))
         }
     }
+
+    pub(super) fn prim_match(&self, args: &[Value]) -> Result<Value> {
+        let matcher = &args[0];
+        match matcher {
+            Value::Closure(_) => Ok(matcher.clone()),
+            Value::Table(t) => {
+                let table = &t.borrow().table;
+                let sym = Symbol::from_ref("match");
+                if let Some(m) = table.get(&sym) {
+                    if matches!(m, Value::Closure(_)) {
+                        Ok(m.clone())
+                    } else {
+                        self.error("table matcher used in custom pattern must be a function")
+                    }
+                } else {
+                    self.error("table used in custom pattern must have a `match` function")
+                }
+            },
+            _ => {
+                self.error("custom matcher must be either a function or a table with a `match` entry")
+            }
+        }
+    }
+
 
     pub(super) fn prim_bytes_set(&self, args: &[Value]) -> Result<Value> {
         let b = &args[0].get_bytes()?;
