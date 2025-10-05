@@ -1,0 +1,8 @@
+// @Name: Test failing var bind
+// @Tags: pattern binding failure
+
+[a, 2] = [1, 3]
+// @ErrorOut:
+// Error: irrefutable var pattern mismatch
+// @EndErrorOut
+// @ExitCode: 1

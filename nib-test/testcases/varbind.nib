@@ -7,8 +7,9 @@
 
 _ = print a
 _ = print b
-_ = print d
+_ = print d.b
+_ = print d.c
 // @Output:
-// 12Table { c: 6, b: 4, }
+// 1246
 // @EndOutput
 // @ExitCode: 0

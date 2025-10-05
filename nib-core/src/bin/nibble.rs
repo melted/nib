@@ -41,7 +41,7 @@ fn main() -> io::Result<()> {
                 exit(exit_code);
             }
             _ => {
-                stderr().write_all(format!("{}", err).as_bytes())?;
+                stderr().write_all(format!("{}\n", err).as_bytes())?;
                 exit(1);
             }
         }
