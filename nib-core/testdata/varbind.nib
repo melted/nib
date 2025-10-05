@@ -1,0 +1,8 @@
+
+[a, b] = [1, 2]
+
+[d.b, d.c] = [4, 6]
+
+_ = print a
+_ = print b
+_ = print d

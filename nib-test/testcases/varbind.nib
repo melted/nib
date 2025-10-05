@@ -1,0 +1,14 @@
+// @Name: Test binding pattern matching
+// @Tags: pattern binding
+
+[a, b] = [1, 2]
+
+[d.b, d.c] = [4, 6]
+
+_ = print a
+_ = print b
+_ = print d
+// @Output:
+// 12Table { c: 6, b: 4, }
+// @EndOutput
+// @ExitCode: 0

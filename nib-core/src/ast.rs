@@ -264,6 +264,11 @@ impl Display for PatternNode {
     }
 }
 
+impl From<Pattern> for PatternNode {
+    fn from(value: Pattern) -> Self {
+        PatternNode {id:0, pattern:value}
+    }
+}
 impl Display for Pattern {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -302,6 +307,12 @@ impl Display for Pattern {
 pub struct ExpressionNode {
     pub id: Node,
     pub expr: Expression,
+}
+
+impl From<Expression> for ExpressionNode {
+    fn from(value: Expression) -> Self {
+        ExpressionNode { id: 0, expr: value }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -368,11 +379,6 @@ impl ExpressionNode {
             _ => {}
         }
         visitor.on_post_expression(self);
-    }
-
-    pub fn free_variables(&self) -> HashSet<Name> {
-        //      let mut bound = HashSet::new();
-        HashSet::new()
     }
 }
 

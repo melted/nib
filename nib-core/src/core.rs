@@ -1,9 +1,10 @@
 use std::{collections::{HashMap, HashSet}, fmt::Display};
-
+use libffi::low::prep_cif;
 use crate::{
     ast::{self, Literal, PatternNode},
     common::{Error, Metadata, Name, Node, Result},
 };
+use crate::ast::{ExpressionNode, FunClause, Pattern};
 
 mod tests;
 
@@ -115,7 +116,7 @@ impl DesugarState {
         ast_binding: &ast::VarBinding,
         is_local: bool,
     ) -> Result<Vec<Binding>> {
-        let pat = &ast_binding.lhs;
+        let mut pat = &ast_binding.lhs;
         let rhs = self.desugar_expression(&ast_binding.rhs)?;
         match &pat.pattern {
             ast::Pattern::Var(v) => {
@@ -130,26 +131,28 @@ impl DesugarState {
                 Ok(vec![Binding::binding(ast_binding.id, Binder::Unbound, rhs)])
             }
             _ => {
-                let mut visitor = UsedVars::new();
-                pat.visit(&mut visitor);
-                let names: Vec<_> = visitor.vars.into_iter().collect();
-                let mut v = Vec::new();
-                for n in names.clone() {
-                    v.push(self.var(n));
-                }
-                let mut arr_mk = vec![self.named_var("_prim_array_mk")];
-                arr_mk.append(&mut v);
-                let lam_rhs = Expression::App(self.new_id(), arr_mk);
-                let npat: Vec<String> = names.iter().map(|n| n.string()).collect();
-                let arity = Arity::Fixed(npat.len() as u32);
-                let args:Vec<Var> = npat.iter().map(|x| self.next_arg()).collect();
-                let lam = Expression::Lambda(self.new_id(), Box::new(Lambda::new(args, arity, lam_rhs)));
-                let body = Expression::App(self.new_id(), vec![lam, rhs]);
+                let mut counter = 0;
+                let mut replacements = HashMap::new();
+                let fun_pat = self.pattern_with_plain_vars(pat, &mut counter, &mut replacements);
+                let fun_names = replacements.keys().collect::<Vec<_>>();
+                let v = fun_names.iter().map(|&n| ExpressionNode::from(ast::Expression::Var(n.clone())));
+                let arr_exp = ExpressionNode::from(ast::Expression::Array(v.collect()));
+                let panic_exp = ExpressionNode::from(ast::Expression::App(
+                    vec![ExpressionNode::from(ast::Expression::Var(Name::str("_prim_panic"))),
+                    ExpressionNode::from(ast::Expression::Literal(Literal::String("irrefutable var pattern mismatch".to_owned())))]
+                ));
+                let clause = ast::FunClause { id:0, args: vec![fun_pat.clone()], guard:None, body:arr_exp};
+                let fallback = ast::FunClause { id:0, args: vec![ast::PatternNode::from(ast::Pattern::Wildcard)], guard:None,
+                body: panic_exp};
+                let fun = ExpressionNode::from(ast::Expression::Lambda(vec![clause, fallback]));
+                let expr = ExpressionNode::from(ast::Expression::App(vec![fun, ast_binding.rhs.clone()]));
+                let desugared = self.desugar_expression(&expr)?;
                 let nam_arr = self.next_local();
                 let binding =
-                    Binding::binding(ast_binding.id, Binder::Local(nam_arr.clone()), body);
+                    Binding::binding(ast_binding.id, Binder::Local(nam_arr.clone()), desugared);
                 let mut bindings = vec![binding];
-                for (i, n) in names.into_iter().enumerate() {
+                for (i, k) in fun_names.iter().enumerate() {
+                    let old = replacements.get(k).unwrap();
                     let rhs = Expression::App(
                         self.new_id(),
                         vec![
@@ -159,9 +162,9 @@ impl DesugarState {
                         ],
                     );
                     let binder = if is_local {
-                        Binder::Local(n)
+                        Binder::Local(old.clone())
                     } else {
-                        Binder::Public(self.desugar_binding_name(&n)?)
+                        Binder::Public(self.desugar_binding_name(old)?)
                     };
                     let bind = Binding::binding(self.new_id(), binder, rhs);
                     bindings.push(bind);
@@ -366,6 +369,51 @@ impl DesugarState {
             }
         }
         Ok((is_irrefutable, exp))
+    }
+
+    fn pattern_with_plain_vars(&mut self, pattern : &ast::PatternNode, counter:&mut i32, replacements: &mut HashMap<Name, Name>) -> ast::PatternNode {
+        let mut p = pattern.clone();
+        match &pattern.pattern {
+            Pattern::Ellipsis(Some(old)) => {
+                let n = Name::Plain(format!("z{}", counter));
+                *counter += 1;
+                replacements.insert(n.clone(), old.clone());
+                p.pattern = Pattern::Ellipsis(Some(n));
+            }
+            Pattern::Var(old) => {
+                let n = Name::Plain(format!("z{}", counter));
+                *counter += 1;
+                replacements.insert(n.clone(), old.clone());
+                p.pattern = Pattern::Var(n)
+            }
+            Pattern::Array(arr) => {
+                let mut new_arr = Vec::new();
+                for p in arr.iter() {
+                    new_arr.push( self.pattern_with_plain_vars(p, counter,replacements));
+                }
+                p.pattern = Pattern::Array(new_arr);
+            }
+            Pattern::Alias(pat, old) => {
+                let n = Name::Plain(format!("z{}", counter));
+                *counter += 1;
+                replacements.insert(n.clone(), old.clone());
+                let new_pat = self.pattern_with_plain_vars(pat, counter,replacements);
+                p.pattern = Pattern::Alias(Box::new(new_pat), n);
+            }
+            Pattern::Custom(matcher, fields) => {
+                let mut new_fields = Vec::new();
+                for p in fields.iter() {
+                    new_fields.push( self.pattern_with_plain_vars(p, counter,replacements));
+                }
+                p.pattern = Pattern::Custom(matcher.clone(), new_fields);
+            }
+            Pattern::Typed(pat, t) => {
+                let new_pat = self.pattern_with_plain_vars(pat, counter,replacements);
+                p.pattern = Pattern::Typed(Box::new(new_pat), t.clone());
+            }
+            _ => {}
+        }
+        p
     }
 
     fn next_local(&mut self) -> Name {
