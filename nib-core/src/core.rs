@@ -936,30 +936,3 @@ pub fn free_vars(expr: &Expression, vars: &mut HashSet<String>, locals: &mut Has
         }
     }
 }
-
-#[derive(Debug)]
-pub(super) struct UsedVars {
-    pub vars: HashSet<Name>,
-}
-
-impl UsedVars {
-    pub(super) fn new() -> Self {
-        UsedVars {
-            vars: HashSet::new(),
-        }
-    }
-}
-
-impl ast::AstVisitor for UsedVars {
-    fn on_pattern(&mut self, pat: &ast::PatternNode) -> bool {
-        match &pat.pattern {
-            ast::Pattern::Var(name)
-            | ast::Pattern::Alias(_, name)
-            | ast::Pattern::Ellipsis(Some(name)) => {
-                self.vars.insert(name.to_owned());
-            }
-            _ => {}
-        };
-        true
-    }
-}

@@ -219,14 +219,13 @@ impl<'a> ParserState<'a> {
     }
 
     pub(super) fn parse_implicit_lambda_expression(&mut self) -> Result<ExpressionNode> {
+        let implicits = vec![Name::str("a"), Name::str("b"),Name::str("c"), Name::str("d")];
         self.expect(TokenValue::LeftBrace)?;
         let expr = self.parse_expression()?;
         self.expect(TokenValue::RightBrace)?;
-        let mut visitor = UsedImplicits::new();
-        expr.visit(&mut visitor);
-        let mut vars: Vec<Name> = visitor.vars.into_iter().collect();
-        vars.sort();
-        let mut pats: Vec<PatternNode> = vars.into_iter().map(|n| self.var_pattern(n)).collect();
+        let free_vars = expr.expr.free_vars();
+        let used_implicits = implicits.iter().filter(|&n| free_vars.contains(n));
+        let mut pats: Vec<PatternNode> = used_implicits.map(|n| self.var_pattern(n.clone())).collect();
         if pats.is_empty() {
             pats.push(self.wildcard_pattern());
         }

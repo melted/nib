@@ -195,17 +195,6 @@ fn parse_guarded_decl() -> Result<()> {
     Ok(())
 }
 
-#[test]
-fn test_implicit_visitor() -> Result<()> {
-    let mut state = ParserState::new("a * b + e");
-    let expr = state.parse_expression()?;
-    let mut visitor = UsedImplicits::new();
-    expr.visit(&mut visitor);
-    assert!(visitor.vars.contains(&Name::str("a")));
-    assert!(visitor.vars.contains(&Name::str("b")));
-    assert!(!visitor.vars.contains(&Name::str("e")));
-    Ok(())
-}
 
 #[test]
 fn parse_implicit_lambda() -> Result<()> {

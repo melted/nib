@@ -115,6 +115,12 @@ pub enum Name {
     Plain(String),
 }
 
+impl From<&Name> for Name {
+    fn from(value: &Name) -> Self {
+        value.clone()
+    }
+}
+
 impl Name {
     pub fn string(&self) -> String {
         match self {

@@ -160,6 +160,19 @@ pub struct FunClause {
     pub body: ExpressionNode,
 }
 
+impl FunClause {
+    fn free_vars_helper(&self, vars:&mut HashSet<Name>, locals:&mut HashSet<Name>) {
+        let mut exp_local = locals.clone();
+        for p in &self.args {
+            p.bound_vars_helper(&mut exp_local);
+        }
+        if let Some(g) = &self.guard {
+            g.expr.free_vars_helper(vars, &mut exp_local);
+        }
+        self.body.expr.free_vars_helper(vars, &mut exp_local);
+    }
+}
+
 impl Display for FunClause {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for a in &self.args {
@@ -195,6 +208,18 @@ pub struct OpClause {
     pub rpat: PatternNode,
     pub guard: Option<ExpressionNode>,
     pub body: ExpressionNode,
+}
+
+impl OpClause {
+    fn free_vars_helper(&self, vars:&mut HashSet<Name>, locals:&mut HashSet<Name>) {
+        let mut exp_local = locals.clone();
+        self.lpat.bound_vars_helper(&mut exp_local);
+        self.rpat.bound_vars_helper(&mut exp_local);
+        if let Some(g) = &self.guard {
+            g.expr.free_vars_helper(vars, &mut exp_local);
+        }
+        self.body.expr.free_vars_helper(vars, &mut exp_local);
+    }
 }
 
 impl Display for OpClause {
@@ -255,6 +280,43 @@ impl PatternNode {
 
     pub fn is_ellipsis(&self) -> bool {
         matches!(self.pattern, Pattern::Ellipsis(_))
+    }
+
+    pub fn bound_vars(&self) -> HashSet<Name> {
+        let mut vars = HashSet::new();
+        self.bound_vars_helper(&mut vars);
+        vars
+    }
+
+    fn bound_vars_helper(&self, vars:&mut HashSet<Name>) {
+        match &self.pattern {
+            Pattern::Ellipsis(name) => {
+                if let Some(n) = name {
+                    vars.insert(n.clone());
+                }
+            }
+            Pattern::Var(n) => {
+                vars.insert(n.clone());
+            }
+            Pattern::Array(elems) => {
+                for e in elems {
+                    e.bound_vars_helper(vars);
+                }
+            }
+            Pattern::Alias(p, n) => {
+                p.bound_vars_helper(vars);
+                vars.insert(n.clone());
+            }
+            Pattern::Custom(_, fields) => {
+                for e in fields {
+                    e.bound_vars_helper(vars);
+                }
+            }
+            Pattern::Typed(p, _) => {
+                p.bound_vars_helper(vars);
+            }
+            _ => {}
+        }
     }
 }
 
@@ -328,6 +390,85 @@ pub enum Expression {
     Projection(Vec<ExpressionNode>),
 }
 
+impl Expression {
+    pub fn free_vars(&self) -> HashSet<Name> {
+        let mut vars = HashSet::new();
+        let mut locals = HashSet::new();
+        self.free_vars_helper(&mut vars, &mut locals);
+        vars
+    }
+
+    fn free_vars_helper(&self, vars:&mut HashSet<Name>, locals:&mut HashSet<Name>) {
+        match self {
+            Expression::Var(n) => {
+                if !locals.contains(n) {
+                    vars.insert(n.clone());
+                }
+            }
+            Expression::Array(elems) => {
+                for e in elems {
+                    e.expr.free_vars_helper(vars, locals);
+                }
+            }
+            Expression::Lambda(clauses) => {
+                for c in clauses {
+                    c.free_vars_helper(vars, locals);
+                }
+            }
+            Expression::App(exps) => {
+                for e in exps {
+                    e.expr.free_vars_helper(vars, locals);
+                }
+            }
+            Expression::Binop(op) => {
+                op.lhs.expr.free_vars_helper(vars, locals);
+                op.rhs.expr.free_vars_helper(vars, locals);
+                let n = op.op.to_name();
+                if !locals.contains(&n) {
+                    vars.insert(n);
+                }
+            }
+            Expression::Where(exp, binds) => {
+                let mut exp_locals = locals.clone();
+                for b in binds {
+                    match b {
+                        Binding::VarBinding(vb) => {
+                            vb.rhs.expr.free_vars_helper(vars, &mut exp_locals);
+                            let bound = vb.lhs.bound_vars();
+                            for n in bound {
+                                exp_locals.insert(n);
+                            }
+                        }
+                        Binding::FunBinding(fb) => {
+                            let n = fb.name.clone();
+                            for c in &fb.clauses {
+                                c.free_vars_helper(vars, &mut exp_locals);
+                            }
+                            exp_locals.insert(n);
+                        }
+                        Binding::OpBinding(op) => {
+                            for c in &op.clauses {
+                                c.free_vars_helper(vars, locals);
+                            }
+                            exp_locals.insert(op.op.to_name());
+                        }
+                    }
+                }
+            }
+            Expression::Cond(cond) => {
+                cond.pred.expr.free_vars_helper(vars, locals);
+                cond.on_true.expr.free_vars_helper(vars, locals);
+                cond.on_false.expr.free_vars_helper(vars, locals);
+            }
+            Expression::Projection(proj) => {
+                for e in proj {
+                    e.expr.free_vars_helper(vars, locals);
+                }
+            }
+            _ => {}
+        }
+    }
+}
 impl ExpressionNode {
     pub fn visit(&self, visitor: &mut dyn AstVisitor) {
         if !visitor.on_expression(self) {
