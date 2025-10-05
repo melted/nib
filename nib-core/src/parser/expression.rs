@@ -1,8 +1,7 @@
 use std::collections::HashSet;
 
 use super::ParserState;
-use crate::ast::{
-    AstVisitor, Binding, Binop, Cond, Expression, ExpressionNode, FunClause, Literal, Operator,
+use crate::ast::{ Binding, Binop, Cond, Expression, ExpressionNode, FunClause, Literal, Operator,
     PatternNode,
 };
 use crate::common::{Location, Name, Result};
@@ -373,30 +372,5 @@ impl<'a> ParserState<'a> {
                 on_false: Box::new(on_false),
             }),
         }
-    }
-}
-
-#[derive(Debug)]
-pub(super) struct UsedImplicits {
-    pub vars: HashSet<Name>,
-}
-
-impl UsedImplicits {
-    pub(super) fn new() -> Self {
-        UsedImplicits {
-            vars: HashSet::new(),
-        }
-    }
-}
-
-impl AstVisitor for UsedImplicits {
-    fn on_expression(&mut self, expr: &ExpressionNode) -> bool {
-        if let Expression::Var(name) = &expr.expr {
-            let v = name.string();
-            if v == "a" || v == "b" || v == "c" || v == "d" {
-                self.vars.insert(name.clone());
-            }
-        };
-        true
     }
 }

@@ -10,32 +10,12 @@ pub struct Module {
     pub declarations: Vec<Declaration>,
 }
 
-impl Module {
-    pub fn visit(&self, visitor: &mut dyn AstVisitor) {
-        for decl in &self.declarations {
-            decl.visit(visitor);
-        }
-    }
-}
-
 // Declarations
 #[derive(Debug, Clone, PartialEq)]
 pub enum Declaration {
     Module(ModuleDirective),
     Use(UseDirective),
     Binding(Binding),
-}
-
-impl Declaration {
-    pub fn visit(&self, visitor: &mut dyn AstVisitor) {
-        if !visitor.on_declaration(self) {
-            return;
-        }
-        if let Declaration::Binding(b) = &self {
-            b.visit(visitor)
-        }
-        visitor.on_post_declaration(self);
-    }
 }
 
 impl Display for Declaration {
@@ -53,40 +33,6 @@ pub enum Binding {
     VarBinding(VarBinding),
     FunBinding(FunBinding),
     OpBinding(OpBinding),
-}
-
-impl Binding {
-    pub fn visit(&self, visitor: &mut dyn AstVisitor) {
-        if !visitor.on_binding(self) {
-            return;
-        }
-        match self {
-            Binding::FunBinding(fb) => {
-                for c in &fb.clauses {
-                    c.args.iter().for_each(|p| p.visit(visitor));
-                    if let Some(g) = c.guard.as_ref() {
-                        g.visit(visitor)
-                    }
-                    c.body.visit(visitor);
-                }
-            }
-            Binding::OpBinding(ob) => {
-                for c in &ob.clauses {
-                    c.lpat.visit(visitor);
-                    c.rpat.visit(visitor);
-                    if let Some(e) = c.guard.as_ref() {
-                        e.visit(visitor)
-                    }
-                    c.body.visit(visitor);
-                }
-            }
-            Binding::VarBinding(vb) => {
-                vb.lhs.visit(visitor);
-                vb.rhs.visit(visitor);
-            }
-        }
-        visitor.on_post_binding(self);
-    }
 }
 
 impl Display for Binding {
@@ -252,32 +198,6 @@ pub enum Pattern {
 }
 
 impl PatternNode {
-    pub fn visit(&self, visitor: &mut dyn AstVisitor) {
-        if !visitor.on_pattern(self) {
-            return;
-        }
-        match &self.pattern {
-            Pattern::Alias(pat, _) => {
-                pat.visit(visitor);
-            }
-            Pattern::Array(pats) => {
-                for p in pats {
-                    p.visit(visitor);
-                }
-            }
-            Pattern::Custom(_, pats) => {
-                for p in pats {
-                    p.visit(visitor);
-                }
-            }
-            Pattern::Typed(pat, _) => {
-                pat.visit(visitor);
-            }
-            _ => {}
-        }
-        visitor.on_post_pattern(self);
-    }
-
     pub fn is_ellipsis(&self) -> bool {
         matches!(self.pattern, Pattern::Ellipsis(_))
     }
@@ -469,60 +389,6 @@ impl Expression {
         }
     }
 }
-impl ExpressionNode {
-    pub fn visit(&self, visitor: &mut dyn AstVisitor) {
-        if !visitor.on_expression(self) {
-            return;
-        }
-        match &self.expr {
-            Expression::App(args) => {
-                for arg in args {
-                    arg.visit(visitor);
-                }
-            }
-            Expression::Array(elems) => {
-                for e in elems {
-                    e.visit(visitor);
-                }
-            }
-            Expression::Binop(Binop { op, lhs, rhs }) => {
-                lhs.visit(visitor);
-                rhs.visit(visitor);
-            }
-            Expression::Cond(Cond {
-                pred,
-                on_true,
-                on_false,
-            }) => {
-                pred.visit(visitor);
-                on_true.visit(visitor);
-                on_false.visit(visitor);
-            }
-            Expression::Lambda(clauses) => {
-                for clause in clauses {
-                    if let Some(guard) = &clause.guard {
-                        guard.visit(visitor);
-                    }
-                    clause.body.visit(visitor);
-                }
-            }
-            Expression::Projection(exps) => {
-                for e in exps {
-                    e.visit(visitor);
-                }
-            }
-            Expression::Where(exp, bindings) => {
-                exp.visit(visitor);
-                for b in bindings {
-                    b.visit(visitor);
-                }
-            }
-            _ => {}
-        }
-        visitor.on_post_expression(self);
-    }
-}
-
 impl Display for ExpressionNode {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.expr)?;
@@ -677,30 +543,4 @@ impl Display for Operator {
         }
         Ok(())
     }
-}
-
-pub trait AstVisitor {
-    fn on_expression(&mut self, expression: &ExpressionNode) -> bool {
-        true
-    }
-
-    fn on_post_expression(&mut self, expression: &ExpressionNode) {}
-
-    fn on_declaration(&mut self, decl: &Declaration) -> bool {
-        true
-    }
-
-    fn on_post_declaration(&mut self, decl: &Declaration) {}
-
-    fn on_pattern(&mut self, pat: &PatternNode) -> bool {
-        true
-    }
-
-    fn on_post_pattern(&mut self, pat: &PatternNode) {}
-
-    fn on_binding(&mut self, binding: &Binding) -> bool {
-        true
-    }
-
-    fn on_post_binding(&mut self, binding: &Binding) {}
 }
