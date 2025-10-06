@@ -1,8 +1,8 @@
 use std::collections::HashSet;
 
 use super::ParserState;
-use crate::ast::{ Binding, Binop, Cond, Expression, ExpressionNode, FunClause, Literal, Operator,
-    PatternNode,
+use crate::ast::{
+    Binding, Binop, Cond, Expression, ExpressionNode, FunClause, Literal, Operator, PatternNode,
 };
 use crate::common::{Location, Name, Result};
 use crate::parser::lexer::TokenValue;
@@ -218,13 +218,20 @@ impl<'a> ParserState<'a> {
     }
 
     pub(super) fn parse_implicit_lambda_expression(&mut self) -> Result<ExpressionNode> {
-        let implicits = vec![Name::str("a"), Name::str("b"),Name::str("c"), Name::str("d")];
+        let implicits = vec![
+            Name::str("a"),
+            Name::str("b"),
+            Name::str("c"),
+            Name::str("d"),
+        ];
         self.expect(TokenValue::LeftBrace)?;
         let expr = self.parse_expression()?;
         self.expect(TokenValue::RightBrace)?;
         let free_vars = expr.expr.free_vars();
         let used_implicits = implicits.iter().filter(|&n| free_vars.contains(n));
-        let mut pats: Vec<PatternNode> = used_implicits.map(|n| self.var_pattern(n.clone())).collect();
+        let mut pats: Vec<PatternNode> = used_implicits
+            .map(|n| self.var_pattern(n.clone()))
+            .collect();
         if pats.is_empty() {
             pats.push(self.wildcard_pattern());
         }

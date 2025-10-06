@@ -12,7 +12,7 @@ pub fn compile(from: crate::core::Module) -> Result<Module> {
 
 #[derive(Debug, Clone)]
 pub struct Module {
-    metadata:Option<Metadata>,
+    metadata: Option<Metadata>,
     bcode: Vec<u8>,
     scratch_mem_size: usize,
     /// A list of symbols that should be put into the scratch space.
@@ -32,13 +32,16 @@ impl Module {
 
 #[derive(Debug, Clone)]
 struct Compilation {
-    module:Module,
-    from: crate::core::Module
+    module: Module,
+    from: crate::core::Module,
 }
 
 impl Compilation {
     fn new(from: crate::core::Module) -> Self {
-        Compilation { module: Module::new(), from }
+        Compilation {
+            module: Module::new(),
+            from,
+        }
     }
 
     fn compile(&mut self) -> Result<()> {

@@ -1,10 +1,13 @@
-use std::{collections::{HashMap, HashSet}, fmt::Display};
-use libffi::low::prep_cif;
+use crate::ast::{ExpressionNode, FunClause, Pattern};
 use crate::{
     ast::{self, Literal, PatternNode},
     common::{Error, Metadata, Name, Node, Result},
 };
-use crate::ast::{ExpressionNode, FunClause, Pattern};
+use libffi::low::prep_cif;
+use std::{
+    collections::{HashMap, HashSet},
+    fmt::Display,
+};
 
 mod tests;
 
@@ -135,17 +138,31 @@ impl DesugarState {
                 let mut replacements = HashMap::new();
                 let fun_pat = self.pattern_with_plain_vars(pat, &mut counter, &mut replacements);
                 let fun_names = replacements.keys().collect::<Vec<_>>();
-                let v = fun_names.iter().map(|&n| ExpressionNode::from(ast::Expression::Var(n.clone())));
+                let v = fun_names
+                    .iter()
+                    .map(|&n| ExpressionNode::from(ast::Expression::Var(n.clone())));
                 let arr_exp = ExpressionNode::from(ast::Expression::Array(v.collect()));
-                let panic_exp = ExpressionNode::from(ast::Expression::App(
-                    vec![ExpressionNode::from(ast::Expression::Var(Name::str("_prim_panic"))),
-                    ExpressionNode::from(ast::Expression::Literal(Literal::String("irrefutable var pattern mismatch".to_owned())))]
-                ));
-                let clause = ast::FunClause { id:0, args: vec![fun_pat.clone()], guard:None, body:arr_exp};
-                let fallback = ast::FunClause { id:0, args: vec![ast::PatternNode::from(ast::Pattern::Wildcard)], guard:None,
-                body: panic_exp};
+                let panic_exp = ExpressionNode::from(ast::Expression::App(vec![
+                    ExpressionNode::from(ast::Expression::Var(Name::str("_prim_panic"))),
+                    ExpressionNode::from(ast::Expression::Literal(Literal::String(
+                        "irrefutable var pattern mismatch".to_owned(),
+                    ))),
+                ]));
+                let clause = ast::FunClause {
+                    id: 0,
+                    args: vec![fun_pat.clone()],
+                    guard: None,
+                    body: arr_exp,
+                };
+                let fallback = ast::FunClause {
+                    id: 0,
+                    args: vec![ast::PatternNode::from(ast::Pattern::Wildcard)],
+                    guard: None,
+                    body: panic_exp,
+                };
                 let fun = ExpressionNode::from(ast::Expression::Lambda(vec![clause, fallback]));
-                let expr = ExpressionNode::from(ast::Expression::App(vec![fun, ast_binding.rhs.clone()]));
+                let expr =
+                    ExpressionNode::from(ast::Expression::App(vec![fun, ast_binding.rhs.clone()]));
                 let desugared = self.desugar_expression(&expr)?;
                 let nam_arr = self.next_local();
                 let binding =
@@ -186,6 +203,7 @@ impl DesugarState {
         pattern: &ast::PatternNode,
         expr: &Expression,
     ) -> Result<Vec<PatternParts>> {
+        let bound_names = pattern.bound_vars();
         match &pattern.pattern {
             ast::Pattern::Alias(pat, alias) => {
                 let name = alias.string();
@@ -202,14 +220,26 @@ impl DesugarState {
                     loc.clone(),
                     Expression::App(pattern.id, vec![name_expr(name), expr.clone()]),
                 ));
-                let failed = app(&vec![var("_prim_eq"), var(&loc), literal(&Literal::Bool(false))]);
+                let failed = app(&vec![
+                    var("_prim_eq"),
+                    var(&loc),
+                    literal(&Literal::Bool(false)),
+                ]);
                 let success = app(&vec![var("_prim_bitnot"), failed]);
                 parts.push(PatternParts::Check(success));
                 let size = app(&vec![var("_prim_array_size"), var(&loc)]);
-                let size_check = app(&vec![var("_prim_eq"), size, literal(&Literal::Integer(fields.len() as i64))]);
+                let size_check = app(&vec![
+                    var("_prim_eq"),
+                    size,
+                    literal(&Literal::Integer(fields.len() as i64)),
+                ]);
                 parts.push(PatternParts::Check(size_check));
                 for (i, f) in fields.iter().enumerate() {
-                    let refer = app(&vec![var("_prim_array_ref"), var(&loc), literal(&Literal::Integer(i as i64))]);
+                    let refer = app(&vec![
+                        var("_prim_array_ref"),
+                        var(&loc),
+                        literal(&Literal::Integer(i as i64)),
+                    ]);
                     let mut field = self.desugar_arg_pattern(&f, &refer)?;
                     parts.append(&mut field);
                 }
@@ -322,13 +352,17 @@ impl DesugarState {
         let args = self.args(&arity);
         for (i, c) in clauses.into_iter().enumerate() {
             let fail_exp = if i + 1 < clauses.len() {
-                app(&vec![local((i+1) as u32)])
+                app(&vec![local((i + 1) as u32)])
             } else {
                 Self::no_match_expression()
             };
             let (is_irrefutable, next_exp) = self.desugar_funclause(c, &args, &fail_exp)?;
             if let Some(e) = exp {
-                exp = Some(letexp(&Var::Local(i as u32), &lambda(vec![], &Arity::Fixed(0), &next_exp), &e));
+                exp = Some(letexp(
+                    &Var::Local(i as u32),
+                    &lambda(vec![], &Arity::Fixed(0), &next_exp),
+                    &e,
+                ));
             } else {
                 exp = Some(next_exp)
             }
@@ -336,7 +370,7 @@ impl DesugarState {
                 break;
             }
         }
-        Ok(lambda(args, &arity,&exp.unwrap()))
+        Ok(lambda(args, &arity, &exp.unwrap()))
     }
 
     fn desugar_funclause(
@@ -356,22 +390,29 @@ impl DesugarState {
             let guard_exp = self.desugar_expression(&guard)?;
             all_parts.push(PatternParts::Check(guard_exp));
         }
-        let is_irrefutable = all_parts.iter().all(|p| !matches!(p, PatternParts::Check(_)));
+        let is_irrefutable = all_parts
+            .iter()
+            .all(|p| !matches!(p, PatternParts::Check(_)));
         let mut exp = self.desugar_expression(&clause.body)?;
         for p in all_parts.iter().rev() {
             match p {
                 PatternParts::Check(pred) => {
                     exp = cond(pred, &exp, &on_fail);
-                },
+                }
                 PatternParts::Bind(var, expression) => {
                     exp = letexp(&Var::Named(var.clone()), expression, &exp);
-                },
+                }
             }
         }
         Ok((is_irrefutable, exp))
     }
 
-    fn pattern_with_plain_vars(&mut self, pattern : &ast::PatternNode, counter:&mut i32, replacements: &mut HashMap<Name, Name>) -> ast::PatternNode {
+    fn pattern_with_plain_vars(
+        &mut self,
+        pattern: &ast::PatternNode,
+        counter: &mut i32,
+        replacements: &mut HashMap<Name, Name>,
+    ) -> ast::PatternNode {
         let mut p = pattern.clone();
         match &pattern.pattern {
             Pattern::Ellipsis(Some(old)) => {
@@ -389,7 +430,7 @@ impl DesugarState {
             Pattern::Array(arr) => {
                 let mut new_arr = Vec::new();
                 for p in arr.iter() {
-                    new_arr.push( self.pattern_with_plain_vars(p, counter,replacements));
+                    new_arr.push(self.pattern_with_plain_vars(p, counter, replacements));
                 }
                 p.pattern = Pattern::Array(new_arr);
             }
@@ -397,18 +438,18 @@ impl DesugarState {
                 let n = Name::Plain(format!("z{}", counter));
                 *counter += 1;
                 replacements.insert(n.clone(), old.clone());
-                let new_pat = self.pattern_with_plain_vars(pat, counter,replacements);
+                let new_pat = self.pattern_with_plain_vars(pat, counter, replacements);
                 p.pattern = Pattern::Alias(Box::new(new_pat), n);
             }
             Pattern::Custom(matcher, fields) => {
                 let mut new_fields = Vec::new();
                 for p in fields.iter() {
-                    new_fields.push( self.pattern_with_plain_vars(p, counter,replacements));
+                    new_fields.push(self.pattern_with_plain_vars(p, counter, replacements));
                 }
                 p.pattern = Pattern::Custom(matcher.clone(), new_fields);
             }
             Pattern::Typed(pat, t) => {
-                let new_pat = self.pattern_with_plain_vars(pat, counter,replacements);
+                let new_pat = self.pattern_with_plain_vars(pat, counter, replacements);
                 p.pattern = Pattern::Typed(Box::new(new_pat), t.clone());
             }
             _ => {}
@@ -427,7 +468,7 @@ impl DesugarState {
         Var::Arg(self.last_arg)
     }
 
-    fn non_shadowed_var(&mut self, exp:&Expression) -> Var {
+    fn non_shadowed_var(&mut self, exp: &Expression) -> Var {
         let mut vars = HashSet::new();
         let mut locals = HashMap::new();
         free_vars(exp, &mut vars, &mut locals);
@@ -443,12 +484,8 @@ impl DesugarState {
 
     fn args(&mut self, arity: &Arity) -> Vec<Var> {
         let n = match arity {
-            Arity::Fixed(n) => {
-                *n as usize
-            }
-            Arity::VarArg(n,_ ) => {
-                (*n + 1) as usize
-            }
+            Arity::Fixed(n) => *n as usize,
+            Arity::VarArg(n, _) => (*n + 1) as usize,
         };
         let mut args = Vec::new();
         for i in 0..n {
@@ -704,9 +741,7 @@ fn var(s: &str) -> Expression {
 
 fn name_expr(n: &Name) -> Expression {
     match n {
-        Name::Plain(s) =>  {
-            var(s)
-        }
+        Name::Plain(s) => var(s),
         Name::Qualified(p, s) => {
             let t = n.top();
             let rest = p[1..].iter().chain(vec![s]);
@@ -743,17 +778,17 @@ fn nil() -> Expression {
     literal(&Literal::Nil)
 }
 
-fn letexp(var:&Var, exp:&Expression, body:&Expression) -> Expression {
+fn letexp(var: &Var, exp: &Expression, body: &Expression) -> Expression {
     let bind = Let::new(var.clone(), exp.clone(), body.clone());
     Expression::Let(0, Box::new(bind))
 }
 
-fn cond(pred:&Expression, if_true:&Expression, if_false:&Expression) -> Expression {
+fn cond(pred: &Expression, if_true: &Expression, if_false: &Expression) -> Expression {
     let cond = Cond::new(pred.clone(), if_true.clone(), if_false.clone());
     Expression::Cond(0, Box::new(cond))
 }
 
-fn lambda(args: Vec<Var>, arity:&Arity, body:&Expression) -> Expression {
+fn lambda(args: Vec<Var>, arity: &Arity, body: &Expression) -> Expression {
     Expression::Lambda(0, Box::new(Lambda::new(args, arity.clone(), body.clone())))
 }
 
@@ -805,7 +840,11 @@ pub fn rename(expr: &Expression, old_name: &Var, new_name: &Var) -> Expression {
             Expression::Cond(*n, Box::new(new_cond))
         }
         Expression::Lambda(n, lam) => {
-            let new_lambda = Lambda::new(lam.args.clone(),lam.arity.clone(), rename(&lam.body, old_name, new_name));
+            let new_lambda = Lambda::new(
+                lam.args.clone(),
+                lam.arity.clone(),
+                rename(&lam.body, old_name, new_name),
+            );
             Expression::Lambda(*n, Box::new(new_lambda))
         }
         Expression::Let(n, bind) => {
@@ -859,26 +898,26 @@ where
     Ok(vars)
 }
 
-fn add_local(locals: &mut  HashMap<String, i32>, var:&Var) {
+fn add_local(locals: &mut HashMap<String, i32>, var: &Var) {
     locals.insert(var.name(), locals.get(&var.name()).unwrap_or(&0) + 1);
 }
 
-fn remove_local(locals: &mut HashMap<String, i32>, var:&Var) {
+fn remove_local(locals: &mut HashMap<String, i32>, var: &Var) {
     if let Some(v) = locals.get_mut(&var.name()) {
-            *v -= 1;
-            if *v == 0 {
-                locals.remove(&var.name());
-            }
+        *v -= 1;
+        if *v == 0 {
+            locals.remove(&var.name());
+        }
     }
 }
 
-fn add_locals(locals: &mut  HashMap<String, i32>, vars:&[Var]) {
+fn add_locals(locals: &mut HashMap<String, i32>, vars: &[Var]) {
     for v in vars {
         add_local(locals, v);
     }
 }
 
-fn remove_locals(locals: &mut  HashMap<String, i32>, vars:&[Var]) {
+fn remove_locals(locals: &mut HashMap<String, i32>, vars: &[Var]) {
     for v in vars {
         remove_local(locals, v);
     }
@@ -893,7 +932,6 @@ pub fn free_vars(expr: &Expression, vars: &mut HashSet<String>, locals: &mut Has
             }
         }
         Expression::Let(_, clause) => {
-
             free_vars(&clause.expr, vars, locals);
             add_local(locals, &clause.var);
             free_vars(&clause.body, vars, locals);

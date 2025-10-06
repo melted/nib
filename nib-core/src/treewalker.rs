@@ -165,7 +165,11 @@ impl Runtime {
         Some(table)
     }
 
-    pub fn get_or_create_module_path(&mut self, path: &[String], start:Rc<RefCell<Table>>) -> Result<Rc<RefCell<Table>>> {
+    pub fn get_or_create_module_path(
+        &mut self,
+        path: &[String],
+        start: Rc<RefCell<Table>>,
+    ) -> Result<Rc<RefCell<Table>>> {
         let mut rest = path;
         let mut table = start;
         while !rest.is_empty() {
@@ -599,9 +603,7 @@ impl TryFrom<&Value> for usize {
     fn try_from(value: &Value) -> std::result::Result<Self, Self::Error> {
         match value {
             Value::Integer(i) => Ok(*i as usize),
-            _ => {
-                Err(Error::runtime_error("Value not an usize"))
-            },
+            _ => Err(Error::runtime_error("Value not an usize")),
         }
     }
 }

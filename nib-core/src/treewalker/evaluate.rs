@@ -79,7 +79,10 @@ impl Runtime {
         match expression {
             Expression::Var(n, var) => {
                 let Some(v) = self.lookup(env, &var.name()) else {
-                    return self.error(&format!("couldn't find variable {} in environment", &var.name()));
+                    return self.error(&format!(
+                        "couldn't find variable {} in environment",
+                        &var.name()
+                    ));
                 };
                 Ok(v)
             }
@@ -184,11 +187,11 @@ impl Runtime {
 
                 let mut ret = match code.borrow().deref() {
                     Code::Nib(lam) => {
-                        if let Arity::VarArg(i,n ) = lam.arity {
+                        if let Arity::VarArg(i, n) = lam.arity {
                             let num = args.len() - i as usize;
                             let array = {
                                 let vars = args.drain((i as usize)..(i as usize + num));
-                                 Value::new_array(vars.as_slice())
+                                Value::new_array(vars.as_slice())
                             };
                             args.insert(i as usize, array);
                         }

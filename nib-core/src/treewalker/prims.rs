@@ -766,13 +766,11 @@ impl Runtime {
                 } else {
                     self.error("table used in custom pattern must have a `match` function")
                 }
-            },
-            _ => {
-                self.error("custom matcher must be either a function or a table with a `match` entry")
             }
+            _ => self
+                .error("custom matcher must be either a function or a table with a `match` entry"),
         }
     }
-
 
     pub(super) fn prim_bytes_set(&self, args: &[Value]) -> Result<Value> {
         let b = &args[0].get_bytes()?;

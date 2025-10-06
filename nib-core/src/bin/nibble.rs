@@ -59,7 +59,7 @@ impl Options {
     fn new() -> Self {
         Options {
             no_prelude: false,
-            verbose:false,
+            verbose: false,
             files: Vec::new(),
         }
     }
@@ -71,7 +71,7 @@ fn parse_options() -> Options {
         match arg {
             _ if arg == "--no-prelude" => {
                 opts.no_prelude = true;
-            },
+            }
             _ if arg == "--verbose" => {
                 opts.verbose = true;
             }

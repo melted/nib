@@ -194,7 +194,6 @@ fn parse_guarded_decl() -> Result<()> {
     Ok(())
 }
 
-
 #[test]
 fn parse_implicit_lambda() -> Result<()> {
     let mut state = ParserState::new("{ a*b*c }");

@@ -107,7 +107,7 @@ pub struct FunClause {
 }
 
 impl FunClause {
-    fn free_vars_helper(&self, vars:&mut HashSet<Name>, locals:&mut HashSet<Name>) {
+    fn free_vars_helper(&self, vars: &mut HashSet<Name>, locals: &mut HashSet<Name>) {
         let mut exp_local = locals.clone();
         for p in &self.args {
             p.bound_vars_helper(&mut exp_local);
@@ -157,7 +157,7 @@ pub struct OpClause {
 }
 
 impl OpClause {
-    fn free_vars_helper(&self, vars:&mut HashSet<Name>, locals:&mut HashSet<Name>) {
+    fn free_vars_helper(&self, vars: &mut HashSet<Name>, locals: &mut HashSet<Name>) {
         let mut exp_local = locals.clone();
         self.lpat.bound_vars_helper(&mut exp_local);
         self.rpat.bound_vars_helper(&mut exp_local);
@@ -208,7 +208,7 @@ impl PatternNode {
         vars
     }
 
-    fn bound_vars_helper(&self, vars:&mut HashSet<Name>) {
+    fn bound_vars_helper(&self, vars: &mut HashSet<Name>) {
         match &self.pattern {
             Pattern::Ellipsis(name) => {
                 if let Some(n) = name {
@@ -248,7 +248,10 @@ impl Display for PatternNode {
 
 impl From<Pattern> for PatternNode {
     fn from(value: Pattern) -> Self {
-        PatternNode {id:0, pattern:value}
+        PatternNode {
+            id: 0,
+            pattern: value,
+        }
     }
 }
 impl Display for Pattern {
@@ -318,7 +321,7 @@ impl Expression {
         vars
     }
 
-    fn free_vars_helper(&self, vars:&mut HashSet<Name>, locals:&mut HashSet<Name>) {
+    fn free_vars_helper(&self, vars: &mut HashSet<Name>, locals: &mut HashSet<Name>) {
         match self {
             Expression::Var(n) => {
                 if !locals.contains(n) {

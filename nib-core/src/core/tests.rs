@@ -20,8 +20,7 @@ fn desugar_pattern() -> Result<()> {
 
 #[test]
 fn desugar_function() -> Result<()> {
-    let prog =
-"fac 0 = 1
+    let prog = "fac 0 = 1
 fac n = n * (fac (n - 1))";
     let t = parse_declarations(None, prog)?;
     let co = desugar(t)?;
