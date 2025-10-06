@@ -1,5 +1,3 @@
-use std::collections::HashSet;
-
 use super::ParserState;
 use crate::ast::{
     Binding, Binop, Cond, Expression, ExpressionNode, FunClause, Literal, Operator, PatternNode,

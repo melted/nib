@@ -275,14 +275,7 @@ impl Runtime {
         env.get(id).or_else(|| self.get_global(id))
     }
 
-    pub(super) fn lookup_name(&self, env: &Environment, id: &Name) -> Option<Value> {
-        if let Name::Plain(s) = id {
-            return self.lookup(env, s);
-        }
-        self.get_name(id)
-    }
-
-    pub fn replace_undefined(&mut self, env: &mut Environment, new_env: &Environment) {
+    fn replace_undefined(&mut self, env: &mut Environment, new_env: &Environment) {
         let udef: Vec<_> = {
             env.envs
                 .iter()

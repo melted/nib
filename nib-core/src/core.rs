@@ -1,9 +1,8 @@
-use crate::ast::{ExpressionNode, FunClause, Pattern};
+use crate::ast::{ExpressionNode, Pattern};
 use crate::{
     ast::{self, Literal, PatternNode},
     common::{Error, Metadata, Name, Node, Result},
 };
-use libffi::low::prep_cif;
 use std::{
     collections::{HashMap, HashSet},
     fmt::Display,
@@ -58,15 +57,7 @@ impl DesugarState {
             last_arg: 0,
         }
     }
-
-    fn named(metadata: Metadata, module_name: &Name) -> Self {
-        let mut ds = DesugarState::new(metadata);
-        ds.module_name = Some(module_name.to_owned());
-        ds
-    }
-}
-
-impl DesugarState {
+    
     fn desugar_binding(&mut self, binding: &ast::Binding, is_local: bool) -> Result<Vec<Binding>> {
         match binding {
             ast::Binding::FunBinding(fb) => self.desugar_funbinding(fb, is_local),

@@ -26,14 +26,6 @@ impl<'a> ParserState<'a> {
         }
     }
 
-    pub(super) fn peek_identifier(&mut self) -> Result<bool> {
-        let next = self.peek_next_token()?;
-        match next.value {
-            TokenValue::Identifier(_) => Ok(true),
-            _ => Ok(false),
-        }
-    }
-
     pub(super) fn peek_operator(&mut self) -> Result<bool> {
         let next = self.peek_next_token()?;
         match next.value {
@@ -42,19 +34,9 @@ impl<'a> ParserState<'a> {
         }
     }
 
-    pub(super) fn peek_literal(&mut self) -> Result<bool> {
-        let next = self.peek_next_token()?;
-        Ok(next.value.is_literal())
-    }
-
     pub(super) fn peek_next(&mut self, t: TokenValue) -> Result<bool> {
         let next = self.peek_next_token()?;
         if t == next.value { Ok(true) } else { Ok(false) }
-    }
-
-    pub(super) fn optional_token(&mut self, t: TokenValue) -> Result<()> {
-        self.is_next(t)?;
-        Ok(())
     }
 
     pub(super) fn try_parse<T>(

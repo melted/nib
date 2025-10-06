@@ -1,3 +1,6 @@
+#![allow(unused_variables)]
+#![allow(dead_code)]
+
 //! Compile a module into a bytecode module
 use crate::common::{Metadata, Result};
 

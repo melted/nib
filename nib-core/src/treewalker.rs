@@ -625,7 +625,7 @@ impl TryFrom<&Value> for f64 {
     fn try_from(value: &Value) -> std::result::Result<Self, Self::Error> {
         match value {
             Value::Real(f) => Ok(*f),
-            _ => Err(Error::runtime_error("Value not an float")),
+            _ => Err(Error::runtime_error("Value not a float")),
         }
     }
 }
@@ -669,7 +669,7 @@ impl<T> TryFrom<&Value> for *const T {
     fn try_from(value: &Value) -> std::result::Result<Self, Self::Error> {
         match value {
             Value::Pointer(i) => Ok(*i as *const T),
-            _ => Err(Error::runtime_error("Value not an pointer")),
+            _ => Err(Error::runtime_error("Value not a pointer")),
         }
     }
 }

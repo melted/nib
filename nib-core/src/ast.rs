@@ -371,12 +371,13 @@ impl Expression {
                         }
                         Binding::OpBinding(op) => {
                             for c in &op.clauses {
-                                c.free_vars_helper(vars, locals);
+                                c.free_vars_helper(vars, &mut exp_locals);
                             }
                             exp_locals.insert(op.op.to_name());
                         }
                     }
                 }
+                exp.expr.free_vars_helper(vars, &mut exp_locals);
             }
             Expression::Cond(cond) => {
                 cond.pred.expr.free_vars_helper(vars, locals);
