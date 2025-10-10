@@ -4,6 +4,9 @@ use crate::{
     common::Result,
     interpreter::heap::{Array, Heap, Space, Symbol, Table, Value, ValueRepr},
 };
+use crate::core::desugar;
+use crate::interpreter::compile::Compilation;
+use crate::parser::parse_declarations;
 
 #[test]
 fn test_data_repr() -> Result<()> {
@@ -91,4 +94,12 @@ fn hash_stuff() {
     dbg!(key.hash());
     dbg!(keys.hash());
     dbg!(Value::from(table).hash());
+}
+
+#[test]
+fn create_compilation() -> Result<()> {
+    let ast_mod = parse_declarations(None, "a = 1")?;
+    let core_mod = desugar(ast_mod)?;
+    let comp = Compilation::new(core_mod);
+    Ok(())
 }

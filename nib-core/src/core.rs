@@ -484,6 +484,7 @@ impl DesugarState {
         }
         args
     }
+
     fn new_id(&mut self) -> u32 {
         self.metadata.last_id += 1;
         self.metadata.last_id

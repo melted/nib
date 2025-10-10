@@ -5,8 +5,11 @@
 
 use std::collections::HashMap;
 
+use crate::common::Result;
 use crate::interpreter::heap::{Heap, Table, Value};
 
+pub mod bytecode;
+pub mod compile;
 pub mod heap;
 mod tests;
 
@@ -28,5 +31,17 @@ impl Runtime {
             global_env,
             symbol_table,
         }
+    }
+
+    pub fn load(&mut self, reload:bool) -> Result<()> {
+        todo!()
+    }
+
+    pub fn add_code(&mut self, name:&str, code:&str) -> Result<()> {
+        todo!()
+    }
+
+    pub fn run_expression(&mut self, code:&str) -> Result<Value> {
+        todo!()
     }
 }

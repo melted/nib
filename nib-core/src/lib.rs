@@ -4,7 +4,6 @@
 #![allow(clippy::match_like_matches_macro)]
 
 pub mod ast;
-pub mod bytecode;
 pub mod capi;
 pub mod common;
 pub mod core;
