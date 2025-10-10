@@ -21,14 +21,26 @@ negate n = _prim_negate n
 
 /// Divide a by b
 a / b = _prim_div a b
+
+/// Calculate `a` modulo `b`
 mod a b = _prim_mod a b
 
+/// Return `b` if `a` is greater than `b`, false otherwise
 a > b = _prim_gt a b
+
+/// Return `b` if `a` is greater than or equal to `b`, false otherwise
 a >= b = _prim_gte a b
+
+/// Return `b` if `a` is less than `b`, false otherwise
 a < b = _prim_lt a b
+
+/// Return `b` if `a` is less than or equal to `b`, false otherwise
 a <= b = _prim_lte a b
 
+/// Return true if `a` equals `b`, false otherwise
 a == b = _prim_eq a b
+
+/// Return true if `a` doesn't equal `b`, false otherwise
 a != b = not (a == b)
 
 not true = false
@@ -66,8 +78,8 @@ type = _prim_type
 
 make_type type_sym name = new where
                                 new = table.create
+                                new.type_id = name
                                 _ = table.set global type_sym new
-                                _ = table.set new #type_id name
 
 type_name v = (type v).type_id
 set_type = _prim_type_set
@@ -166,4 +178,5 @@ ffi.void = #cvoid
 ffi.ptr = #cpointer 
 
 ffi.pointer x = [#cpointer, x]
-ffi.struct ...x = array.concat (array.make #cstruct) x 
+ffi.struct ...x = array.concat (array.make #cstruct) x
+
