@@ -33,7 +33,7 @@ pub fn desugar(module: ast::Module) -> Result<Module> {
     })
 }
 
-pub fn desugar_expression(expr: ast::ExpressionNode) -> Result<Expression> {
+pub fn desugar_expression(expr: ExpressionNode) -> Result<Expression> {
     let meta = Metadata::new(None);
     let mut state = DesugarState::new(meta);
     state.desugar_expression(&expr)
@@ -113,7 +113,7 @@ impl DesugarState {
         let mut pat = &ast_binding.lhs;
         let rhs = self.desugar_expression(&ast_binding.rhs)?;
         match &pat.pattern {
-            ast::Pattern::Var(v) => {
+            Pattern::Var(v) => {
                 let binder = if is_local {
                     Binder::Local(v.clone())
                 } else {
@@ -121,7 +121,7 @@ impl DesugarState {
                 };
                 Ok(vec![Binding::binding(ast_binding.id, binder, rhs)])
             }
-            ast::Pattern::Wildcard => {
+            Pattern::Wildcard => {
                 Ok(vec![Binding::binding(ast_binding.id, Binder::Unbound, rhs)])
             }
             _ => {
@@ -147,7 +147,7 @@ impl DesugarState {
                 };
                 let fallback = ast::FunClause {
                     id: 0,
-                    args: vec![ast::PatternNode::from(ast::Pattern::Wildcard)],
+                    args: vec![ast::PatternNode::from(Pattern::Wildcard)],
                     guard: None,
                     body: panic_exp,
                 };
@@ -166,7 +166,7 @@ impl DesugarState {
                         vec![
                             self.named_var("_prim_array_ref"),
                             self.named_var(&nam_arr.string()),
-                            Expression::Literal(self.new_id(), ast::Literal::Integer(i as i64)),
+                            Expression::Literal(self.new_id(), Literal::Integer(i as i64)),
                         ],
                     );
                     let binder = if is_local {
@@ -191,12 +191,12 @@ impl DesugarState {
 
     fn desugar_arg_pattern(
         &mut self,
-        pattern: &ast::PatternNode,
+        pattern: &PatternNode,
         expr: &Expression,
     ) -> Result<Vec<PatternParts>> {
         let bound_names = pattern.bound_vars();
         match &pattern.pattern {
-            ast::Pattern::Alias(pat, alias) => {
+            Pattern::Alias(pat, alias) => {
                 let name = alias.string();
                 let mut parts = Vec::new();
                 parts.push(PatternParts::Bind(name.clone(), expr.to_owned()));
@@ -204,7 +204,7 @@ impl DesugarState {
                 parts.append(&mut inner);
                 Ok(parts)
             }
-            ast::Pattern::Custom(name, fields) => {
+            Pattern::Custom(name, fields) => {
                 let mut parts = Vec::new();
                 let loc = self.non_shadowed_var(&expr).name();
                 parts.push(PatternParts::Bind(
@@ -236,26 +236,26 @@ impl DesugarState {
                 }
                 Ok(parts)
             }
-            ast::Pattern::Array(fields) => self.desugar_arg_pattern(
+            Pattern::Array(fields) => self.desugar_arg_pattern(
                 &PatternNode {
                     id: 0,
-                    pattern: ast::Pattern::Custom(Name::str("_prim_array_match"), fields.to_vec()),
+                    pattern: Pattern::Custom(Name::str("_prim_array_match"), fields.to_vec()),
                 },
                 expr,
             ),
-            ast::Pattern::Ellipsis(name) => {
+            Pattern::Ellipsis(name) => {
                 if let Some(n) = name {
                     Ok(vec![PatternParts::Bind(n.string(), expr.clone())])
                 } else {
                     Ok(vec![])
                 }
             }
-            ast::Pattern::Literal(lit) => {
+            Pattern::Literal(lit) => {
                 // TODO: Generate appropriate check for each literal type
                 let check = app(&vec![var("_prim_eq"), expr.clone(), literal(lit)]);
                 Ok(vec![PatternParts::Check(check)])
             }
-            ast::Pattern::Typed(pat, typ) => {
+            Pattern::Typed(pat, typ) => {
                 let mut inner = self.desugar_arg_pattern(&pat, expr)?;
                 let mut val = expr.clone();
                 if let Some(PatternParts::Bind(name, exp)) = inner.last() {
@@ -268,12 +268,12 @@ impl DesugarState {
                 inner.push(PatternParts::Check(check));
                 Ok(inner)
             }
-            ast::Pattern::Var(name) => Ok(vec![PatternParts::Bind(name.string(), expr.clone())]),
-            ast::Pattern::Wildcard => Ok(vec![]),
+            Pattern::Var(name) => Ok(vec![PatternParts::Bind(name.string(), expr.clone())]),
+            Pattern::Wildcard => Ok(vec![]),
         }
     }
 
-    fn desugar_expression(&mut self, expression: &ast::ExpressionNode) -> Result<Expression> {
+    fn desugar_expression(&mut self, expression: &ExpressionNode) -> Result<Expression> {
         match &expression.expr {
             ast::Expression::App(x) => {
                 let mut args = Vec::new();
@@ -343,17 +343,21 @@ impl DesugarState {
         let args = self.args(&arity);
         for (i, c) in clauses.into_iter().enumerate() {
             let fail_exp = if i + 1 < clauses.len() {
-                app(&vec![local((i + 1) as u32)])
+                app(&vec![var(&local(i + 1))])
             } else {
                 Self::no_match_expression()
             };
             let (is_irrefutable, next_exp) = self.desugar_funclause(c, &args, &fail_exp)?;
-            if let Some(e) = exp {
-                exp = Some(letexp(
-                    &Var::Local(i as u32),
-                    &lambda(vec![], &Arity::Fixed(0), &next_exp),
-                    &e,
-                ));
+            if let Some(e) = &mut exp {
+                let binding = Binding::binding(0, Binder::Local(Name::Plain(local(i))),lambda(vec![], &Arity::Fixed(0), &next_exp));
+                match e {
+                    Expression::Where(_, exp, bindings) => {
+                        bindings.insert(0, binding);
+                    }
+                    _ => {
+                        exp = Some(Expression::Where(0, Box::new(e.clone()), vec![binding]));
+                    }
+                }
             } else {
                 exp = Some(next_exp)
             }
@@ -391,7 +395,15 @@ impl DesugarState {
                     exp = cond(pred, &exp, &on_fail);
                 }
                 PatternParts::Bind(var, expression) => {
-                    exp = letexp(&Var::Named(var.clone()), expression, &exp);
+                    let binding = Binding::binding(0, Binder::Local(Name::str(var)), expression.clone());
+                    match &mut exp {
+                        Expression::Where(n, expr, binds) => {
+                            binds.insert(0, binding);
+                        },
+                        _ => {
+                            exp = Expression::Where(0, Box::new(exp.clone()), vec![binding]);
+                        }
+                    }
                 }
             }
         }
@@ -400,10 +412,10 @@ impl DesugarState {
 
     fn pattern_with_plain_vars(
         &mut self,
-        pattern: &ast::PatternNode,
+        pattern: &PatternNode,
         counter: &mut i32,
         replacements: &mut HashMap<Name, Name>,
-    ) -> ast::PatternNode {
+    ) -> PatternNode {
         let mut p = pattern.clone();
         match &pattern.pattern {
             Pattern::Ellipsis(Some(old)) => {
@@ -528,7 +540,7 @@ fn verify_arity(clauses: &[ast::FunClause]) -> Result<Arity> {
     Ok(arity)
 }
 
-pub fn get_arity(patterns: &[ast::PatternNode]) -> Arity {
+pub fn get_arity(patterns: &[PatternNode]) -> Arity {
     let mut vararg = false;
     let mut index = 0;
     for (i, p) in patterns.iter().enumerate() {
@@ -678,10 +690,9 @@ impl Display for Var {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Expression {
-    Literal(Node, ast::Literal),
+    Literal(Node, Literal),
     Var(Node, Var),
     Lambda(Node, Box<Lambda>),
-    Let(Node, Box<Let>),
     Cond(Node, Box<Cond>),
     App(Node, Vec<Expression>),
     Where(Node, Box<Expression>, Vec<Binding>),
@@ -699,9 +710,6 @@ impl Display for Expression {
             }
             Expression::Cond(_, cond) => {
                 write!(f, "({} => {} ; {})", cond.pred, cond.if_true, cond.if_false)?;
-            }
-            Expression::Let(_, bind) => {
-                write!(f, "(let {} = {} in {})", bind.var, bind.expr, bind.body)?;
             }
             Expression::Lambda(_, lam) => {
                 write!(f, "{{ ")?;
@@ -754,8 +762,8 @@ fn env(n: u32) -> Expression {
     Expression::Var(0, Var::Env(n))
 }
 
-fn local(n: u32) -> Expression {
-    Expression::Var(0, Var::Local(n))
+fn local(n: usize) -> String {
+    format!("loc{}", n)
 }
 
 fn app(exps: &[Expression]) -> Expression {
@@ -768,11 +776,6 @@ fn literal(lit: &Literal) -> Expression {
 
 fn nil() -> Expression {
     literal(&Literal::Nil)
-}
-
-fn letexp(var: &Var, exp: &Expression, body: &Expression) -> Expression {
-    let bind = Let::new(var.clone(), exp.clone(), body.clone());
-    Expression::Let(0, Box::new(bind))
 }
 
 fn cond(pred: &Expression, if_true: &Expression, if_false: &Expression) -> Expression {
@@ -838,16 +841,6 @@ pub fn rename(expr: &Expression, old_name: &Var, new_name: &Var) -> Expression {
                 rename(&lam.body, old_name, new_name),
             );
             Expression::Lambda(*n, Box::new(new_lambda))
-        }
-        Expression::Let(n, bind) => {
-            let new_expr = rename(&bind.expr, old_name, new_name);
-            let new_body = if bind.var != *old_name {
-                rename(&bind.body, old_name, new_name)
-            } else {
-                bind.body.clone()
-            };
-            let new_bind = Let::new(bind.var.clone(), new_expr, new_body);
-            Expression::Let(*n, Box::new(new_bind))
         }
         Expression::Where(n, exp, defs) => {
             let mut shadowed = false;
@@ -922,12 +915,6 @@ pub fn free_vars(expr: &Expression, vars: &mut HashSet<String>, locals: &mut Has
             if locals.get(&v.name()).is_none() {
                 vars.insert(v.name());
             }
-        }
-        Expression::Let(_, clause) => {
-            free_vars(&clause.expr, vars, locals);
-            add_local(locals, &clause.var);
-            free_vars(&clause.body, vars, locals);
-            remove_local(locals, &clause.var);
         }
         Expression::Cond(_, cond) => {
             free_vars(&cond.pred, vars, locals);

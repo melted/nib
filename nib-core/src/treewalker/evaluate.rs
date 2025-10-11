@@ -102,14 +102,6 @@ impl Runtime {
                     self.evaluate_expression(binding_name, &cond.if_true, env)
                 }
             }
-            Expression::Let(_, bind) => {
-                let val = self.evaluate_expression(binding_name, &bind.expr, env)?;
-                env.push();
-                env.add(&bind.var.name(), &val);
-                let res = self.evaluate_expression(binding_name, &bind.body, env)?;
-                env.pop();
-                Ok(res)
-            }
             Expression::Where(n, exp, bindings) => {
                 env.push();
                 let prev_cc = self.closures_to_check.clone();
