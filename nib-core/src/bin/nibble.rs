@@ -52,7 +52,7 @@ fn main() -> io::Result<()> {
 pub struct Options {
     pub no_prelude: bool,
     pub verbose: bool,
-    pub use_treewalker:bool,
+    pub use_treewalker: bool,
     pub files: Vec<String>,
 }
 
@@ -61,7 +61,7 @@ impl Options {
         Options {
             no_prelude: false,
             verbose: false,
-            use_treewalker:true,
+            use_treewalker: true,
             files: Vec::new(),
         }
     }

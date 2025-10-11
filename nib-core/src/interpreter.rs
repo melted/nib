@@ -33,15 +33,15 @@ impl Runtime {
         }
     }
 
-    pub fn load(&mut self, reload:bool) -> Result<()> {
+    pub fn load(&mut self, reload: bool) -> Result<()> {
         todo!()
     }
 
-    pub fn add_code(&mut self, name:&str, code:&str) -> Result<()> {
+    pub fn add_code(&mut self, name: &str, code: &str) -> Result<()> {
         todo!()
     }
 
-    pub fn run_expression(&mut self, code:&str) -> Result<Value> {
+    pub fn run_expression(&mut self, code: &str) -> Result<Value> {
         todo!()
     }
 }

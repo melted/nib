@@ -1,12 +1,12 @@
 #![cfg(test)]
 
+use crate::core::desugar;
+use crate::interpreter::compile::Compilation;
+use crate::parser::parse_declarations;
 use crate::{
     common::Result,
     interpreter::heap::{Array, Heap, Space, Symbol, Table, Value, ValueRepr},
 };
-use crate::core::desugar;
-use crate::interpreter::compile::Compilation;
-use crate::parser::parse_declarations;
 
 #[test]
 fn test_data_repr() -> Result<()> {

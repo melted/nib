@@ -927,7 +927,7 @@ impl Runtime {
         Ok(Value::Nil)
     }
 
-    fn project_table(&self, from:&Value, projection:&Value) -> Result<Value> {
+    fn project_table(&self, from: &Value, projection: &Value) -> Result<Value> {
         match (from, projection) {
             (Value::Table(from), Value::Symbol(sym)) => {
                 let table_ref = from.borrow();

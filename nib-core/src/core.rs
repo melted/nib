@@ -57,7 +57,7 @@ impl DesugarState {
             last_arg: 0,
         }
     }
-    
+
     fn desugar_binding(&mut self, binding: &ast::Binding, is_local: bool) -> Result<Vec<Binding>> {
         match binding {
             ast::Binding::FunBinding(fb) => self.desugar_funbinding(fb, is_local),
@@ -121,9 +121,7 @@ impl DesugarState {
                 };
                 Ok(vec![Binding::binding(ast_binding.id, binder, rhs)])
             }
-            Pattern::Wildcard => {
-                Ok(vec![Binding::binding(ast_binding.id, Binder::Unbound, rhs)])
-            }
+            Pattern::Wildcard => Ok(vec![Binding::binding(ast_binding.id, Binder::Unbound, rhs)]),
             _ => {
                 let mut counter = 0;
                 let mut replacements = HashMap::new();
@@ -349,7 +347,11 @@ impl DesugarState {
             };
             let (is_irrefutable, next_exp) = self.desugar_funclause(c, &args, &fail_exp)?;
             if let Some(e) = &mut exp {
-                let binding = Binding::binding(0, Binder::Local(Name::Plain(local(i))),lambda(vec![], &Arity::Fixed(0), &next_exp));
+                let binding = Binding::binding(
+                    0,
+                    Binder::Local(Name::Plain(local(i))),
+                    lambda(vec![], &Arity::Fixed(0), &next_exp),
+                );
                 match e {
                     Expression::Where(_, exp, bindings) => {
                         bindings.insert(0, binding);
@@ -395,11 +397,12 @@ impl DesugarState {
                     exp = cond(pred, &exp, &on_fail);
                 }
                 PatternParts::Bind(var, expression) => {
-                    let binding = Binding::binding(0, Binder::Local(Name::str(var)), expression.clone());
+                    let binding =
+                        Binding::binding(0, Binder::Local(Name::str(var)), expression.clone());
                     match &mut exp {
                         Expression::Where(n, expr, binds) => {
                             binds.insert(0, binding);
-                        },
+                        }
                         _ => {
                             exp = Expression::Where(0, Box::new(exp.clone()), vec![binding]);
                         }
