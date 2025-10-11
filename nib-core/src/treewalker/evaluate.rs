@@ -17,16 +17,8 @@ use crate::{
 impl Runtime {
     pub(super) fn evaluate(&mut self, code: &mut Module, env: &mut Environment) -> Result<()> {
         for b in code.bindings.iter_mut() {
-            self.evaluate_binding(b, env, false)?;
-            if let Some(hs) = self.closures_to_check.get(&b.name) {
-                for c in hs.clone() {
-                    if let Some(Value::Closure(closure)) = self.lookup(env, &c) {
-                        let mut cl = closure.borrow_mut();
-                        self.replace_undefined(&mut cl.env, env);
-                    }
-                }
-                self.closures_to_check.remove(&b.name);
-            }
+            self.evaluate_binding(b, env)?;
+            self.update_closures(env, b);
         }
         Ok(())
     }
@@ -35,7 +27,6 @@ impl Runtime {
         &mut self,
         binding: &Binding,
         env: &mut Environment,
-        local: bool,
     ) -> Result<()> {
         info!("Evaluating binding {}", binding);
         let val = self.evaluate_expression(&binding.name, &binding.body, env)?;
@@ -107,20 +98,24 @@ impl Runtime {
                 let prev_cc = self.closures_to_check.clone();
                 self.closures_to_check = HashMap::new();
                 for b in bindings.iter() {
-                    self.evaluate_binding(b, env, true)?;
-                    if let Some(hs) = self.closures_to_check.get(&b.name) {
-                        for c in hs.clone() {
-                            if let Some(Value::Closure(closure)) = self.lookup(env, &c) {
-                                let mut cl = closure.borrow_mut();
-                                self.replace_undefined(&mut cl.env, env);
-                            }
-                        }
-                    }
+                    self.evaluate_binding(b, env)?;
+                    self.update_closures(env, b);
                 }
                 let val = self.evaluate_expression(binding_name, exp, env)?;
                 self.closures_to_check = prev_cc;
                 env.pop();
                 Ok(val)
+            }
+        }
+    }
+
+    fn update_closures(&mut self, env: &mut Environment, b: &Binding) {
+        if let Some(hs) = self.closures_to_check.get(&b.name) {
+            for c in hs.clone() {
+                if let Some(Value::Closure(closure)) = self.lookup(env, &c) {
+                    let mut cl = closure.borrow_mut();
+                    self.replace_undefined(&mut cl.env, env);
+                }
             }
         }
     }
