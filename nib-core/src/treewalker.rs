@@ -15,17 +15,16 @@ use libffi::middle::{Cif, CodePtr};
 
 use crate::{
     common::{Error, Metadata, Name, Result},
-    core::{Arity, Lambda, desugar, desugar_expression},
+    core::{desugar, desugar_expression, Arity, Lambda},
     parser::{parse_declarations, parse_expression},
     treewalker::evaluate::Environment,
 };
+use crate::common::Symbol;
 
 mod evaluate;
 mod foreign;
 mod prims;
 mod tests;
-
-type Symbol = Intern<String>;
 
 #[derive(Debug, Clone)]
 pub struct Runtime {

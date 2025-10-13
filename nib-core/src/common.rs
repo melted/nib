@@ -6,6 +6,7 @@ use std::{
 
 use anyhow::anyhow;
 use thiserror::Error;
+use internment::Intern;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Metadata {
@@ -190,3 +191,5 @@ impl Display for Name {
 pub fn align_int(value: usize, alignment: usize) -> usize {
     (value + (alignment - 1)) & !(alignment - 1)
 }
+
+pub type Symbol = Intern<String>;

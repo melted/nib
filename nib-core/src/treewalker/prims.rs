@@ -1,9 +1,9 @@
 use std::ops::{Shl, Shr};
 use std::os::raw::c_void;
 
-use crate::common::{Error, Name, Result};
+use crate::common::{Error, Name, Result, Symbol};
 use crate::core::Arity;
-use crate::treewalker::{Runtime, Symbol, Value};
+use crate::treewalker::{Runtime, Value};
 
 impl Runtime {
     pub(super) fn register_primitives(&mut self) -> Result<()> {

@@ -10,9 +10,10 @@ use log::info;
 use crate::{
     ast::Literal,
     common::{Name, Result},
-    core::{Arity, Binder, Binding, Expression, Lambda, Module, free_vars},
-    treewalker::{CType, Closure, Code, Runtime, Symbol, Value, new_ref},
+    core::{free_vars, Arity, Binder, Binding, Expression, Lambda, Module},
+    treewalker::{new_ref, CType, Closure, Code, Runtime, Value},
 };
+use crate::common::Symbol;
 
 impl Runtime {
     pub(super) fn evaluate(&mut self, code: &mut Module, env: &mut Environment) -> Result<()> {
