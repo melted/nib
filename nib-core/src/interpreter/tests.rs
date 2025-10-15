@@ -4,8 +4,8 @@ use crate::core::desugar;
 use crate::interpreter::compile::Compilation;
 use crate::parser::parse_declarations;
 use crate::{
-    common::Result,
-    interpreter::heap::{Array, Heap, Space, Symbol, Table, Value, ValueRepr},
+    common::{Result, Symbol},
+    interpreter::heap::{Array, Heap, Space, Table, Value, ValueRepr},
 };
 
 #[test]
@@ -66,7 +66,7 @@ fn make_heap() {
 fn make_table() {
     let mut heap = Heap::new(10000);
     let mut table = Table::make(&mut heap);
-    let key = Value::from(Symbol::make(&mut heap, "key"));
+    let key = Value::from(Symbol::from("key"));
     table.insert(&mut heap, key, Value::integer(42));
     let keys = table.keys(&mut heap);
     assert_eq!(keys.get_immediate_repr(), ValueRepr::Array);
@@ -87,7 +87,7 @@ fn alloc_float() {
 fn hash_stuff() {
     let mut heap = Heap::new(10000);
     let mut table = Table::make(&mut heap);
-    let key = Value::from(Symbol::make(&mut heap, "key"));
+    let key = Value::from(Symbol::from("key"));
     table.insert(&mut heap, key, Value::integer(42));
     table.insert(&mut heap, Value::integer(12), Value::integer(22));
     let keys = table.keys(&mut heap);

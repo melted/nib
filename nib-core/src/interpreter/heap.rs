@@ -10,7 +10,12 @@ use std::{
 
 use region::Allocation;
 
-use crate::{ast::Expression, common::align_int, treewalker::Signature};
+use crate::{
+    ast::Expression,
+    common,
+    common::{Symbol, align_int},
+    treewalker::Signature,
+};
 
 const BIG_OBJECT_THRESHOLD: usize = 0x3fff;
 
@@ -128,11 +133,6 @@ impl Heap {
                     Self::copy_object(closure.type_table(), &mut self.to_space);
                     Self::copy_object(get_value(obj, 1), &mut self.to_space);
                     Self::copy_object(closure.env(), &mut self.to_space);
-                }
-                ValueRepr::Symbol => {
-                    let symbol = Symbol { ptr: obj };
-                    Self::copy_object(symbol.type_table(), &mut self.to_space);
-                    Self::copy_object(symbol.name(), &mut self.to_space);
                 }
                 ValueRepr::Table => {
                     let table = Table { ptr: obj };
@@ -311,10 +311,6 @@ impl Value {
                 closure.get_code().hash(hasher);
                 closure.env().add_hash(hasher);
             }
-            ValueRepr::Symbol => {
-                let symbol = self.get_symbol();
-                symbol.name().add_hash(hasher);
-            }
             ValueRepr::Table => {
                 let table = self.get_table();
                 let content = Value::from(table.storage());
@@ -363,8 +359,11 @@ impl Value {
         Self::with_tag(flt, FLOAT_TAG)
     }
 
-    pub fn symbol(sym: *mut ObjectHeader) -> Self {
-        Self::with_tag(sym, SYM_TAG)
+    pub fn symbol(sym: &Symbol) -> Self {
+        let v = common::symbol_id(sym) as u64;
+        Value {
+            val: v << 3 | SYM_TAG,
+        }
     }
 
     pub fn array(arr: *mut ObjectHeader) -> Self {
@@ -546,8 +545,8 @@ impl Value {
     }
 
     pub fn get_symbol(&self) -> Symbol {
-        let ptr = self.get_object();
-        Symbol { ptr }
+        let s = self.val >> 3;
+        common::get_symbol(s as u32)
     }
 
     pub fn get_closure(&self) -> Closure {
@@ -594,7 +593,7 @@ impl From<Bytes> for Value {
 
 impl From<Symbol> for Value {
     fn from(value: Symbol) -> Self {
-        Self::symbol(value.ptr)
+        Self::symbol(&value)
     }
 }
 
@@ -891,46 +890,6 @@ impl Bytes {
 
     pub fn set_type_table(&self, value: Value) {
         set_value(self.ptr, 0, value);
-    }
-}
-
-#[derive(Clone, Copy, PartialEq, Eq)]
-pub struct Symbol {
-    ptr: *mut ObjectHeader,
-}
-
-impl Symbol {
-    pub fn make(heap: &mut Heap, name: &str) -> Self {
-        let header = ObjectHeader::make(heap, 24, ValueRepr::Symbol);
-        let me = Symbol { ptr: header };
-        me.set_type_table(Value::nil());
-        let name_bytes = Bytes::with(heap, name.as_bytes());
-        set_value(header, 1, Value::from(name_bytes));
-        me
-    }
-
-    pub fn type_table(&self) -> Value {
-        get_value(self.ptr, 0)
-    }
-
-    pub fn set_type_table(&self, value: Value) {
-        set_value(self.ptr, 0, value);
-    }
-
-    pub fn name(&self) -> Value {
-        get_value(self.ptr, 1)
-    }
-
-    pub fn as_string(&self) -> String {
-        let name_bytes = self.name().get_bytes();
-        let name_str = str::from_utf8(name_bytes.get_slice()).expect("symbols must be utf-8");
-        name_str.to_owned()
-    }
-}
-
-impl Debug for Symbol {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "#({})", self.as_string())
     }
 }
 

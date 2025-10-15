@@ -756,7 +756,7 @@ impl Runtime {
             Value::Closure(_) => Ok(matcher.clone()),
             Value::Table(t) => {
                 let table = &t.borrow().table;
-                let sym = Symbol::from_ref("match");
+                let sym = Symbol::from("match");
                 if let Some(m) = table.get(&sym) {
                     if matches!(m, Value::Closure(_)) {
                         Ok(m.clone())

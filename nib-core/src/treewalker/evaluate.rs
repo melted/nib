@@ -4,16 +4,15 @@ use std::{
     os::raw::c_void,
 };
 
-use internment::Intern;
-use log::info;
-
+use crate::common::Symbol;
 use crate::{
     ast::Literal,
     common::{Name, Result},
-    core::{free_vars, Arity, Binder, Binding, Expression, Lambda, Module},
-    treewalker::{new_ref, CType, Closure, Code, Runtime, Value},
+    core::{Arity, Binder, Binding, Expression, Lambda, Module, free_vars},
+    treewalker::{CType, Closure, Code, Runtime, Value, new_ref},
 };
-use crate::common::Symbol;
+use log::info;
+use symbol_table::GlobalSymbol;
 
 impl Runtime {
     pub(super) fn evaluate(&mut self, code: &mut Module, env: &mut Environment) -> Result<()> {
@@ -275,8 +274,8 @@ impl Runtime {
                 .collect()
         };
         for k in udef {
-            if let Some(v) = self.lookup(new_env, &k) {
-                env.add(&k, &v);
+            if let Some(v) = self.lookup(new_env, k.into()) {
+                env.add(k.into(), &v);
             }
         }
     }
@@ -316,7 +315,7 @@ impl Environment {
 
     pub fn get(&self, id: &str) -> Option<Value> {
         for e in self.envs.iter().rev() {
-            let v = e.get(&Intern::from_ref(id));
+            let v = e.get(&Symbol::from(id));
             if v.is_some() {
                 return v.cloned();
             }
@@ -331,14 +330,14 @@ impl Environment {
         } else {
             self.envs.last_mut().unwrap()
         };
-        e.insert(Intern::from_ref(id), value.clone());
+        e.insert(Symbol::from(id), value.clone());
     }
 
     pub fn remove(&mut self, id: &str) {
         for e in self.envs.iter_mut().rev() {
-            let v = e.get(&Intern::from_ref(id));
+            let v = e.get(&Symbol::from(id));
             if v.is_some() {
-                e.remove(&Intern::from_ref(id));
+                e.remove(&Symbol::from(id));
             }
         }
     }

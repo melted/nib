@@ -1,6 +1,15 @@
 #![allow(clippy::not_unsafe_ptr_arg_deref)]
 #![allow(clippy::mutable_key_type)]
 
+use crate::common::Symbol;
+use crate::{
+    common::{Error, Metadata, Name, Result},
+    core::{Arity, Lambda, desugar, desugar_expression},
+    parser::{parse_declarations, parse_expression},
+    treewalker::evaluate::Environment,
+};
+use libffi::middle::{Cif, CodePtr};
+use std::fmt::Pointer;
 use std::{
     cell::RefCell,
     collections::{BTreeSet, HashMap, HashSet},
@@ -9,24 +18,13 @@ use std::{
     fs::read_to_string,
     rc::Rc,
 };
-
-use internment::Intern;
-use libffi::middle::{Cif, CodePtr};
-
-use crate::{
-    common::{Error, Metadata, Name, Result},
-    core::{desugar, desugar_expression, Arity, Lambda},
-    parser::{parse_declarations, parse_expression},
-    treewalker::evaluate::Environment,
-};
-use crate::common::Symbol;
+use symbol_table::SymbolTable;
 
 mod evaluate;
 mod foreign;
 mod prims;
 mod tests;
 
-#[derive(Debug, Clone)]
 pub struct Runtime {
     metadata: HashMap<String, Metadata>,
     globals: Rc<RefCell<Table>>,
@@ -106,7 +104,7 @@ impl Runtime {
     }
 
     pub fn get_symbol(&self, name: &str) -> Symbol {
-        let sym = Intern::from_ref(name);
+        let sym = Symbol::from(name);
         sym
     }
 
@@ -114,7 +112,7 @@ impl Runtime {
         self.globals
             .borrow()
             .table
-            .get(&Intern::from_ref(name))
+            .get(&Symbol::from(name))
             .cloned()
     }
 
@@ -279,7 +277,7 @@ impl Display for Value {
             Value::Real(x) => write!(f, "{}", x),
             Value::Char(c) => write!(f, "{}", c),
             Value::Pointer(p) => write!(f, "ptr({:x})", p.addr()),
-            Value::Symbol(symbol) => write!(f, "{}", symbol),
+            Value::Symbol(symbol) => write!(f, "#<{}>", symbol),
             Value::Bytes(ref_cell) => write!(f, "{}", &ref_cell.borrow()),
             Value::Array(ref_cell) => write!(f, "{}", &ref_cell.borrow()),
             Value::Table(ref_cell) => write!(f, "{}", &ref_cell.borrow()),

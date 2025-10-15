@@ -1,12 +1,11 @@
+use anyhow::anyhow;
+use std::num::NonZeroU32;
 use std::{
     collections::{HashMap, HashSet},
     fmt::Display,
     io,
 };
-
-use anyhow::anyhow;
 use thiserror::Error;
-use internment::Intern;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Metadata {
@@ -192,4 +191,12 @@ pub fn align_int(value: usize, alignment: usize) -> usize {
     (value + (alignment - 1)) & !(alignment - 1)
 }
 
-pub type Symbol = Intern<String>;
+pub type Symbol = symbol_table::GlobalSymbol;
+
+pub fn symbol_id(symbol: &Symbol) -> u32 {
+    NonZeroU32::from(*symbol).get()
+}
+
+pub fn get_symbol(id: u32) -> Symbol {
+    Symbol::from(NonZeroU32::new(id).unwrap())
+}
