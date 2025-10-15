@@ -1,4 +1,4 @@
-use crate::common::Result;
+use crate::common::{Result, Symbol};
 use crate::common::{Metadata, Name};
 use crate::core::Binder;
 use std::collections::HashMap;
@@ -25,7 +25,7 @@ pub struct Module {
     bcode: Vec<u8>,
     local_env_size: usize,
     /// A list of symbols that should be put into the local environment.
-    want_symbols: HashMap<String, usize>,
+    want_symbols: HashMap<Symbol, usize>,
 }
 
 impl Module {
@@ -44,7 +44,7 @@ pub(in crate::interpreter) struct Compilation {
     module: Module,
     from: crate::core::Module,
     next_loc: usize,
-    local_vars: HashMap<String, usize>,
+    local_vars: HashMap<Symbol, usize>,
     data: Vec<u8>,
 }
 

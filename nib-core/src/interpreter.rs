@@ -5,7 +5,7 @@
 
 use std::collections::HashMap;
 
-use crate::common::Result;
+use crate::common::{Result, Symbol};
 use crate::interpreter::heap::{Heap, Table, Value};
 
 pub mod bytecode;
@@ -16,7 +16,7 @@ mod tests;
 pub struct Runtime {
     heap: Heap,
     global_env: Value,
-    symbol_table: HashMap<String, Value>,
+    stack:Vec<Value>,
 }
 
 const DEFAULT_HEAP_SIZE: usize = 1000000;
@@ -25,11 +25,11 @@ impl Runtime {
     pub fn new() -> Self {
         let mut heap = Heap::new(DEFAULT_HEAP_SIZE);
         let global_env = Value::from(Table::make(&mut heap));
-        let symbol_table = HashMap::new();
+        let stack = Vec::new();
         Runtime {
             heap,
             global_env,
-            symbol_table,
+            stack
         }
     }
 
