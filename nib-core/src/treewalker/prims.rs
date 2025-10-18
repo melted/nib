@@ -987,7 +987,7 @@ impl Runtime {
         for v in &arr.borrow().array {
             vals.push(v.clone());
         }
-        self.apply_values("", &vals)
+        self.evaluate_apply(&vals)
     }
 
     fn table_keys(&self, arg: &[Value]) -> Result<Value> {

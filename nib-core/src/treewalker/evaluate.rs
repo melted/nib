@@ -1,9 +1,5 @@
-use std::{
-    collections::{HashMap, HashSet},
-    ops::Deref,
-    os::raw::c_void,
-};
-
+use std::{collections::{HashMap, HashSet}, mem, ops::Deref, os::raw::c_void};
+use std::hash::Hash;
 use crate::common::Symbol;
 use crate::{
     ast::Literal,
@@ -11,116 +7,54 @@ use crate::{
     core::{Arity, Binder, Binding, Expression, Lambda, Module, free_vars},
     treewalker::{CType, Closure, Code, Runtime, Value, new_ref},
 };
-use log::info;
+use log::{info, log};
 use symbol_table::GlobalSymbol;
+
+type ClosureRefs = HashMap<String, HashSet<String>>;
 
 impl Runtime {
     pub(super) fn evaluate(&mut self, code: &mut Module, env: &mut Environment) -> Result<()> {
-        for b in code.bindings.iter_mut() {
-            self.evaluate_binding(b, env)?;
-            self.update_closures(env, b);
+        let mut eval_status = EvalStatus::new();
+        for b in code.bindings.iter().rev() {
+            self.add_binding(&mut eval_status, b);
         }
+        self.eval(&mut eval_status, env)?;
         Ok(())
     }
 
-    pub(super) fn evaluate_binding(
-        &mut self,
-        binding: &Binding,
-        env: &mut Environment,
-    ) -> Result<()> {
-        info!("Evaluating binding {}", binding);
-        let val = self.evaluate_expression(&binding.name, &binding.body, env)?;
-        let is_closure = matches!(val, Value::Closure(_));
-        match &binding.binder {
-            Binder::Public(name) => {
-                self.add_name(name, &val)?;
-            }
-            Binder::Local(name) => {
-                match name {
-                    Name::Plain(s) => {
-                        env.add(s, &val);
-                    }
-                    Name::Qualified(path, id) => {
-                        let start = &path[0];
-                        let rest = &path[1..];
-                        let first = if let Some(v) = env.get(start) {
-                            v.get_table()?
-                        } else {
-                            let nt = Value::new_table();
-                            env.add(start, &nt);
-                            nt.get_table()?
-                        };
-                        let tab = self.get_or_create_module_path(rest, first)?;
-                        self.add_to_table(tab, &id, &val);
-                    }
-                };
-            }
-            Binder::Unbound => {}
-        }
-        Ok(())
+    pub(super) fn evaluate_expression(&mut self, expression: Expression) -> Result<Value> {
+        let mut eval_status = EvalStatus::new();
+        let mut env = Environment::new();
+        eval_status.work_stack.push(EvalStep::Expression("".to_string(), expression));
+        self.eval(&mut eval_status, &mut env)?;
+        Ok(eval_status.value_stack.pop().unwrap_or(Value::Nil))
     }
 
-    pub(super) fn evaluate_expression(
-        &mut self,
-        binding_name: &str,
-        expression: &Expression,
-        env: &mut Environment,
-    ) -> Result<Value> {
-        info!("Evaluating expression {}", expression);
-        match expression {
-            Expression::Var(n, var) => {
-                let Some(v) = self.lookup(env, &var.name()) else {
-                    return self.error(&format!(
-                        "couldn't find variable {} in environment",
-                        &var.name()
-                    ));
-                };
-                Ok(v)
-            }
-            Expression::App(n, exps) => self.evaluate_application(binding_name, exps, env),
-            Expression::Literal(n, lit) => self.evaluate_literal(lit),
-            Expression::Lambda(n, lambda) => {
-                let mut free = HashSet::new();
-                let mut locals = HashMap::new();
-                free_vars(expression, &mut free, &mut locals);
-                self.evaluate_lambda(binding_name, lambda, &free, env)
-            }
-            Expression::Cond(_, cond) => {
-                let pred_res = self.evaluate_expression(binding_name, &cond.pred, env)?;
-                if pred_res == Value::Bool(false) {
-                    self.evaluate_expression(binding_name, &cond.if_false, env)
-                } else {
-                    self.evaluate_expression(binding_name, &cond.if_true, env)
-                }
-            }
-            Expression::Where(n, exp, bindings) => {
-                env.push();
-                let prev_cc = self.closures_to_check.clone();
-                self.closures_to_check = HashMap::new();
-                for b in bindings.iter() {
-                    self.evaluate_binding(b, env)?;
-                    self.update_closures(env, b);
-                }
-                let val = self.evaluate_expression(binding_name, exp, env)?;
-                self.closures_to_check = prev_cc;
-                env.pop();
-                Ok(val)
-            }
+    pub(super) fn evaluate_apply(&mut self, vals : &[Value]) -> Result<Value> {
+        let size = vals.len();
+        let mut eval_status = EvalStatus::new();
+        let mut env = Environment::new();
+        for v in vals {
+            eval_status.value_stack.push(v.clone());
         }
+        eval_status.work_stack.push(EvalStep::Apply("".to_string(), size));
+        self.eval(&mut eval_status, &mut env)?;
+        Ok(eval_status.value_stack.pop().unwrap_or(Value::Nil))
     }
 
-    fn update_closures(&mut self, env: &mut Environment, b: &Binding) {
-        if let Some(hs) = self.closures_to_check.get(&b.name) {
+
+    fn update_closures(&mut self, env: &mut Environment, name: &str) {
+        if let Some(hs) = self.closures_to_check.get(name) {
             for c in hs.clone() {
                 if let Some(Value::Closure(closure)) = self.lookup(env, &c) {
                     let mut cl = closure.borrow_mut();
-                    self.replace_undefined(&mut cl.env, env);
+                    self.replace_undefined(&c, &mut cl.env, env);
                 }
             }
         }
     }
 
-    pub(super) fn evaluate_literal(&self, literal: &Literal) -> Result<Value> {
+    fn evaluate_literal(&self, literal: &Literal) -> Result<Value> {
         info!("evaluating literal {}", literal);
         match literal {
             Literal::Nil => Ok(Value::Nil),
@@ -134,21 +68,189 @@ impl Runtime {
         }
     }
 
-    pub(super) fn evaluate_application(
+    fn evaluate_lambda(
         &mut self,
         binding_name: &str,
-        exps: &Vec<Expression>,
+        lam: &Lambda,
+        free: &HashSet<String>,
         env: &mut Environment,
     ) -> Result<Value> {
-        info!("Apply: Evaluate arguments");
-        let mut vals = Vec::new();
-        for e in exps {
-            vals.push(self.evaluate_expression(binding_name, e, env)?);
+        info!("Evaluating lambda");
+        let mut lexical_env = Environment::new();
+        lexical_env.push();
+        for v in free.iter() {
+            let val = self.lookup(env, v).unwrap_or(Value::Undefined);
+            if !binding_name.is_empty() {
+                if val == Value::Undefined {
+                    let c = self.closures_to_check.entry(v.to_owned()).or_default();
+                    c.insert(binding_name.to_string());
+                }
+            }
+            lexical_env.add(v, &val);
         }
-        self.apply_values(binding_name, &vals)
+        let arity = lam.arity.clone();
+        Ok(Value::Closure(new_ref(Closure {
+            code: new_ref(Code::Nib(Box::new(lam.clone()))),
+            type_table: None,
+            env: lexical_env,
+            args: Vec::new(),
+            arity,
+        })))
     }
 
-    pub(super) fn apply_values(&mut self, binding_name: &str, vals: &[Value]) -> Result<Value> {
+    pub(super) fn lookup(&self, env: &Environment, id: &str) -> Option<Value> {
+        env.get(id).or_else(|| self.get_global(id))
+    }
+
+    fn replace_undefined(&mut self, place: &str, env: &mut Environment, new_env: &Environment) {
+        let udef: Vec<_> = {
+            env.envs
+                .iter()
+                .flat_map(|hm| {
+                    hm.iter()
+                        .filter(|&(k, v)| v == &Value::Undefined)
+                        .map(|(k, v)| k.to_owned())
+                })
+                .collect()
+        };
+        for k in udef {
+            if let Some(v) = self.lookup(new_env, k.into()) {
+                env.add(k.into(), &v);
+                if let Some(hs) = self.closures_to_check.get_mut(place) {
+                    hs.remove(k.into());
+                }
+            }
+        }
+    }
+
+    fn add_binding(&mut self, eval_status: &mut EvalStatus, binding: &Binding) {
+        eval_status.work_stack.push(EvalStep::Bind(binding.name.clone(), binding.binder.clone()));
+        eval_status.work_stack.push(EvalStep::Expression(binding.name.clone(), binding.body.clone()));
+    }
+
+
+    fn eval(&mut self, eval_status: &mut EvalStatus, env:&mut Environment) -> Result<()> {
+        while let Some(step) = eval_status.work_stack.pop() {
+            self.eval_step(eval_status, step, env)?;
+        }
+        Ok(())
+    }
+
+    fn eval_step(&mut self, eval_status: &mut EvalStatus, step: EvalStep, env:&mut Environment) -> Result<()> {
+        info!("taking eval step {:?}", &step);
+        match step {
+            EvalStep::Expression(binding_name, exp) => {
+                self.eval_expression(eval_status, exp, env, &binding_name)?;
+            }
+            EvalStep::ReplaceClosureRefs(prev_cc) => {
+                self.closures_to_check = prev_cc;
+            }
+            EvalStep::Select(if_true, if_false) => {
+                let Some(val) = eval_status.value_stack.pop() else {
+                    return self.error("Expected Value in select eval");
+                };
+                let next = if val == Value::Bool(false) {
+                    if_false
+                } else {
+                    if_true
+                };
+                eval_status.work_stack.push(*next);
+            }
+            EvalStep::Apply(name, size) => {
+                let from = eval_status.value_stack.len() - size;
+                let args = eval_status.value_stack.drain(from..).collect::<Vec<_>>();
+                self.eval_apply(eval_status, &args, env, &name)?;
+            }
+            EvalStep::Bind(name, binder) => {
+                let Some(val) = eval_status.value_stack.pop() else {
+                    return self.error("no value to bind to");
+                };
+                match binder {
+                    Binder::Public(name) => {
+                        self.add_name(&name, &val)?;
+                    }
+                    Binder::Local(name) => {
+                        match name {
+                            Name::Plain(s) => {
+                                env.add(&s, &val);
+                            }
+                            Name::Qualified(path, id) => {
+                                let start = &path[0];
+                                let rest = &path[1..];
+                                let first = if let Some(v) = env.get(start) {
+                                    v.get_table()?
+                                } else {
+                                    let nt = Value::new_table();
+                                    env.add(start, &nt);
+                                    nt.get_table()?
+                                };
+                                let tab = self.get_or_create_module_path(rest, first)?;
+                                self.add_to_table(tab, &id, &val);
+                            }
+                        };
+                    }
+                    Binder::Unbound => {}
+                }
+                self.update_closures(env, &name);
+            }
+            EvalStep::ReplaceEnv(mut new_env) => {
+                mem::swap(env, &mut new_env);
+            }
+            EvalStep::Value(val) => {
+                eval_status.value_stack.push(val);
+            }
+        }
+        Ok(())
+    }
+
+    fn eval_expression(&mut self, eval_status: &mut EvalStatus, expr:Expression, env:&mut Environment, binding_name:&str) -> Result<()> {
+        match expr {
+            Expression::Literal(_, lit) => {
+                let val = self.evaluate_literal(&lit)?;
+                eval_status.value_stack.push(val);
+            }
+            Expression::Var(_, var) => {
+                let Some(v) = self.lookup(env, &var.name()) else {
+                    return self.error(&format!(
+                        "couldn't find variable {} in environment",
+                        &var.name()
+                    ));
+                };
+                eval_status.value_stack.push(v);
+            }
+            Expression::Lambda(_, lam) => {
+                let mut free = HashSet::new();
+                let mut locals = HashMap::new();
+                free_vars(&Expression::Lambda(0, lam.clone()), &mut free, &mut locals);
+                let closure =self.evaluate_lambda(&binding_name, &lam, &free, env)?;
+                eval_status.value_stack.push(closure);
+            }
+            Expression::Cond(_, cond) => {
+                eval_status.work_stack.push(EvalStep::Select(Box::new(EvalStep::Expression(binding_name.to_string(), cond.if_true)),
+                                                             Box::new(EvalStep::Expression(binding_name.to_string(), cond.if_false))));
+                eval_status.work_stack.push(EvalStep::Expression(binding_name.to_string(), cond.pred));
+            }
+            Expression::App(_, app) => {
+                let size = app.len();
+                eval_status.work_stack.push(EvalStep::Apply(binding_name.to_string(), size));
+                for exp in app.into_iter().rev() {
+                    eval_status.work_stack.push(EvalStep::Expression(binding_name.to_string(), exp));
+                }
+            }
+            Expression::Where(_, exp, binds) => {
+                let mut prev_cc = HashMap::new();
+                mem::swap(&mut prev_cc, &mut self.closures_to_check);
+                eval_status.work_stack.push(EvalStep::ReplaceClosureRefs(prev_cc));
+                eval_status.work_stack.push(EvalStep::Expression(binding_name.to_string(), *exp));
+                for b in binds.into_iter().rev() {
+                    self.add_binding(eval_status, &b);
+                }
+            }
+        }
+        Ok(())
+    }
+
+    pub(super) fn eval_apply(&mut self, eval_status: &mut EvalStatus, vals: &[Value], current_env:&mut Environment, binding_name:&str) -> Result<()> {
         info!("Applying {} to {} arguments", &vals[0], &vals[1..].len());
         match &vals[0] {
             Value::Closure(closure_rc) => {
@@ -161,7 +263,8 @@ impl Runtime {
                     args.append(&mut vals[1..].to_vec());
 
                     if args.len() < closure.arity.min_arity() as usize {
-                        return Ok(Value::Closure(new_ref(closure.with_args(&args))));
+                        eval_status.value_stack.push(Value::Closure(new_ref(closure.with_args(&args))));
+                        return Ok(());
                     }
                     env = closure.env.clone();
                     (args, closure.code.clone(), closure.arity.clone())
@@ -171,8 +274,14 @@ impl Runtime {
                     Arity::Fixed(n) => args.split_off(n as usize),
                     Arity::VarArg(_, _) => Vec::new(),
                 };
-
-                let mut ret = match code.borrow().deref() {
+                if !remaining.is_empty() {
+                    let size = remaining.len();
+                    eval_status.work_stack.push(EvalStep::Apply(binding_name.to_string(), size+1));
+                    for r in remaining.into_iter().rev() {
+                        eval_status.work_stack.push(EvalStep::Value(r));
+                    }
+                }
+                let ret = match code.borrow().deref() {
                     Code::Nib(lam) => {
                         if let Arity::VarArg(i, n) = lam.arity {
                             let num = args.len() - i as usize;
@@ -185,11 +294,14 @@ impl Runtime {
                         for (v, i) in args.iter().zip(lam.args.iter()) {
                             env.add(&i.name(), v);
                         }
-                        self.evaluate_expression(binding_name, &lam.body, &mut env)?
+                        mem::swap(&mut env, current_env);
+                        eval_status.work_stack.push(EvalStep::ReplaceEnv(env));
+                        eval_status.work_stack.push(EvalStep::Expression(binding_name.to_string(), lam.body.clone()));
+                        None
                     }
-                    Code::ExternSimple(ext) => ext(&args)?,
-                    Code::ExternMut(ext) => ext(self, &args)?,
-                    Code::Extern(ext) => ext(self, &args)?,
+                    Code::ExternSimple(ext) => Some(ext(&args)?),
+                    Code::ExternMut(ext) => Some(ext(self, &args)?),
+                    Code::Extern(ext) => Some(ext(self, &args)?),
                     Code::Foreign(signature, code) => {
                         let mut cargs = Vec::new();
                         for (a, t) in args.iter().zip(&signature.arg_types) {
@@ -217,68 +329,43 @@ impl Runtime {
                                 Value::from(n)
                             }
                         };
-                        ret
+                        Some(ret)
                     }
                 };
-                if !remaining.is_empty() {
-                    remaining.insert(0, ret);
-                    ret = self.apply_values(binding_name, &remaining)?;
+                if let Some(val) = ret {
+                    eval_status.value_stack.push(val);
                 }
-                Ok(ret)
+                Ok(())
             }
-            _ => self.error(&format!("Not a callable type in application {}", vals[0])),
+            _ => self.error(&format!("Not a callable type in application {} {:?}", vals[0], vals)),
         }
     }
+}
 
-    pub(super) fn evaluate_lambda(
-        &mut self,
-        binding_name: &str,
-        lam: &Lambda,
-        free: &HashSet<String>,
-        env: &mut Environment,
-    ) -> Result<Value> {
-        info!("Evaluating lambda");
-        let mut lexical_env = Environment::new();
-        lexical_env.push();
-        for v in free.iter() {
-            let val = self.lookup(env, v).unwrap_or(Value::Undefined);
-            if val == Value::Undefined {
-                let c = self.closures_to_check.entry(v.to_owned()).or_default();
-                c.insert(binding_name.to_owned());
-            }
-            lexical_env.add(v, &val);
-        }
-        let arity = lam.arity.clone();
-        Ok(Value::Closure(new_ref(Closure {
-            code: new_ref(Code::Nib(Box::new(lam.clone()))),
-            type_table: None,
-            env: lexical_env,
-            args: Vec::new(),
-            arity,
-        })))
-    }
+#[derive(Debug, Clone)]
+pub(super) struct EvalStatus {
+    work_stack: Vec<EvalStep>,
+    value_stack: Vec<Value>
+}
 
-    pub(super) fn lookup(&self, env: &Environment, id: &str) -> Option<Value> {
-        env.get(id).or_else(|| self.get_global(id))
-    }
-
-    fn replace_undefined(&mut self, env: &mut Environment, new_env: &Environment) {
-        let udef: Vec<_> = {
-            env.envs
-                .iter()
-                .flat_map(|hm| {
-                    hm.iter()
-                        .filter(|&(k, v)| v == &Value::Undefined)
-                        .map(|(k, v)| k.to_owned())
-                })
-                .collect()
-        };
-        for k in udef {
-            if let Some(v) = self.lookup(new_env, k.into()) {
-                env.add(k.into(), &v);
-            }
+impl EvalStatus {
+    fn new() -> Self {
+        EvalStatus {
+            work_stack: Vec::new(),
+            value_stack: Vec::new()
         }
     }
+}
+
+#[derive(Debug, Clone)]
+pub(super) enum EvalStep  {
+    Expression(String, Expression),
+    ReplaceClosureRefs(ClosureRefs),
+    ReplaceEnv(Environment),
+    Select(Box<EvalStep>, Box<EvalStep>),
+    Value(Value),
+    Apply(String, usize),
+    Bind(String, Binder)
 }
 
 #[derive(Debug, Clone, PartialEq)]

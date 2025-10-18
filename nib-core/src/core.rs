@@ -938,7 +938,6 @@ pub fn free_vars(expr: &Expression, vars: &mut HashSet<String>, locals: &mut Has
             let mut used = HashSet::new();
             let mut bound = Vec::new();
             for b in bindings {
-                free_vars(&b.body, &mut used, locals);
                 match &b.binder {
                     Binder::Local(n) | Binder::Public(n) => {
                         let var = Var::Named(n.top());
@@ -947,6 +946,7 @@ pub fn free_vars(expr: &Expression, vars: &mut HashSet<String>, locals: &mut Has
                     }
                     _ => {}
                 };
+                free_vars(&b.body, &mut used, locals);
             }
             free_vars(expression, &mut used, locals);
             remove_locals(locals, &bound);

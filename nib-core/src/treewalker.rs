@@ -74,7 +74,7 @@ impl Runtime {
     pub fn run_expression(&mut self, code: &str) -> Result<Value> {
         let ast_expr = parse_expression(code)?;
         let expr = desugar_expression(ast_expr)?;
-        self.evaluate_expression("", &expr, &mut Environment::new())
+        self.evaluate_expression(expr)
     }
 
     pub fn error<T>(&self, msg: &str) -> Result<T> {
