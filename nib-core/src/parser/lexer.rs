@@ -3,6 +3,7 @@ use unicode_categories::UnicodeCategories;
 use crate::common::Error;
 use crate::common::Location;
 use crate::common::Result;
+use crate::common::Symbol;
 
 impl<'a> super::ParserState<'a> {
     pub(super) fn peek_next_token(&mut self) -> Result<Token> {
@@ -43,7 +44,7 @@ impl<'a> super::ParserState<'a> {
                         let c = *c;
                         if !self.check_prefix("//") && operator_char(c) {
                             let id = self.read_parenthesized_operator()?;
-                            Some(self.token(TokenValue::Identifier(id)))
+                            Some(self.token(TokenValue::Identifier(Symbol::from(id))))
                         } else if c == ')' {
                             self.next();
                             Some(self.token(TokenValue::Nil))
@@ -172,7 +173,7 @@ impl<'a> super::ParserState<'a> {
                 "false" => Ok(self.token(TokenValue::False)),
                 "where" => Ok(self.token(TokenValue::Where)),
                 "_" => Ok(self.token(TokenValue::Underscore)),
-                _ => Ok(self.token(TokenValue::Identifier(id.to_string()))),
+                _ => Ok(self.token(TokenValue::Identifier(Symbol::from(id)))),
             }
         } else {
             self.lex_error("Expected a valid identifier")
@@ -197,7 +198,7 @@ impl<'a> super::ParserState<'a> {
                             '(' => {
                                 self.next();
                                 let id = self.read_parenthesized_operator()?;
-                                Ok(self.token(TokenValue::Symbol(id)))
+                                Ok(self.token(TokenValue::Symbol(Symbol::from(id))))
                             }
                             _ if identifier_initial_char(c) => {
                                 let t = self.read_identifier()?;
@@ -211,7 +212,7 @@ impl<'a> super::ParserState<'a> {
                                 };
                                 Ok(self.token(TokenValue::Symbol(id)))
                             }
-                            _ => Ok(self.token(TokenValue::Operator(id.to_string()))),
+                            _ => Ok(self.token(TokenValue::Operator(Symbol::from(id)))),
                         }
                     } else {
                         Ok(self.token(TokenValue::Hash))
@@ -230,9 +231,9 @@ impl<'a> super::ParserState<'a> {
                             return self.read_number(true);
                         }
                     } */
-                    Ok(self.token(TokenValue::Operator(id.to_string())))
+                    Ok(self.token(TokenValue::Operator(Symbol::from(id))))
                 }
-                _ => Ok(self.token(TokenValue::Operator(id.to_string()))),
+                _ => Ok(self.token(TokenValue::Operator(Symbol::from(id)))),
             }
         } else {
             self.lex_error("Expected a valid operator")
@@ -477,13 +478,13 @@ fn operator_char(ch: char) -> bool {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum TokenValue {
-    Identifier(String),
-    Operator(String),
+    Identifier(Symbol),
+    Operator(Symbol),
     Integer(i64),
     Float(f64),
     Char(char),
     String(String),
-    Symbol(String),
+    Symbol(Symbol),
     // punctuation
     Colon,
     Comma,
@@ -509,7 +510,7 @@ pub enum TokenValue {
     False,
     // Symbols
     Underscore,
-    Ellipsis(Option<String>),
+    Ellipsis(Option<Symbol>),
     Equals,
     Hash,
     Backslash,

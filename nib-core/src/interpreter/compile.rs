@@ -1,5 +1,5 @@
-use crate::common::{Metadata, Name};
 use crate::common::{Result, Symbol};
+use crate::common::{Metadata, Name};
 use crate::core::Binder;
 use crate::interpreter::heap::Value;
 use std::collections::HashMap;
@@ -30,7 +30,6 @@ pub struct Module {
     want_symbols: HashMap<Symbol, usize>,
     /// Global variables used by the module.
     captures: HashMap<Symbol, usize>,
-    constants: HashMap<usize, Value>,
 }
 
 impl Module {
@@ -41,7 +40,6 @@ impl Module {
             local_env_size: 0,
             want_symbols: HashMap::new(),
             captures: HashMap::new(),
-            constants: HashMap::new(),
         }
     }
 }
