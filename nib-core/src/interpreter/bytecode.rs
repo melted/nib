@@ -9,7 +9,7 @@ use std::mem;
 pub struct BytecodeBuilder {
     pieces: Vec<Vec<u8>>,
     labels: HashMap<String, usize>,
-    references: HashMap<String, Vec<usize>>
+    references: HashMap<String, Vec<usize>>,
 }
 
 impl BytecodeBuilder {
@@ -18,14 +18,13 @@ impl BytecodeBuilder {
             pieces: Vec::new(),
             labels: HashMap::new(),
             references: HashMap::new(),
-         }
+        }
     }
 
     pub fn build(self) -> Vec<u8> {
         self.pieces.into_iter().flatten().collect::<Vec<u8>>()
     }
 }
-
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 #[repr(u8)]

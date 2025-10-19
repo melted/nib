@@ -16,7 +16,7 @@ mod tests;
 pub struct Runtime {
     heap: Heap,
     global_env: Value,
-    stack:Vec<Value>,
+    stack: Vec<Value>,
 }
 
 const DEFAULT_HEAP_SIZE: usize = 1000000;
@@ -29,7 +29,7 @@ impl Runtime {
         Runtime {
             heap,
             global_env,
-            stack
+            stack,
         }
     }
 

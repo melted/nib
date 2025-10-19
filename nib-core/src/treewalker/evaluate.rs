@@ -1,5 +1,3 @@
-use std::{collections::{HashMap, HashSet}, mem, ops::Deref, os::raw::c_void};
-use std::hash::Hash;
 use crate::common::Symbol;
 use crate::{
     ast::Literal,
@@ -8,6 +6,13 @@ use crate::{
     treewalker::{CType, Closure, Code, Runtime, Value, new_ref},
 };
 use log::{info, log};
+use std::hash::Hash;
+use std::{
+    collections::{HashMap, HashSet},
+    mem,
+    ops::Deref,
+    os::raw::c_void,
+};
 use symbol_table::GlobalSymbol;
 
 type ClosureRefs = HashMap<String, HashSet<String>>;
@@ -25,23 +30,26 @@ impl Runtime {
     pub(super) fn evaluate_expression(&mut self, expression: Expression) -> Result<Value> {
         let mut eval_status = EvalStatus::new();
         let mut env = Environment::new();
-        eval_status.work_stack.push(EvalStep::Expression("".to_string(), expression));
+        eval_status
+            .work_stack
+            .push(EvalStep::Expression("".to_string(), expression));
         self.eval(&mut eval_status, &mut env)?;
         Ok(eval_status.value_stack.pop().unwrap_or(Value::Nil))
     }
 
-    pub(super) fn evaluate_apply(&mut self, vals : &[Value]) -> Result<Value> {
+    pub(super) fn evaluate_apply(&mut self, vals: &[Value]) -> Result<Value> {
         let size = vals.len();
         let mut eval_status = EvalStatus::new();
         let mut env = Environment::new();
         for v in vals {
             eval_status.value_stack.push(v.clone());
         }
-        eval_status.work_stack.push(EvalStep::Apply("".to_string(), size));
+        eval_status
+            .work_stack
+            .push(EvalStep::Apply("".to_string(), size));
         self.eval(&mut eval_status, &mut env)?;
         Ok(eval_status.value_stack.pop().unwrap_or(Value::Nil))
     }
-
 
     fn update_closures(&mut self, env: &mut Environment, name: &str) {
         if let Some(hs) = self.closures_to_check.get(name) {
@@ -124,19 +132,28 @@ impl Runtime {
     }
 
     fn add_binding(&mut self, eval_status: &mut EvalStatus, binding: &Binding) {
-        eval_status.work_stack.push(EvalStep::Bind(binding.name.clone(), binding.binder.clone()));
-        eval_status.work_stack.push(EvalStep::Expression(binding.name.clone(), binding.body.clone()));
+        eval_status
+            .work_stack
+            .push(EvalStep::Bind(binding.name.clone(), binding.binder.clone()));
+        eval_status.work_stack.push(EvalStep::Expression(
+            binding.name.clone(),
+            binding.body.clone(),
+        ));
     }
 
-
-    fn eval(&mut self, eval_status: &mut EvalStatus, env:&mut Environment) -> Result<()> {
+    fn eval(&mut self, eval_status: &mut EvalStatus, env: &mut Environment) -> Result<()> {
         while let Some(step) = eval_status.work_stack.pop() {
             self.eval_step(eval_status, step, env)?;
         }
         Ok(())
     }
 
-    fn eval_step(&mut self, eval_status: &mut EvalStatus, step: EvalStep, env:&mut Environment) -> Result<()> {
+    fn eval_step(
+        &mut self,
+        eval_status: &mut EvalStatus,
+        step: EvalStep,
+        env: &mut Environment,
+    ) -> Result<()> {
         info!("taking eval step {:?}", &step);
         match step {
             EvalStep::Expression(binding_name, exp) => {
@@ -203,7 +220,13 @@ impl Runtime {
         Ok(())
     }
 
-    fn eval_expression(&mut self, eval_status: &mut EvalStatus, expr:Expression, env:&mut Environment, binding_name:&str) -> Result<()> {
+    fn eval_expression(
+        &mut self,
+        eval_status: &mut EvalStatus,
+        expr: Expression,
+        env: &mut Environment,
+        binding_name: &str,
+    ) -> Result<()> {
         match expr {
             Expression::Literal(_, lit) => {
                 let val = self.evaluate_literal(&lit)?;
@@ -222,26 +245,41 @@ impl Runtime {
                 let mut free = HashSet::new();
                 let mut locals = HashMap::new();
                 free_vars(&Expression::Lambda(0, lam.clone()), &mut free, &mut locals);
-                let closure =self.evaluate_lambda(&binding_name, &lam, &free, env)?;
+                let closure = self.evaluate_lambda(&binding_name, &lam, &free, env)?;
                 eval_status.value_stack.push(closure);
             }
             Expression::Cond(_, cond) => {
-                eval_status.work_stack.push(EvalStep::Select(Box::new(EvalStep::Expression(binding_name.to_string(), cond.if_true)),
-                                                             Box::new(EvalStep::Expression(binding_name.to_string(), cond.if_false))));
-                eval_status.work_stack.push(EvalStep::Expression(binding_name.to_string(), cond.pred));
+                eval_status.work_stack.push(EvalStep::Select(
+                    Box::new(EvalStep::Expression(binding_name.to_string(), cond.if_true)),
+                    Box::new(EvalStep::Expression(
+                        binding_name.to_string(),
+                        cond.if_false,
+                    )),
+                ));
+                eval_status
+                    .work_stack
+                    .push(EvalStep::Expression(binding_name.to_string(), cond.pred));
             }
             Expression::App(_, app) => {
                 let size = app.len();
-                eval_status.work_stack.push(EvalStep::Apply(binding_name.to_string(), size));
+                eval_status
+                    .work_stack
+                    .push(EvalStep::Apply(binding_name.to_string(), size));
                 for exp in app.into_iter().rev() {
-                    eval_status.work_stack.push(EvalStep::Expression(binding_name.to_string(), exp));
+                    eval_status
+                        .work_stack
+                        .push(EvalStep::Expression(binding_name.to_string(), exp));
                 }
             }
             Expression::Where(_, exp, binds) => {
                 let mut prev_cc = HashMap::new();
                 mem::swap(&mut prev_cc, &mut self.closures_to_check);
-                eval_status.work_stack.push(EvalStep::ReplaceClosureRefs(prev_cc));
-                eval_status.work_stack.push(EvalStep::Expression(binding_name.to_string(), *exp));
+                eval_status
+                    .work_stack
+                    .push(EvalStep::ReplaceClosureRefs(prev_cc));
+                eval_status
+                    .work_stack
+                    .push(EvalStep::Expression(binding_name.to_string(), *exp));
                 for b in binds.into_iter().rev() {
                     self.add_binding(eval_status, &b);
                 }
@@ -250,7 +288,13 @@ impl Runtime {
         Ok(())
     }
 
-    pub(super) fn eval_apply(&mut self, eval_status: &mut EvalStatus, vals: &[Value], current_env:&mut Environment, binding_name:&str) -> Result<()> {
+    pub(super) fn eval_apply(
+        &mut self,
+        eval_status: &mut EvalStatus,
+        vals: &[Value],
+        current_env: &mut Environment,
+        binding_name: &str,
+    ) -> Result<()> {
         info!("Applying {} to {} arguments", &vals[0], &vals[1..].len());
         match &vals[0] {
             Value::Closure(closure_rc) => {
@@ -263,7 +307,9 @@ impl Runtime {
                     args.append(&mut vals[1..].to_vec());
 
                     if args.len() < closure.arity.min_arity() as usize {
-                        eval_status.value_stack.push(Value::Closure(new_ref(closure.with_args(&args))));
+                        eval_status
+                            .value_stack
+                            .push(Value::Closure(new_ref(closure.with_args(&args))));
                         return Ok(());
                     }
                     env = closure.env.clone();
@@ -276,7 +322,9 @@ impl Runtime {
                 };
                 if !remaining.is_empty() {
                     let size = remaining.len();
-                    eval_status.work_stack.push(EvalStep::Apply(binding_name.to_string(), size+1));
+                    eval_status
+                        .work_stack
+                        .push(EvalStep::Apply(binding_name.to_string(), size + 1));
                     for r in remaining.into_iter().rev() {
                         eval_status.work_stack.push(EvalStep::Value(r));
                     }
@@ -296,7 +344,10 @@ impl Runtime {
                         }
                         mem::swap(&mut env, current_env);
                         eval_status.work_stack.push(EvalStep::ReplaceEnv(env));
-                        eval_status.work_stack.push(EvalStep::Expression(binding_name.to_string(), lam.body.clone()));
+                        eval_status.work_stack.push(EvalStep::Expression(
+                            binding_name.to_string(),
+                            lam.body.clone(),
+                        ));
                         None
                     }
                     Code::ExternSimple(ext) => Some(ext(&args)?),
@@ -337,7 +388,10 @@ impl Runtime {
                 }
                 Ok(())
             }
-            _ => self.error(&format!("Not a callable type in application {} {:?}", vals[0], vals)),
+            _ => self.error(&format!(
+                "Not a callable type in application {} {:?}",
+                vals[0], vals
+            )),
         }
     }
 }
@@ -345,27 +399,27 @@ impl Runtime {
 #[derive(Debug, Clone)]
 pub(super) struct EvalStatus {
     work_stack: Vec<EvalStep>,
-    value_stack: Vec<Value>
+    value_stack: Vec<Value>,
 }
 
 impl EvalStatus {
     fn new() -> Self {
         EvalStatus {
             work_stack: Vec::new(),
-            value_stack: Vec::new()
+            value_stack: Vec::new(),
         }
     }
 }
 
 #[derive(Debug, Clone)]
-pub(super) enum EvalStep  {
+pub(super) enum EvalStep {
     Expression(String, Expression),
     ReplaceClosureRefs(ClosureRefs),
     ReplaceEnv(Environment),
     Select(Box<EvalStep>, Box<EvalStep>),
     Value(Value),
     Apply(String, usize),
-    Bind(String, Binder)
+    Bind(String, Binder),
 }
 
 #[derive(Debug, Clone, PartialEq)]
