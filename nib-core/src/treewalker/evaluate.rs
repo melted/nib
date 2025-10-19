@@ -15,7 +15,7 @@ use std::{
 };
 use symbol_table::GlobalSymbol;
 
-type ClosureRefs = HashMap<String, HashSet<String>>;
+type ClosureRefs = HashMap<Symbol, HashSet<Symbol>>;
 
 impl Runtime {
     pub(super) fn evaluate(&mut self, code: &mut Module, env: &mut Environment) -> Result<()> {
@@ -32,7 +32,7 @@ impl Runtime {
         let mut env = Environment::new();
         eval_status
             .work_stack
-            .push(EvalStep::Expression("".to_string(), expression));
+            .push(EvalStep::Expression(Symbol::from("it"), expression));
         self.eval(&mut eval_status, &mut env)?;
         Ok(eval_status.value_stack.pop().unwrap_or(Value::Nil))
     }
@@ -46,15 +46,15 @@ impl Runtime {
         }
         eval_status
             .work_stack
-            .push(EvalStep::Apply("".to_string(), size));
+            .push(EvalStep::Apply(Symbol::from("it"), size));
         self.eval(&mut eval_status, &mut env)?;
         Ok(eval_status.value_stack.pop().unwrap_or(Value::Nil))
     }
 
     fn update_closures(&mut self, env: &mut Environment, name: &str) {
-        if let Some(hs) = self.closures_to_check.get(name) {
+        if let Some(hs) = self.closures_to_check.get(&Symbol::from(name)) {
             for c in hs.clone() {
-                if let Some(Value::Closure(closure)) = self.lookup(env, &c) {
+                if let Some(Value::Closure(closure)) = self.lookup(env, c.into()) {
                     let mut cl = closure.borrow_mut();
                     self.replace_undefined(&c, &mut cl.env, env);
                 }
@@ -78,7 +78,7 @@ impl Runtime {
 
     fn evaluate_lambda(
         &mut self,
-        binding_name: &str,
+        binding_name: &Symbol,
         lam: &Lambda,
         free: &HashSet<String>,
         env: &mut Environment,
@@ -88,10 +88,10 @@ impl Runtime {
         lexical_env.push();
         for v in free.iter() {
             let val = self.lookup(env, v).unwrap_or(Value::Undefined);
-            if !binding_name.is_empty() {
+            if !binding_name.as_str().is_empty() {
                 if val == Value::Undefined {
-                    let c = self.closures_to_check.entry(v.to_owned()).or_default();
-                    c.insert(binding_name.to_string());
+                    let c = self.closures_to_check.entry(v.into()).or_default();
+                    c.insert(binding_name.clone());
                 }
             }
             lexical_env.add(v, &val);
@@ -110,7 +110,7 @@ impl Runtime {
         env.get(id).or_else(|| self.get_global(id))
     }
 
-    fn replace_undefined(&mut self, place: &str, env: &mut Environment, new_env: &Environment) {
+    fn replace_undefined(&mut self, place: &Symbol, env: &mut Environment, new_env: &Environment) {
         let udef: Vec<_> = {
             env.envs
                 .iter()
@@ -125,7 +125,7 @@ impl Runtime {
             if let Some(v) = self.lookup(new_env, k.into()) {
                 env.add(k.into(), &v);
                 if let Some(hs) = self.closures_to_check.get_mut(place) {
-                    hs.remove(k.into());
+                    hs.remove(&k);
                 }
             }
         }
@@ -136,7 +136,7 @@ impl Runtime {
             .work_stack
             .push(EvalStep::Bind(binding.name.clone(), binding.binder.clone()));
         eval_status.work_stack.push(EvalStep::Expression(
-            binding.name.clone(),
+            Symbol::from(&binding.name),
             binding.body.clone(),
         ));
     }
@@ -225,7 +225,7 @@ impl Runtime {
         eval_status: &mut EvalStatus,
         expr: Expression,
         env: &mut Environment,
-        binding_name: &str,
+        binding_name: &Symbol,
     ) -> Result<()> {
         match expr {
             Expression::Literal(_, lit) => {
@@ -250,25 +250,25 @@ impl Runtime {
             }
             Expression::Cond(_, cond) => {
                 eval_status.work_stack.push(EvalStep::Select(
-                    Box::new(EvalStep::Expression(binding_name.to_string(), cond.if_true)),
+                    Box::new(EvalStep::Expression(*binding_name, cond.if_true)),
                     Box::new(EvalStep::Expression(
-                        binding_name.to_string(),
+                        *binding_name,
                         cond.if_false,
                     )),
                 ));
                 eval_status
                     .work_stack
-                    .push(EvalStep::Expression(binding_name.to_string(), cond.pred));
+                    .push(EvalStep::Expression(*binding_name, cond.pred));
             }
             Expression::App(_, app) => {
                 let size = app.len();
                 eval_status
                     .work_stack
-                    .push(EvalStep::Apply(binding_name.to_string(), size));
+                    .push(EvalStep::Apply(*binding_name, size));
                 for exp in app.into_iter().rev() {
                     eval_status
                         .work_stack
-                        .push(EvalStep::Expression(binding_name.to_string(), exp));
+                        .push(EvalStep::Expression(*binding_name, exp));
                 }
             }
             Expression::Where(_, exp, binds) => {
@@ -279,7 +279,7 @@ impl Runtime {
                     .push(EvalStep::ReplaceClosureRefs(prev_cc));
                 eval_status
                     .work_stack
-                    .push(EvalStep::Expression(binding_name.to_string(), *exp));
+                    .push(EvalStep::Expression(*binding_name, *exp));
                 for b in binds.into_iter().rev() {
                     self.add_binding(eval_status, &b);
                 }
@@ -293,7 +293,7 @@ impl Runtime {
         eval_status: &mut EvalStatus,
         vals: &[Value],
         current_env: &mut Environment,
-        binding_name: &str,
+        binding_name: &Symbol,
     ) -> Result<()> {
         info!("Applying {} to {} arguments", &vals[0], &vals[1..].len());
         match &vals[0] {
@@ -324,7 +324,7 @@ impl Runtime {
                     let size = remaining.len();
                     eval_status
                         .work_stack
-                        .push(EvalStep::Apply(binding_name.to_string(), size + 1));
+                        .push(EvalStep::Apply(*binding_name, size + 1));
                     for r in remaining.into_iter().rev() {
                         eval_status.work_stack.push(EvalStep::Value(r));
                     }
@@ -345,7 +345,7 @@ impl Runtime {
                         mem::swap(&mut env, current_env);
                         eval_status.work_stack.push(EvalStep::ReplaceEnv(env));
                         eval_status.work_stack.push(EvalStep::Expression(
-                            binding_name.to_string(),
+                            *binding_name,
                             lam.body.clone(),
                         ));
                         None
@@ -413,12 +413,12 @@ impl EvalStatus {
 
 #[derive(Debug, Clone)]
 pub(super) enum EvalStep {
-    Expression(String, Expression),
+    Expression(Symbol, Expression),
     ReplaceClosureRefs(ClosureRefs),
     ReplaceEnv(Environment),
     Select(Box<EvalStep>, Box<EvalStep>),
     Value(Value),
-    Apply(String, usize),
+    Apply(Symbol, usize),
     Bind(String, Binder),
 }
 

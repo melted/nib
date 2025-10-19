@@ -29,7 +29,7 @@ pub struct Runtime {
     metadata: HashMap<String, Metadata>,
     globals: Rc<RefCell<Table>>,
     local_module: Option<Rc<RefCell<Table>>>,
-    closures_to_check: HashMap<String, HashSet<String>>,
+    closures_to_check: HashMap<Symbol, HashSet<Symbol>>,
     output_core: bool,
 }
 
