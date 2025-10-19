@@ -860,40 +860,40 @@ impl Runtime {
 
     pub fn type_query(&self, arg: &Value) -> Result<Value> {
         match arg {
-            Value::Nil => Ok(self.get_global("nil_type").unwrap()),
+            Value::Nil => Ok(self.get_global(&Symbol::from("nil_type")).unwrap()),
             Value::Undefined => Ok(Value::Nil),
-            Value::Bool(_) => Ok(self.get_global("bool").unwrap()),
-            Value::Integer(_) => Ok(self.get_global("int").unwrap()),
-            Value::Real(_) => Ok(self.get_global("float").unwrap()),
-            Value::Char(_) => Ok(self.get_global("char").unwrap()),
-            Value::Pointer(_) => Ok(self.get_global("pointer").unwrap()),
-            Value::Symbol(sym) => Ok(self.get_global("symbol").unwrap()),
+            Value::Bool(_) => Ok(self.get_global(&Symbol::from("bool")).unwrap()),
+            Value::Integer(_) => Ok(self.get_global(&Symbol::from("int")).unwrap()),
+            Value::Real(_) => Ok(self.get_global(&Symbol::from("float")).unwrap()),
+            Value::Char(_) => Ok(self.get_global(&Symbol::from("char")).unwrap()),
+            Value::Pointer(_) => Ok(self.get_global(&Symbol::from("pointer")).unwrap()),
+            Value::Symbol(sym) => Ok(self.get_global(&Symbol::from("symbol")).unwrap()),
             Value::Array(array) => {
                 if let Some(type_table) = &array.borrow().type_table {
                     Ok(Value::Table(type_table.clone()))
                 } else {
-                    Ok(self.get_global("array").unwrap())
+                    Ok(self.get_global(&Symbol::from("array")).unwrap())
                 }
             }
             Value::Bytes(bytes) => {
                 if let Some(type_table) = &bytes.borrow().type_table {
                     Ok(Value::Table(type_table.clone()))
                 } else {
-                    Ok(self.get_global("bytes").unwrap())
+                    Ok(self.get_global(&Symbol::from("bytes")).unwrap())
                 }
             }
             Value::Table(table) => {
                 if let Some(type_table) = &table.borrow().type_table {
                     Ok(Value::Table(type_table.clone()))
                 } else {
-                    Ok(self.get_global("table").unwrap())
+                    Ok(self.get_global(&Symbol::from("table")).unwrap())
                 }
             }
             Value::Closure(fun) => {
                 if let Some(type_table) = &fun.borrow().type_table {
                     Ok(Value::Table(type_table.clone()))
                 } else {
-                    Ok(self.get_global("function").unwrap())
+                    Ok(self.get_global(&Symbol::from("function")).unwrap())
                 }
             }
         }

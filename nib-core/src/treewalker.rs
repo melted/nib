@@ -96,22 +96,20 @@ impl Runtime {
     }
 
     pub fn add_global(&mut self, name: &str, value: Value) {
-        self.add_to_table(self.globals.clone(), name, &value);
+        let sym = Symbol::from(name);
+        self.add_to_table(self.globals.clone(), &sym, &value);
     }
 
-    pub fn delete_global(&mut self, name: &str) {
-        let sym = self.get_symbol(name);
-        self.globals.borrow_mut().table.remove(&sym);
+    pub fn delete_global(&mut self, name: &Symbol) {
+        self.globals.borrow_mut().table.remove(name);
     }
 
-    pub fn add_to_table(&mut self, table: Rc<RefCell<Table>>, name: &str, value: &Value) {
-        let sym = self.get_symbol(name);
-        table.borrow_mut().table.insert(sym, value.clone());
+    pub fn add_to_table(&mut self, table: Rc<RefCell<Table>>, name: &Symbol, value: &Value) {
+        table.borrow_mut().table.insert(*name, value.clone());
     }
 
-    pub fn get_from_table(&self, table: Rc<RefCell<Table>>, name: &str) -> Option<Value> {
-        let sym = self.get_symbol(name);
-        table.borrow().table.get(&sym).cloned()
+    pub fn get_from_table(&self, table: Rc<RefCell<Table>>, name: &Symbol) -> Option<Value> {
+        table.borrow().table.get(&name).cloned()
     }
 
     pub fn get_symbol(&self, name: &str) -> Symbol {
@@ -119,11 +117,11 @@ impl Runtime {
         sym
     }
 
-    pub fn get_global(&self, name: &str) -> Option<Value> {
+    pub fn get_global(&self, name: &Symbol) -> Option<Value> {
         self.globals
             .borrow()
             .table
-            .get(&Symbol::from(name))
+            .get(name)
             .cloned()
     }
 
@@ -131,7 +129,7 @@ impl Runtime {
         match name {
             Name::Qualified(path, name) => {
                 let t = self.get_or_create_module_path(path, self.globals.clone())?;
-                self.add_to_table(t, name.as_str(), val);
+                self.add_to_table(t, name, val);
             }
             Name::Plain(name) => {
                 self.add_global(name.as_str(), val.clone());
@@ -144,12 +142,12 @@ impl Runtime {
         match name {
             Name::Qualified(path, name) => {
                 if let Some(t) = self.get_module_path(path) {
-                    self.get_from_table(t, name.as_str())
+                    self.get_from_table(t, name)
                 } else {
                     None
                 }
             }
-            Name::Plain(name) => self.get_global(name.as_str()),
+            Name::Plain(name) => self.get_global(name),
         }
     }
 
@@ -157,7 +155,7 @@ impl Runtime {
         let mut rest = path;
         let mut table = self.globals.clone();
         while !rest.is_empty() {
-            let sym = self.get_symbol(&rest[0].as_str());
+            let sym = &rest[0];
             table = {
                 let t = &mut table.borrow_mut().table;
                 let v = t.get(&sym);
@@ -181,7 +179,7 @@ impl Runtime {
         let mut rest = path;
         let mut table = start;
         while !rest.is_empty() {
-            let sym = self.get_symbol(&rest[0].as_str());
+            let sym = &rest[0];
             table = {
                 let t = &mut table.borrow_mut().table;
                 let v = t.get(&sym);
@@ -189,7 +187,7 @@ impl Runtime {
                     Some(Value::Table(n)) => n.clone(),
                     None | Some(Value::Nil) => {
                         let nt = new_ref(Table::new());
-                        t.insert(sym, Value::Table(nt.clone()));
+                        t.insert(*sym, Value::Table(nt.clone()));
                         nt
                     }
                     _ => {

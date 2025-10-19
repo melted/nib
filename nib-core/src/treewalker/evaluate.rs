@@ -54,7 +54,7 @@ impl Runtime {
     fn update_closures(&mut self, env: &mut Environment, name: &str) {
         if let Some(hs) = self.closures_to_check.get(&Symbol::from(name)) {
             for c in hs.clone() {
-                if let Some(Value::Closure(closure)) = self.lookup(env, c.into()) {
+                if let Some(Value::Closure(closure)) = self.lookup(env, &c) {
                     let mut cl = closure.borrow_mut();
                     self.replace_undefined(&c, &mut cl.env, env);
                 }
@@ -71,7 +71,7 @@ impl Runtime {
             Literal::Char(c) => Ok(Value::Char(*c)),
             Literal::Real(r) => Ok(Value::Real(*r)),
             Literal::Bytearray(ba) => Ok(Value::new_bytes(ba.clone())),
-            Literal::Symbol(sym) => Ok(Value::Symbol(self.get_symbol(sym.as_str()))),
+            Literal::Symbol(sym) => Ok(Value::Symbol(*sym)),
             Literal::String(s) => self.make_string(s),
         }
     }
@@ -87,14 +87,14 @@ impl Runtime {
         let mut lexical_env = Environment::new();
         lexical_env.push();
         for v in free.iter() {
-            let val = self.lookup(env, v.as_str()).unwrap_or(Value::Undefined);
+            let val = self.lookup(env, &v).unwrap_or(Value::Undefined);
             if let Some(name) = binding_name {
                 if val == Value::Undefined {
                     let c = self.closures_to_check.entry(*v).or_default();
                     c.insert(name.top());
                 }
             }
-            lexical_env.add(v.as_str(), &val);
+            lexical_env.add(v, &val);
         }
         let arity = lam.arity.clone();
         Ok(Value::Closure(new_ref(Closure {
@@ -106,7 +106,7 @@ impl Runtime {
         })))
     }
 
-    pub(super) fn lookup(&self, env: &Environment, id: &str) -> Option<Value> {
+    pub(super) fn lookup(&self, env: &Environment, id: &Symbol) -> Option<Value> {
         env.get(id).or_else(|| self.get_global(id))
     }
 
@@ -122,8 +122,8 @@ impl Runtime {
                 .collect()
         };
         for k in udef {
-            if let Some(v) = self.lookup(new_env, k.into()) {
-                env.add(k.into(), &v);
+            if let Some(v) = self.lookup(new_env, &k) {
+                env.add(&k, &v);
                 if let Some(hs) = self.closures_to_check.get_mut(place) {
                     hs.remove(&k);
                 }
@@ -189,20 +189,20 @@ impl Runtime {
                     Binder::Local(name) => {
                         match name {
                             Name::Plain(s) => {
-                                env.add(&s.as_str(), &val);
+                                env.add(&s, &val);
                             }
                             Name::Qualified(path, id) => {
                                 let start = &path[0];
                                 let rest = &path[1..];
-                                let first = if let Some(v) = env.get(id.as_str()) {
+                                let first = if let Some(v) = env.get(&id) {
                                     v.get_table()?
                                 } else {
                                     let nt = Value::new_table();
-                                    env.add(start.as_str(), &nt);
+                                    env.add(start, &nt);
                                     nt.get_table()?
                                 };
                                 let tab = self.get_or_create_module_path(rest, first)?;
-                                self.add_to_table(tab, &id.as_str(), &val);
+                                self.add_to_table(tab, &id, &val);
                             }
                         };
                     }
@@ -235,7 +235,7 @@ impl Runtime {
                 eval_status.value_stack.push(val);
             }
             Expression::Var(_, var) => {
-                let Some(v) = self.lookup(env, &var.name().as_str()) else {
+                let Some(v) = self.lookup(env, &var.name()) else {
                     return self.error(&format!(
                         "couldn't find variable {} in environment",
                         &var.name()
@@ -342,7 +342,7 @@ impl Runtime {
                             args.insert(i as usize, array);
                         }
                         for (v, i) in args.iter().zip(lam.args.iter()) {
-                            env.add(&i.name().as_str(), v);
+                            env.add(&i.name(), v);
                         }
                         mem::swap(&mut env, current_env);
                         eval_status.work_stack.push(EvalStep::ReplaceEnv(env));
@@ -456,9 +456,9 @@ impl Environment {
         self.envs.pop()
     }
 
-    pub fn get(&self, id: &str) -> Option<Value> {
+    pub fn get(&self, id: &Symbol) -> Option<Value> {
         for e in self.envs.iter().rev() {
-            let v = e.get(&Symbol::from(id));
+            let v = e.get(id);
             if v.is_some() {
                 return v.cloned();
             }
@@ -466,21 +466,21 @@ impl Environment {
         None
     }
 
-    pub fn add(&mut self, id: &str, value: &Value) {
+    pub fn add(&mut self, id: &Symbol, value: &Value) {
         let e = if self.envs.is_empty() {
             self.push();
             &mut self.envs[0]
         } else {
             self.envs.last_mut().unwrap()
         };
-        e.insert(Symbol::from(id), value.clone());
+        e.insert(*id, value.clone());
     }
 
-    pub fn remove(&mut self, id: &str) {
+    pub fn remove(&mut self, id: &Symbol) {
         for e in self.envs.iter_mut().rev() {
-            let v = e.get(&Symbol::from(id));
+            let v = e.get(id);
             if v.is_some() {
-                e.remove(&Symbol::from(id));
+                e.remove(id);
             }
         }
     }
