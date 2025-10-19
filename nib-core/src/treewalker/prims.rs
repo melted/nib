@@ -383,7 +383,7 @@ impl Runtime {
 
     pub(super) fn prim_symbol_make(&self, args: &[Value]) -> Result<Value> {
         let str = String::try_from(&args[0])?;
-        Ok(Value::Symbol(self.get_symbol(&str)))
+        Ok(Value::Symbol(Symbol::from(str)))
     }
 
     pub(super) fn prim_ceiling(&self, args: &[Value]) -> Result<Value> {
@@ -843,7 +843,7 @@ impl Runtime {
         match self.type_query(arg) {
             Ok(Value::Table(type_table)) => {
                 let table = &type_table.borrow().table;
-                let tid = self.get_symbol("type_id");
+                let tid = Symbol::from("type_id");
                 if let Some(Value::Bytes(b)) = table.get(&tid) {
                     str::from_utf8(&b.borrow().bytes).unwrap_or_default() == t
                 } else {
@@ -955,7 +955,7 @@ impl Runtime {
             let tt = self.type_query(&from)?;
             if let type_tab = tt.get_table()? {
                 let tab = &type_tab.borrow().table;
-                let res = if let Some(proj_fun) = tab.get(&self.get_symbol("project")) {
+                let res = if let Some(proj_fun) = tab.get(&Symbol::from("project")) {
                     self.prim_apply(&vec![from, projections[0].clone()])?
                 } else {
                     self.project_table(&from, &projections[0])?

@@ -96,9 +96,13 @@ impl Runtime {
     }
 
     pub fn add_global(&mut self, name: &str, value: Value) {
-        let sym = Symbol::from(name);
+        self.add_global_symbol(&Symbol::from(name), value);
+    }
+
+    pub fn add_global_symbol(&mut self, sym: &Symbol, value: Value) {
         self.add_to_table(self.globals.clone(), &sym, &value);
     }
+
 
     pub fn delete_global(&mut self, name: &Symbol) {
         self.globals.borrow_mut().table.remove(name);
@@ -110,11 +114,6 @@ impl Runtime {
 
     pub fn get_from_table(&self, table: Rc<RefCell<Table>>, name: &Symbol) -> Option<Value> {
         table.borrow().table.get(&name).cloned()
-    }
-
-    pub fn get_symbol(&self, name: &str) -> Symbol {
-        let sym = Symbol::from(name);
-        sym
     }
 
     pub fn get_global(&self, name: &Symbol) -> Option<Value> {
