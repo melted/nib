@@ -18,6 +18,9 @@ fn main() -> io::Result<()> {
         log::Level::Error
     };
     simple_logger::init_with_level(level).unwrap();
+    if opts.output_core {
+        rt.set_output_core(true);
+    }
     if !opts.no_prelude {
         rt.add_code("prelude", prelude_code)?;
     }
@@ -53,6 +56,7 @@ pub struct Options {
     pub no_prelude: bool,
     pub verbose: bool,
     pub use_treewalker: bool,
+    pub output_core: bool,
     pub files: Vec<String>,
 }
 
@@ -62,6 +66,7 @@ impl Options {
             no_prelude: false,
             verbose: false,
             use_treewalker: true,
+            output_core: false,
             files: Vec::new(),
         }
     }
@@ -76,6 +81,9 @@ fn parse_options() -> Options {
             }
             _ if arg == "--verbose" => {
                 opts.verbose = true;
+            }
+            _ if arg == "--output-core" => {
+                opts.output_core = true;
             }
             file => {
                 opts.files.push(file);

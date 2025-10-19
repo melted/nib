@@ -397,14 +397,20 @@ impl DesugarState {
                     exp = cond(pred, &exp, &on_fail);
                 }
                 PatternParts::Bind(var, expression) => {
-                    let binding =
-                        Binding::binding(0, Binder::Local(Name::str(var)), expression.clone());
-                    match &mut exp {
-                        Expression::Where(n, expr, binds) => {
-                            binds.insert(0, binding);
-                        }
-                        _ => {
-                            exp = Expression::Where(0, Box::new(exp.clone()), vec![binding]);
+                    if let Expression::Var(n, v) = expression {
+                        // Just a = b, can rename all 'a' to 'b' instead of
+                        // creating a binding.
+                        exp = rename(&exp, &Var::Named(var.to_string()), v);
+                    } else {
+                        let binding =
+                            Binding::binding(0, Binder::Local(Name::str(var)), expression.clone());
+                        match &mut exp {
+                            Expression::Where(n, expr, binds) => {
+                                binds.insert(0, binding);
+                            }
+                            _ => {
+                                exp = Expression::Where(0, Box::new(exp.clone()), vec![binding]);
+                            }
                         }
                     }
                 }

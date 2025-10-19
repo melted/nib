@@ -30,6 +30,7 @@ pub struct Runtime {
     globals: Rc<RefCell<Table>>,
     local_module: Option<Rc<RefCell<Table>>>,
     closures_to_check: HashMap<String, HashSet<String>>,
+    output_core: bool,
 }
 
 impl Default for Runtime {
@@ -45,6 +46,7 @@ impl Runtime {
             globals: new_ref(Table::new()),
             local_module: None,
             closures_to_check: HashMap::new(),
+            output_core: false
         };
 
         rt.register_type_tables();
@@ -63,6 +65,11 @@ impl Runtime {
     pub fn add_code(&mut self, name: &str, code: &str) -> Result<()> {
         let ast_module = parse_declarations(Some(name.to_owned()), code)?;
         let mut module = desugar(ast_module)?;
+        if self.output_core {
+            for b in &module.bindings {
+                println!("{}", b);
+            }
+        }
         let v = self
             .metadata
             .insert(name.to_owned(), module.metadata.clone());
@@ -82,6 +89,10 @@ impl Runtime {
             msg: msg.to_owned(),
             loc: None,
         })
+    }
+
+    pub fn set_output_core(&mut self, output:bool) {
+        self.output_core = output;
     }
 
     pub fn add_global(&mut self, name: &str, value: Value) {
