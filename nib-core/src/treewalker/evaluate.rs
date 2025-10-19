@@ -44,9 +44,7 @@ impl Runtime {
         for v in vals {
             eval_status.value_stack.push(v.clone());
         }
-        eval_status
-            .work_stack
-            .push(EvalStep::Apply(None, size));
+        eval_status.work_stack.push(EvalStep::Apply(None, size));
         self.eval(&mut eval_status, &mut env)?;
         Ok(eval_status.value_stack.pop().unwrap_or(Value::Nil))
     }
@@ -253,10 +251,7 @@ impl Runtime {
             Expression::Cond(_, cond) => {
                 eval_status.work_stack.push(EvalStep::Select(
                     Box::new(EvalStep::Expression(binding_name.clone(), cond.if_true)),
-                    Box::new(EvalStep::Expression(
-                        binding_name.clone(),
-                        cond.if_false,
-                    )),
+                    Box::new(EvalStep::Expression(binding_name.clone(), cond.if_false)),
                 ));
                 eval_status
                     .work_stack
@@ -295,7 +290,7 @@ impl Runtime {
         eval_status: &mut EvalStatus,
         vals: &[Value],
         current_env: &mut Environment,
-        binding_name: &Option<Name>
+        binding_name: &Option<Name>,
     ) -> Result<()> {
         info!("Applying {} to {} arguments", &vals[0], &vals[1..].len());
         match &vals[0] {
@@ -346,10 +341,9 @@ impl Runtime {
                         }
                         mem::swap(&mut env, current_env);
                         eval_status.work_stack.push(EvalStep::ReplaceEnv(env));
-                        eval_status.work_stack.push(EvalStep::Expression(
-                            binding_name.clone(),
-                            lam.body.clone(),
-                        ));
+                        eval_status
+                            .work_stack
+                            .push(EvalStep::Expression(binding_name.clone(), lam.body.clone()));
                         None
                     }
                     Code::ExternSimple(ext) => Some(ext(&args)?),

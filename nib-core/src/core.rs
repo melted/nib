@@ -256,7 +256,11 @@ impl DesugarState {
             }
             Pattern::Literal(lit) => {
                 // TODO: Generate appropriate check for each literal type
-                let check = app(&vec![var(&Symbol::from("_prim_eq")), expr.clone(), literal(lit)]);
+                let check = app(&vec![
+                    var(&Symbol::from("_prim_eq")),
+                    expr.clone(),
+                    literal(lit),
+                ]);
                 Ok(vec![PatternParts::Check(check)])
             }
             Pattern::Typed(pat, typ) => {
@@ -268,14 +272,18 @@ impl DesugarState {
                     }
                 }
                 let get_type = app(&vec![var(&Symbol::from("_prim_type")), val]);
-                let check = app(&vec![var(&Symbol::from("_prim_eq")), get_type, name_expr(typ)]);
+                let check = app(&vec![
+                    var(&Symbol::from("_prim_eq")),
+                    get_type,
+                    name_expr(typ),
+                ]);
                 inner.push(PatternParts::Check(check));
                 Ok(inner)
             }
-            Pattern::Var(Name::Plain(name)) => Ok(vec![PatternParts::Bind(name.clone(), expr.clone())]),
-            Pattern::Var(_) => {
-                self.error("Qualified name in arg pattern")
+            Pattern::Var(Name::Plain(name)) => {
+                Ok(vec![PatternParts::Bind(name.clone(), expr.clone())])
             }
+            Pattern::Var(_) => self.error("Qualified name in arg pattern"),
             Pattern::Wildcard => Ok(vec![]),
         }
     }
@@ -872,8 +880,9 @@ pub fn rename(expr: &Expression, old_name: &Var, new_name: &Var) -> Expression {
                 new_binding.body = new_body;
                 new_defs.push(new_binding);
                 if let Var::Named(n) = old_name {
-                    if let Some(Name::Plain(x)) = &b.name &&
-                        n == x {
+                    if let Some(Name::Plain(x)) = &b.name
+                        && n == x
+                    {
                         shadowed = true;
                     }
                 }

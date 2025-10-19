@@ -1,5 +1,5 @@
-use crate::common::{Result, Symbol};
 use crate::common::{Metadata, Name};
+use crate::common::{Result, Symbol};
 use crate::core::Binder;
 use crate::interpreter::heap::Value;
 use std::collections::HashMap;

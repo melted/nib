@@ -17,7 +17,10 @@ fn lex_numbers() -> Result<()> {
 fn lex_identifier() -> Result<()> {
     let tokens = lex("hello_world aaa bbb ccc")?;
     assert_eq!(tokens.len(), 5);
-    assert_eq!(tokens[0], TokenValue::Identifier(Symbol::from("hello_world")));
+    assert_eq!(
+        tokens[0],
+        TokenValue::Identifier(Symbol::from("hello_world"))
+    );
     Ok(())
 }
 

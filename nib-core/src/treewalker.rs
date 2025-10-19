@@ -46,7 +46,7 @@ impl Runtime {
             globals: new_ref(Table::new()),
             local_module: None,
             closures_to_check: HashMap::new(),
-            output_core: false
+            output_core: false,
         };
 
         rt.register_type_tables();
@@ -91,7 +91,7 @@ impl Runtime {
         })
     }
 
-    pub fn set_output_core(&mut self, output:bool) {
+    pub fn set_output_core(&mut self, output: bool) {
         self.output_core = output;
     }
 
@@ -102,7 +102,6 @@ impl Runtime {
     pub fn add_global_symbol(&mut self, sym: &Symbol, value: Value) {
         self.add_to_table(self.globals.clone(), &sym, &value);
     }
-
 
     pub fn delete_global(&mut self, name: &Symbol) {
         self.globals.borrow_mut().table.remove(name);
@@ -117,11 +116,7 @@ impl Runtime {
     }
 
     pub fn get_global(&self, name: &Symbol) -> Option<Value> {
-        self.globals
-            .borrow()
-            .table
-            .get(name)
-            .cloned()
+        self.globals.borrow().table.get(name).cloned()
     }
 
     pub fn add_name(&mut self, name: &Name, val: &Value) -> Result<()> {
