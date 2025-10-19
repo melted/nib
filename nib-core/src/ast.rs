@@ -1,5 +1,5 @@
 use crate::{
-    common::{Metadata, Name, Node},
+    common::{Metadata, Name, Node, Symbol},
     parser::lexer,
 };
 use std::{collections::HashSet, fmt::Display};
@@ -482,7 +482,7 @@ pub enum Literal {
     Real(f64),
     Char(char),
     String(String),
-    Symbol(String),
+    Symbol(Symbol),
     Bytearray(Vec<u8>),
 }
 
@@ -513,8 +513,8 @@ impl Display for Literal {
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Operator {
-    Qualified(Vec<String>, String),
-    Plain(String),
+    Qualified(Vec<Symbol>, Symbol),
+    Plain(Symbol),
 }
 
 impl Operator {
@@ -526,11 +526,11 @@ impl Operator {
     }
 }
 
-fn operator_id(op: &str) -> String {
-    if lexer::identifier_initial_char(op.chars().next().unwrap()) {
-        op.to_owned()
+fn operator_id(op: &Symbol) -> Symbol {
+    if lexer::identifier_initial_char(op.as_str().chars().next().unwrap()) {
+        op.clone()
     } else {
-        format!("({})", op)
+        Symbol::from(format!("({})", op))
     }
 }
 

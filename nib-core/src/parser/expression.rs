@@ -2,7 +2,7 @@ use super::ParserState;
 use crate::ast::{
     Binding, Binop, Cond, Expression, ExpressionNode, FunClause, Literal, Operator, PatternNode,
 };
-use crate::common::{Location, Name, Result};
+use crate::common::{Location, Name, Result, Symbol};
 use crate::parser::lexer::TokenValue;
 
 impl<'a> ParserState<'a> {
@@ -49,7 +49,7 @@ impl<'a> ParserState<'a> {
                 TokenValue::Where if min_pred < 2 => self.parse_where_expression(lhs),
                 TokenValue::Operator(op) if min_pred < 6 => {
                     self.get_next_token()?;
-                    self.parse_binop_expression(lhs, Operator::Plain(op))
+                    self.parse_binop_expression(lhs, Operator::Plain(Symbol::from(op)))
                 }
                 TokenValue::FatRightArrow if min_pred < 4 => self.parse_cond_expression(lhs),
                 TokenValue::Period => self.parse_projection_expression(lhs),
@@ -259,7 +259,7 @@ impl<'a> ParserState<'a> {
             let next = match self.peek_next_token()?.value {
                 TokenValue::Identifier(id) => {
                     self.get_next_token()?;
-                    self.literal_expression(Literal::Symbol(id))
+                    self.literal_expression(Literal::Symbol(Symbol::from(id)))
                 }
                 _ => self.parse_inner_expression(10)?,
             };

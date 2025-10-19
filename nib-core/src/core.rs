@@ -1,4 +1,5 @@
 use crate::ast::{ExpressionNode, Pattern};
+use crate::common::Symbol;
 use crate::{
     ast::{self, Literal, PatternNode},
     common::{Error, Metadata, Name, Node, Result},
@@ -195,7 +196,9 @@ impl DesugarState {
         let bound_names = pattern.bound_vars();
         match &pattern.pattern {
             Pattern::Alias(pat, alias) => {
-                let name = alias.string();
+                let Name::Plain(name) = alias else {
+                    return self.error("Qualified name in alias pattern.");
+                };
                 let mut parts = Vec::new();
                 parts.push(PatternParts::Bind(name.clone(), expr.to_owned()));
                 let mut inner = self.desugar_arg_pattern(&pat, &var(&name))?;
@@ -210,22 +213,22 @@ impl DesugarState {
                     Expression::App(pattern.id, vec![name_expr(name), expr.clone()]),
                 ));
                 let failed = app(&vec![
-                    var("_prim_eq"),
+                    var(&Symbol::from("_prim_eq")),
                     var(&loc),
                     literal(&Literal::Bool(false)),
                 ]);
-                let success = app(&vec![var("_prim_bitnot"), failed]);
+                let success = app(&vec![var(&Symbol::from("_prim_bitnot")), failed]);
                 parts.push(PatternParts::Check(success));
-                let size = app(&vec![var("_prim_array_size"), var(&loc)]);
+                let size = app(&vec![var(&Symbol::from("_prim_array_size")), var(&loc)]);
                 let size_check = app(&vec![
-                    var("_prim_eq"),
+                    var(&Symbol::from("_prim_eq")),
                     size,
                     literal(&Literal::Integer(fields.len() as i64)),
                 ]);
                 parts.push(PatternParts::Check(size_check));
                 for (i, f) in fields.iter().enumerate() {
                     let refer = app(&vec![
-                        var("_prim_array_ref"),
+                        var(&Symbol::from("_prim_array_ref")),
                         var(&loc),
                         literal(&Literal::Integer(i as i64)),
                     ]);
@@ -243,14 +246,17 @@ impl DesugarState {
             ),
             Pattern::Ellipsis(name) => {
                 if let Some(n) = name {
-                    Ok(vec![PatternParts::Bind(n.string(), expr.clone())])
+                    let Name::Plain(s) = n else {
+                        return self.error("Qualified name in ellipsis pattern.");
+                    };
+                    Ok(vec![PatternParts::Bind(s.clone(), expr.clone())])
                 } else {
                     Ok(vec![])
                 }
             }
             Pattern::Literal(lit) => {
                 // TODO: Generate appropriate check for each literal type
-                let check = app(&vec![var("_prim_eq"), expr.clone(), literal(lit)]);
+                let check = app(&vec![var(&Symbol::from("_prim_eq")), expr.clone(), literal(lit)]);
                 Ok(vec![PatternParts::Check(check)])
             }
             Pattern::Typed(pat, typ) => {
@@ -261,12 +267,15 @@ impl DesugarState {
                         val = var(name);
                     }
                 }
-                let get_type = app(&vec![var("_prim_type"), val]);
-                let check = app(&vec![var("_prim_eq"), get_type, name_expr(typ)]);
+                let get_type = app(&vec![var(&Symbol::from("_prim_type")), val]);
+                let check = app(&vec![var(&Symbol::from("_prim_eq")), get_type, name_expr(typ)]);
                 inner.push(PatternParts::Check(check));
                 Ok(inner)
             }
-            Pattern::Var(name) => Ok(vec![PatternParts::Bind(name.string(), expr.clone())]),
+            Pattern::Var(Name::Plain(name)) => Ok(vec![PatternParts::Bind(name.clone(), expr.clone())]),
+            Pattern::Var(_) => {
+                self.error("Qualified name in arg pattern")
+            }
             Pattern::Wildcard => Ok(vec![]),
         }
     }
@@ -330,7 +339,7 @@ impl DesugarState {
 
     fn no_match_expression() -> Expression {
         app(&vec![
-            var("_prim_panic"),
+            var(&Symbol::from("_prim_panic")),
             literal(&Literal::String("No matching pattern".to_owned())),
         ])
     }
@@ -400,10 +409,10 @@ impl DesugarState {
                     if let Expression::Var(n, v) = expression {
                         // Just a = b, can rename all 'a' to 'b' instead of
                         // creating a binding.
-                        exp = rename(&exp, &Var::Named(var.to_string()), v);
+                        exp = rename(&exp, &Var::Named(var.clone()), v);
                     } else {
                         let binding =
-                            Binding::binding(0, Binder::Local(Name::str(var)), expression.clone());
+                            Binding::binding(0, Binder::Local(Name::sym(var)), expression.clone());
                         match &mut exp {
                             Expression::Where(n, expr, binds) => {
                                 binds.insert(0, binding);
@@ -428,13 +437,13 @@ impl DesugarState {
         let mut p = pattern.clone();
         match &pattern.pattern {
             Pattern::Ellipsis(Some(old)) => {
-                let n = Name::Plain(format!("z{}", counter));
+                let n = Name::Plain(Symbol::from(format!("z{}", counter)));
                 *counter += 1;
                 replacements.insert(n.clone(), old.clone());
                 p.pattern = Pattern::Ellipsis(Some(n));
             }
             Pattern::Var(old) => {
-                let n = Name::Plain(format!("z{}", counter));
+                let n = Name::Plain(Symbol::from(format!("z{}", counter)));
                 *counter += 1;
                 replacements.insert(n.clone(), old.clone());
                 p.pattern = Pattern::Var(n)
@@ -447,7 +456,7 @@ impl DesugarState {
                 p.pattern = Pattern::Array(new_arr);
             }
             Pattern::Alias(pat, old) => {
-                let n = Name::Plain(format!("z{}", counter));
+                let n = Name::Plain(Symbol::from(format!("z{}", counter)));
                 *counter += 1;
                 replacements.insert(n.clone(), old.clone());
                 let new_pat = self.pattern_with_plain_vars(pat, counter, replacements);
@@ -472,7 +481,7 @@ impl DesugarState {
     fn next_local(&mut self) -> Name {
         self.last_local += 1;
         let id = format!("$local{}", self.last_local);
-        Name::Plain(id)
+        Name::Plain(Symbol::from(id))
     }
 
     fn next_arg(&mut self) -> Var {
@@ -486,7 +495,7 @@ impl DesugarState {
         free_vars(exp, &mut vars, &mut locals);
         let mut counter = 0;
         loop {
-            let next = format!("x{}", counter);
+            let next = Symbol::from(format!("x{}", counter));
             if !vars.contains(&next) {
                 return Var::Named(next);
             }
@@ -512,11 +521,11 @@ impl DesugarState {
     }
 
     fn named_var(&mut self, name: &str) -> Expression {
-        Expression::Var(self.new_id(), Var::Named(name.to_owned()))
+        Expression::Var(self.new_id(), Var::Named(Symbol::from(name)))
     }
 
     fn var(&mut self, name: Name) -> Expression {
-        Expression::Var(self.new_id(), Var::Named(name.string()))
+        Expression::Var(self.new_id(), Var::Named(name.top()))
     }
 
     fn error<T>(&self, msg: &str) -> Result<T> {
@@ -586,16 +595,15 @@ impl Display for Module {
 pub struct Binding {
     pub id: Node,
     pub binder: Binder,
-    pub name: String,
+    pub name: Option<Name>,
     pub body: Expression,
 }
 
 impl Binding {
     pub fn binding(id: Node, binder: Binder, body: Expression) -> Self {
         let name = match &binder {
-            Binder::Public(name) => name.string(),
-            Binder::Local(s) => s.string(),
-            Binder::Unbound => "".to_string(),
+            Binder::Public(name) | Binder::Local(name) => Some(name.clone()),
+            Binder::Unbound => None,
         };
         Binding {
             id,
@@ -674,19 +682,19 @@ impl Lambda {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Var {
-    Named(String),
+    Named(Symbol),
     Arg(u32),
     Env(u32),
     Local(u32),
 }
 
 impl Var {
-    pub fn name(&self) -> String {
+    pub fn name(&self) -> Symbol {
         match self {
             Var::Named(s) => s.clone(),
-            Var::Arg(n) => format!("$arg{}", n),
-            Var::Env(n) => format!("$env{}", n),
-            Var::Local(n) => format!("$loc{}", n),
+            Var::Arg(n) => Symbol::from(&format!("$arg{}", n)),
+            Var::Env(n) => Symbol::from(format!("$env{}", n)),
+            Var::Local(n) => Symbol::from(format!("$loc{}", n)),
         }
     }
 }
@@ -744,8 +752,8 @@ impl Display for Expression {
     }
 }
 
-fn var(s: &str) -> Expression {
-    Expression::Var(0, Var::Named(s.to_owned()))
+fn var(s: &Symbol) -> Expression {
+    Expression::Var(0, Var::Named(s.clone()))
 }
 
 fn name_expr(n: &Name) -> Expression {
@@ -754,7 +762,7 @@ fn name_expr(n: &Name) -> Expression {
         Name::Qualified(p, s) => {
             let t = n.top();
             let rest = p[1..].iter().chain(vec![s]);
-            let mut args = vec![var("project"), var(&t)];
+            let mut args = vec![var(&Symbol::from("project")), var(&t)];
             for a in rest {
                 args.push(literal(&Literal::Symbol(a.clone())));
             }
@@ -771,8 +779,8 @@ fn env(n: u32) -> Expression {
     Expression::Var(0, Var::Env(n))
 }
 
-fn local(n: usize) -> String {
-    format!("loc{}", n)
+fn local(n: usize) -> Symbol {
+    Symbol::from(format!("$loc{}", n))
 }
 
 fn app(exps: &[Expression]) -> Expression {
@@ -799,7 +807,7 @@ fn lambda(args: Vec<Var>, arity: &Arity, body: &Expression) -> Expression {
 #[derive(Debug, Clone, PartialEq)]
 pub enum PatternParts {
     Check(Expression),
-    Bind(String, Expression),
+    Bind(Symbol, Expression),
 }
 
 #[derive(Debug, Clone, PartialEq, PartialOrd, Hash)]
@@ -863,10 +871,11 @@ pub fn rename(expr: &Expression, old_name: &Var, new_name: &Var) -> Expression {
                 let mut new_binding = b.clone();
                 new_binding.body = new_body;
                 new_defs.push(new_binding);
-                if let Var::Named(n) = old_name
-                    && n == &b.name
-                {
-                    shadowed = true;
+                if let Var::Named(n) = old_name {
+                    if let Some(Name::Plain(x)) = &b.name &&
+                        n == x {
+                        shadowed = true;
+                    }
                 }
             }
             let new_exp = if !shadowed {
@@ -880,7 +889,7 @@ pub fn rename(expr: &Expression, old_name: &Var, new_name: &Var) -> Expression {
     }
 }
 
-pub fn free_vars_iter<'a, T>(iter: &'a mut T) -> Result<HashSet<String>>
+pub fn free_vars_iter<'a, T>(iter: &'a mut T) -> Result<HashSet<Symbol>>
 where
     T: Iterator<Item = &'a Expression>,
 {
@@ -892,11 +901,11 @@ where
     Ok(vars)
 }
 
-fn add_local(locals: &mut HashMap<String, i32>, var: &Var) {
+fn add_local(locals: &mut HashMap<Symbol, i32>, var: &Var) {
     locals.insert(var.name(), locals.get(&var.name()).unwrap_or(&0) + 1);
 }
 
-fn remove_local(locals: &mut HashMap<String, i32>, var: &Var) {
+fn remove_local(locals: &mut HashMap<Symbol, i32>, var: &Var) {
     if let Some(v) = locals.get_mut(&var.name()) {
         *v -= 1;
         if *v == 0 {
@@ -905,19 +914,19 @@ fn remove_local(locals: &mut HashMap<String, i32>, var: &Var) {
     }
 }
 
-fn add_locals(locals: &mut HashMap<String, i32>, vars: &[Var]) {
+fn add_locals(locals: &mut HashMap<Symbol, i32>, vars: &[Var]) {
     for v in vars {
         add_local(locals, v);
     }
 }
 
-fn remove_locals(locals: &mut HashMap<String, i32>, vars: &[Var]) {
+fn remove_locals(locals: &mut HashMap<Symbol, i32>, vars: &[Var]) {
     for v in vars {
         remove_local(locals, v);
     }
 }
 
-pub fn free_vars(expr: &Expression, vars: &mut HashSet<String>, locals: &mut HashMap<String, i32>) {
+pub fn free_vars(expr: &Expression, vars: &mut HashSet<Symbol>, locals: &mut HashMap<Symbol, i32>) {
     match expr {
         Expression::Literal(_, literal) => {}
         Expression::Var(_, v) => {

@@ -111,8 +111,8 @@ impl From<Error> for io::Error {
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Name {
-    Qualified(Vec<String>, String),
-    Plain(String),
+    Qualified(Vec<Symbol>, Symbol),
+    Plain(Symbol),
 }
 
 impl From<&Name> for Name {
@@ -127,28 +127,32 @@ impl Name {
             Name::Qualified(path, name) => {
                 let mut str = String::new();
                 for s in path {
-                    str.push_str(s);
+                    str.push_str(s.as_str());
                     str.push('.');
                 }
-                str.push_str(name);
+                str.push_str(name.as_str());
                 str
             }
-            Name::Plain(name) => name.clone(),
+            Name::Plain(name) => name.as_str().to_owned(),
         }
     }
 
     pub fn str(n: &str) -> Self {
         let mut parts: Vec<&str> = n.split(".").collect();
         if parts.len() == 1 {
-            Name::Plain(parts[0].to_string())
+            Name::Plain(Symbol::from(parts[0]))
         } else {
             let base = parts.pop().unwrap();
-            let path = parts.iter().map(|s| s.to_string()).collect();
-            Name::Qualified(path, base.to_string())
+            let path = parts.into_iter().map(|s| Symbol::from(s)).collect();
+            Name::Qualified(path, Symbol::from(base))
         }
     }
 
-    pub fn top(&self) -> String {
+    pub fn sym(s: &Symbol) -> Self {
+        Name::Plain(s.clone())
+    }
+
+    pub fn top(&self) -> Symbol {
         match self {
             Name::Qualified(items, n) => items.first().unwrap_or(n).clone(),
             Name::Plain(n) => n.clone(),

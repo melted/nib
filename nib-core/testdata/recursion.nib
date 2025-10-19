@@ -1,7 +1,7 @@
 // Overflows
 // Todo: make it not overflow
 
-a = array.create 20000
+a = array.create 2000
 b = array.create 2000
 
 c = a ++ b

@@ -1,6 +1,6 @@
 #![cfg(test)]
 use crate::ast::{Binding, Cond, Declaration, Expression, Literal, Pattern};
-use crate::common::{Name, Result};
+use crate::common::{Name, Result, Symbol};
 use crate::parser::lexer::TokenValue;
 use crate::parser::{ParserState, lex};
 
@@ -35,9 +35,9 @@ fn parse_names() -> Result<()> {
     assert!(ret.is_ok());
     match ret {
         Ok(Name::Qualified(p, n)) => {
-            assert_eq!(n, "name");
+            assert_eq!(n.as_str(), "name");
             assert_eq!(p.len(), 1);
-            assert_eq!(p[0], "a");
+            assert_eq!(p[0].as_str(), "a");
         }
         _ => assert!(false),
     }
@@ -96,7 +96,7 @@ fn parse_module_declaration() -> Result<()> {
     if let Declaration::Module(module) = decl {
         assert_eq!(
             module.name,
-            Name::Qualified(vec!["cool".to_string()], "mod".to_string())
+            Name::Qualified(vec![Symbol::from("cool")], Symbol::from("mod"))
         );
     } else {
         assert!(false);

@@ -32,7 +32,7 @@ impl Runtime {
         let mut env = Environment::new();
         eval_status
             .work_stack
-            .push(EvalStep::Expression(Symbol::from("it"), expression));
+            .push(EvalStep::Expression(None, expression));
         self.eval(&mut eval_status, &mut env)?;
         Ok(eval_status.value_stack.pop().unwrap_or(Value::Nil))
     }
@@ -46,7 +46,7 @@ impl Runtime {
         }
         eval_status
             .work_stack
-            .push(EvalStep::Apply(Symbol::from("it"), size));
+            .push(EvalStep::Apply(None, size));
         self.eval(&mut eval_status, &mut env)?;
         Ok(eval_status.value_stack.pop().unwrap_or(Value::Nil))
     }
@@ -71,30 +71,30 @@ impl Runtime {
             Literal::Char(c) => Ok(Value::Char(*c)),
             Literal::Real(r) => Ok(Value::Real(*r)),
             Literal::Bytearray(ba) => Ok(Value::new_bytes(ba.clone())),
-            Literal::Symbol(sym) => Ok(Value::Symbol(self.get_symbol(sym))),
+            Literal::Symbol(sym) => Ok(Value::Symbol(self.get_symbol(sym.as_str()))),
             Literal::String(s) => self.make_string(s),
         }
     }
 
     fn evaluate_lambda(
         &mut self,
-        binding_name: &Symbol,
+        binding_name: &Option<Name>,
         lam: &Lambda,
-        free: &HashSet<String>,
+        free: &HashSet<Symbol>,
         env: &mut Environment,
     ) -> Result<Value> {
         info!("Evaluating lambda");
         let mut lexical_env = Environment::new();
         lexical_env.push();
         for v in free.iter() {
-            let val = self.lookup(env, v).unwrap_or(Value::Undefined);
-            if !binding_name.as_str().is_empty() {
+            let val = self.lookup(env, v.as_str()).unwrap_or(Value::Undefined);
+            if let Some(name) = binding_name {
                 if val == Value::Undefined {
-                    let c = self.closures_to_check.entry(v.into()).or_default();
-                    c.insert(binding_name.clone());
+                    let c = self.closures_to_check.entry(*v).or_default();
+                    c.insert(name.top());
                 }
             }
-            lexical_env.add(v, &val);
+            lexical_env.add(v.as_str(), &val);
         }
         let arity = lam.arity.clone();
         Ok(Value::Closure(new_ref(Closure {
@@ -136,7 +136,7 @@ impl Runtime {
             .work_stack
             .push(EvalStep::Bind(binding.name.clone(), binding.binder.clone()));
         eval_status.work_stack.push(EvalStep::Expression(
-            Symbol::from(&binding.name),
+            binding.name.clone(),
             binding.body.clone(),
         ));
     }
@@ -189,26 +189,28 @@ impl Runtime {
                     Binder::Local(name) => {
                         match name {
                             Name::Plain(s) => {
-                                env.add(&s, &val);
+                                env.add(&s.as_str(), &val);
                             }
                             Name::Qualified(path, id) => {
                                 let start = &path[0];
                                 let rest = &path[1..];
-                                let first = if let Some(v) = env.get(start) {
+                                let first = if let Some(v) = env.get(id.as_str()) {
                                     v.get_table()?
                                 } else {
                                     let nt = Value::new_table();
-                                    env.add(start, &nt);
+                                    env.add(start.as_str(), &nt);
                                     nt.get_table()?
                                 };
                                 let tab = self.get_or_create_module_path(rest, first)?;
-                                self.add_to_table(tab, &id, &val);
+                                self.add_to_table(tab, &id.as_str(), &val);
                             }
                         };
                     }
                     Binder::Unbound => {}
                 }
-                self.update_closures(env, &name);
+                if let Some(n) = &name {
+                    self.update_closures(env, n.top().as_str());
+                }
             }
             EvalStep::ReplaceEnv(mut new_env) => {
                 mem::swap(env, &mut new_env);
@@ -225,7 +227,7 @@ impl Runtime {
         eval_status: &mut EvalStatus,
         expr: Expression,
         env: &mut Environment,
-        binding_name: &Symbol,
+        binding_name: &Option<Name>,
     ) -> Result<()> {
         match expr {
             Expression::Literal(_, lit) => {
@@ -233,7 +235,7 @@ impl Runtime {
                 eval_status.value_stack.push(val);
             }
             Expression::Var(_, var) => {
-                let Some(v) = self.lookup(env, &var.name()) else {
+                let Some(v) = self.lookup(env, &var.name().as_str()) else {
                     return self.error(&format!(
                         "couldn't find variable {} in environment",
                         &var.name()
@@ -250,25 +252,25 @@ impl Runtime {
             }
             Expression::Cond(_, cond) => {
                 eval_status.work_stack.push(EvalStep::Select(
-                    Box::new(EvalStep::Expression(*binding_name, cond.if_true)),
+                    Box::new(EvalStep::Expression(binding_name.clone(), cond.if_true)),
                     Box::new(EvalStep::Expression(
-                        *binding_name,
+                        binding_name.clone(),
                         cond.if_false,
                     )),
                 ));
                 eval_status
                     .work_stack
-                    .push(EvalStep::Expression(*binding_name, cond.pred));
+                    .push(EvalStep::Expression(binding_name.clone(), cond.pred));
             }
             Expression::App(_, app) => {
                 let size = app.len();
                 eval_status
                     .work_stack
-                    .push(EvalStep::Apply(*binding_name, size));
+                    .push(EvalStep::Apply(binding_name.clone(), size));
                 for exp in app.into_iter().rev() {
                     eval_status
                         .work_stack
-                        .push(EvalStep::Expression(*binding_name, exp));
+                        .push(EvalStep::Expression(binding_name.clone(), exp));
                 }
             }
             Expression::Where(_, exp, binds) => {
@@ -279,7 +281,7 @@ impl Runtime {
                     .push(EvalStep::ReplaceClosureRefs(prev_cc));
                 eval_status
                     .work_stack
-                    .push(EvalStep::Expression(*binding_name, *exp));
+                    .push(EvalStep::Expression(binding_name.clone(), *exp));
                 for b in binds.into_iter().rev() {
                     self.add_binding(eval_status, &b);
                 }
@@ -293,7 +295,7 @@ impl Runtime {
         eval_status: &mut EvalStatus,
         vals: &[Value],
         current_env: &mut Environment,
-        binding_name: &Symbol,
+        binding_name: &Option<Name>
     ) -> Result<()> {
         info!("Applying {} to {} arguments", &vals[0], &vals[1..].len());
         match &vals[0] {
@@ -324,7 +326,7 @@ impl Runtime {
                     let size = remaining.len();
                     eval_status
                         .work_stack
-                        .push(EvalStep::Apply(*binding_name, size + 1));
+                        .push(EvalStep::Apply(binding_name.clone(), size + 1));
                     for r in remaining.into_iter().rev() {
                         eval_status.work_stack.push(EvalStep::Value(r));
                     }
@@ -340,12 +342,12 @@ impl Runtime {
                             args.insert(i as usize, array);
                         }
                         for (v, i) in args.iter().zip(lam.args.iter()) {
-                            env.add(&i.name(), v);
+                            env.add(&i.name().as_str(), v);
                         }
                         mem::swap(&mut env, current_env);
                         eval_status.work_stack.push(EvalStep::ReplaceEnv(env));
                         eval_status.work_stack.push(EvalStep::Expression(
-                            *binding_name,
+                            binding_name.clone(),
                             lam.body.clone(),
                         ));
                         None
@@ -413,13 +415,13 @@ impl EvalStatus {
 
 #[derive(Debug, Clone)]
 pub(super) enum EvalStep {
-    Expression(Symbol, Expression),
+    Expression(Option<Name>, Expression),
     ReplaceClosureRefs(ClosureRefs),
     ReplaceEnv(Environment),
     Select(Box<EvalStep>, Box<EvalStep>),
     Value(Value),
-    Apply(Symbol, usize),
-    Bind(String, Binder),
+    Apply(Option<Name>, usize),
+    Bind(Option<Name>, Binder),
 }
 
 #[derive(Debug, Clone, PartialEq)]

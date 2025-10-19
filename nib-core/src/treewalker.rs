@@ -131,10 +131,10 @@ impl Runtime {
         match name {
             Name::Qualified(path, name) => {
                 let t = self.get_or_create_module_path(path, self.globals.clone())?;
-                self.add_to_table(t, name, val);
+                self.add_to_table(t, name.as_str(), val);
             }
             Name::Plain(name) => {
-                self.add_global(name, val.clone());
+                self.add_global(name.as_str(), val.clone());
             }
         }
         Ok(())
@@ -144,20 +144,20 @@ impl Runtime {
         match name {
             Name::Qualified(path, name) => {
                 if let Some(t) = self.get_module_path(path) {
-                    self.get_from_table(t, name)
+                    self.get_from_table(t, name.as_str())
                 } else {
                     None
                 }
             }
-            Name::Plain(name) => self.get_global(name),
+            Name::Plain(name) => self.get_global(name.as_str()),
         }
     }
 
-    pub fn get_module_path(&self, path: &[String]) -> Option<Rc<RefCell<Table>>> {
+    pub fn get_module_path(&self, path: &[Symbol]) -> Option<Rc<RefCell<Table>>> {
         let mut rest = path;
         let mut table = self.globals.clone();
         while !rest.is_empty() {
-            let sym = self.get_symbol(&rest[0]);
+            let sym = self.get_symbol(&rest[0].as_str());
             table = {
                 let t = &mut table.borrow_mut().table;
                 let v = t.get(&sym);
@@ -175,13 +175,13 @@ impl Runtime {
 
     pub fn get_or_create_module_path(
         &mut self,
-        path: &[String],
+        path: &[Symbol],
         start: Rc<RefCell<Table>>,
     ) -> Result<Rc<RefCell<Table>>> {
         let mut rest = path;
         let mut table = start;
         while !rest.is_empty() {
-            let sym = self.get_symbol(&rest[0]);
+            let sym = self.get_symbol(&rest[0].as_str());
             table = {
                 let t = &mut table.borrow_mut().table;
                 let v = t.get(&sym);
@@ -204,7 +204,7 @@ impl Runtime {
 
     pub fn make_string(&self, s: &str) -> Result<Value> {
         let mut b = Bytes::with(s.as_bytes().to_vec());
-        b.type_table = self.get_module_path(&["string".to_owned()]);
+        b.type_table = self.get_module_path(&[Symbol::from("string")]);
         if b.type_table.is_none() {
             return self.error("trying to make string before string type table exists");
         }

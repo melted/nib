@@ -1,6 +1,6 @@
 use crate::{
     ast::{ExpressionNode, FunClause, Literal, Operator, PatternNode},
-    common::{Name, Result},
+    common::{Name, Result, Symbol},
 };
 
 use super::{ParserState, lexer::TokenValue};
@@ -61,7 +61,7 @@ impl<'a> ParserState<'a> {
     pub(super) fn parse_qualified_name(&mut self) -> Result<Name> {
         let first = self.get_next_token()?;
         let mut id = match first.value {
-            TokenValue::Identifier(id) => id,
+            TokenValue::Identifier(id) => Symbol::from(id),
             _ => {
                 return self.error(&format!("Expected identifier, got {:?}", &first.value));
             }
@@ -71,7 +71,7 @@ impl<'a> ParserState<'a> {
             path.push(id);
             let next = self.get_next_token()?;
             id = match next.value {
-                TokenValue::Identifier(id) => id,
+                TokenValue::Identifier(id) => Symbol::from(id),
                 _ => {
                     return self.error(&format!("Expected identifier, got {:?}", &next.value));
                 }
@@ -87,7 +87,7 @@ impl<'a> ParserState<'a> {
 
     pub(super) fn parse_operator(&mut self) -> Result<Operator> {
         match self.get_next_token()?.value {
-            TokenValue::Operator(op) => Ok(Operator::Plain(op)),
+            TokenValue::Operator(op) => Ok(Operator::Plain(Symbol::from(op))),
             t => self.error(&format!("Expected an operator, got {t:?}")),
         }
     }
@@ -102,7 +102,7 @@ impl<'a> ParserState<'a> {
             TokenValue::Float(x) => Ok(Literal::Real(x)),
             TokenValue::Char(ch) => Ok(Literal::Char(ch)),
             TokenValue::String(s) => Ok(Literal::String(s)),
-            TokenValue::Symbol(s) => Ok(Literal::Symbol(s)),
+            TokenValue::Symbol(s) => Ok(Literal::Symbol(Symbol::from(s))),
             TokenValue::HashLeftBracket => {
                 let mut bytes = Vec::new();
                 bytes.push(self.parse_byte()?);
