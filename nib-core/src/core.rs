@@ -738,7 +738,16 @@ impl Display for Expression {
             }
             Expression::Lambda(_, lam) => {
                 write!(f, "{{ ")?;
-                write!(f, "{} ", lam.arity)?;
+                let ellipsis = match lam.arity {
+                    Arity::Fixed(_) => None,
+                    Arity::VarArg(_, n) => Some(n as usize)
+                };
+                for (i, a) in lam.args.iter().enumerate() {
+                    if let Some(n) = ellipsis && n == i {
+                        write!(f, "...")?;
+                    }
+                    write!(f, "{} ", a.name())?;
+                }
                 write!(f, "-> {}", lam.body)?;
                 write!(f, " }}")?;
             }

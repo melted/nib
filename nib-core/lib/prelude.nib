@@ -65,6 +65,8 @@ x && y = x => y (); false
 on x f = f x
 id x = x
 
+begin ... last = last
+
 /// Sequencing operator. The arguments are evaluated in order and the right argument
 /// is returned.
 a & b = b
