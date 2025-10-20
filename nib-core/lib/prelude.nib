@@ -43,8 +43,8 @@ a == b = _prim_eq a b
 /// Return true if `a` doesn't equal `b`, false otherwise
 a != b = not (a == b)
 
-not true = false
 not false = true
+not _ = false
 
 // bitops
 bit_and = _prim_bitand

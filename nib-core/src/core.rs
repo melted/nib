@@ -728,8 +728,9 @@ impl Display for Expression {
         match self {
             Expression::App(_, exprs) => {
                 write!(f, "(")?;
-                for e in exprs {
-                    write!(f, "{} ", e)?;
+                write!(f, "{}", exprs[0])?;
+                for e in exprs[1..].iter() {
+                    write!(f, " {}", e)?;
                 }
                 write!(f, ")")?;
             }
