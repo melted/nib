@@ -1,7 +1,9 @@
 #![cfg(test)]
 
 use crate::core::desugar;
+use crate::interpreter::bytecode::INSTR_ADD;
 use crate::interpreter::compile::Compilation;
+use crate::interpreter::Runtime;
 use crate::parser::parse_declarations;
 use crate::{
     common::{Result, Symbol},
@@ -101,5 +103,18 @@ fn create_compilation() -> Result<()> {
     let ast_mod = parse_declarations(None, "a = 1")?;
     let core_mod = desugar(ast_mod)?;
     let comp = Compilation::new(core_mod);
+    Ok(())
+}
+
+#[test]
+fn add_numbers() -> Result<()> {
+    let mut rt = Runtime::new();
+    rt.code = vec![INSTR_ADD, 0, 1, 2];
+    rt.regs[1] = Value::integer(8);
+    rt.regs[2] = Value::integer(7);
+    let err = rt.run();
+    assert!(err.is_ok());
+    let res = Value::get_integer(&rt.regs[0]);
+    assert_eq!(res, 15);
     Ok(())
 }

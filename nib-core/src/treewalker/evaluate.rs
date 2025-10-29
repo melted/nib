@@ -192,7 +192,7 @@ impl Runtime {
                             Name::Qualified(path, id) => {
                                 let start = &path[0];
                                 let rest = &path[1..];
-                                let first = if let Some(v) = env.get(&id) {
+                                let first = if let Some(v) = env.get(&start) {
                                     v.get_table()?
                                 } else {
                                     let nt = Value::new_table();

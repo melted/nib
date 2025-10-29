@@ -1,0 +1,13 @@
+// @Name: Test qualified local binding
+// @Tags: where binding
+t = tab where
+            tab.a = 1
+            tab.b = 2
+
+_ = println t.a
+_ = println t.b
+// @Output:
+// 1
+// 2
+// @EndOutput
+// @ExitCode: 0
