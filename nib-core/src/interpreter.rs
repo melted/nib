@@ -10,7 +10,7 @@ use std::ops::BitXor;
 
 use crate::common::{Error, Result, Symbol};
 use crate::interpreter::bytecode::*;
-use crate::interpreter::heap::{Heap, Table, Value, ValueRepr, TYPE_BYTECODE, TYPE_CORE, TYPE_EXTERN};
+use crate::interpreter::heap::{Bytes, Heap, Table, Value, ValueRepr, TYPE_BYTECODE, TYPE_CORE, TYPE_EXTERN};
 use crate::interpreter::prims::PrimFn;
 
 pub mod bytecode;
@@ -60,10 +60,14 @@ impl Runtime {
         todo!()
     }
 
-    pub fn add_global(&mut self, sym: &Symbol, value:&Value) -> Result<()> {
+    pub fn set_global(&mut self, sym: &Symbol, value:&Value) {
         let mut env = self.global_env.get_table();
         env.insert(&mut self.heap, Value::symbol(sym), value.clone());
-        Ok(())
+    }
+
+    pub fn get_global(&mut self, sym: &Symbol) -> Value{
+        let env = self.global_env.get_table();
+        env.get(Value::symbol(sym))
     }
 
     fn run(&mut self) -> Result<()> {
@@ -81,12 +85,29 @@ impl Runtime {
         let code = bytes.get_slice();
         let instr = code[self.ip];
         match instr {
+            INSTR_NOP => {
+                self.ip += 1;
+                Ok(false)
+            }
             INSTR_ADD..=INSTR_MOD => self.op_arithmetic(),
             INSTR_NEG => self.op_negate(),
             INSTR_CMP..=INSTR_NEQ => self.op_compare(),
             INSTR_CALL => self.op_call(),
             INSTR_RETURN => self.op_return(),
-            INSTR_JUMP..=INSTR_JNFALSE_IMM32 => self.op_jump(),
+            INSTR_JUMP..=INSTR_JUMP_IMM8 => self.op_jump(),
+            INSTR_JZ..=INSTR_JNFALSE_IMM8 => self.op_conditional_jump(),
+            INSTR_MOVE => self.op_move(),
+            INSTR_LOAD_IMM8..=INSTR_LOAD_IMM64 => self.op_load_imm(),
+            INSTR_LOAD_BYTES_IMM => self.op_load_bytes(),
+            INSTR_PUSH => self.op_push(),
+            INSTR_POP => self.op_pop(),
+            INSTR_ALLOC_FLOAT..=INSTR_ALLOC_CLOSURE => self.op_alloc(),
+            INSTR_ARRAY_REF => self.op_array_get(),
+            INSTR_ARRAY_SET => self.op_array_set(),
+            INSTR_BYTES_REF => self.op_bytes_get(),
+            INSTR_BYTES_SET => self.op_bytes_set(),
+            INSTR_TABLE_GET => self.op_table_get(),
+            INSTR_TABLE_SET => self.op_table_set(),
             _ => {
                 self.error(&format!("unimplemented opcode: {}", instr))
             }
@@ -261,6 +282,228 @@ impl Runtime {
     }
 
     fn op_jump(&mut self) -> Result<bool> {
+        let bytes = self.code.get_bytes();
+        let code = bytes.get_slice();
+        let op = code[self.ip];
+        let arg = code[self.ip+1];
+        let dist = if op == INSTR_JUMP {
+            let val = self.regs[arg as usize];
+            ensure_type(&val, ValueRepr::Integer)?;
+            val.get_integer() as i64
+        } else {
+            (arg as i64 - 128)
+        };
+        let target = (self.ip as i64 + dist) as usize;
+        if target < code.len() {
+            self.ip = target;
+            Ok(false)
+        } else {
+            self.error("Jump outside of code")
+        }
+    }
+    
+    fn op_conditional_jump(&mut self) -> Result<bool> {
+        let bytes = self.code.get_bytes();
+        let code = bytes.get_slice();
+        let op = code[self.ip];
+        let check = code[self.ip + 1];
+        let val = self.regs[check as usize];
+        let do_jump = match op {
+            INSTR_JZ | INSTR_JZ_IMM8 => val.get_integer() == 0,
+            INSTR_JPOS | INSTR_JPOS_IMM8 => val.get_integer() > 0,
+            INSTR_JNEG | INSTR_JNEG_IMM8 => val.get_integer() < 0,
+            INSTR_JNPOS | INSTR_JNPOS_IMM8 => !(val.get_integer() > 0),
+            INSTR_JNNEG | INSTR_JNNEG_IMM8 => !(val.get_integer() < 0),
+            INSTR_JFALSE | INSTR_JFALSE_IMM8 => val == Value::bool(false),
+            INSTR_JNFALSE | INSTR_JNFALSE_IMM8 => val != Value::bool(false),
+            _ => unreachable!()
+        };
+        if do_jump {
+            let arg = code[self.ip+1];
+            let dist = match op {
+                INSTR_JPOS | INSTR_JNEG | INSTR_JNPOS | INSTR_JNNEG | INSTR_JFALSE | INSTR_JNFALSE => {
+                    let val = self.regs[arg as usize];
+                    ensure_type(&val, ValueRepr::Integer)?;
+                    val.get_integer() as i64
+                }
+                _ => {
+                    arg as i64 - 128
+                }
+            };
+            let target = (self.ip as i64 + dist) as usize;
+            if target < code.len() {
+                self.ip = target;
+                Ok(false)
+            } else {
+                self.error("Jump outside of code")
+            }
+        } else {
+            self.ip += 3;
+            Ok(false)
+        }
+    }
+
+    fn op_load_imm(&mut self) -> Result<bool> {
+        let bytes = self.code.get_bytes();
+        let code = bytes.get_slice();
+        let op = code[self.ip];
+        let target_reg = code[self.ip+1];
+        let rest = &code[self.ip+2..];
+        let (val, skip) = match op {
+            INSTR_LOAD_IMM8 => (code[self.ip+2] as u64, 3),
+            INSTR_LOAD_IMM16 => {
+                let v = rest.first_chunk::<2>().unwrap();
+                (u16::from_ne_bytes(*v) as u64, 4)
+            }
+            INSTR_LOAD_IMM32 => {
+                let v = rest.first_chunk::<4>().unwrap();
+                (u32::from_ne_bytes(*v) as u64, 6)
+            }
+            INSTR_LOAD_IMM64 => {
+                let v = rest.first_chunk::<8>().unwrap();
+                (u64::from_ne_bytes(*v), 10)
+            }
+            _ => unreachable!()
+        };
+        self.regs[target_reg as usize] = Value { val };
+        self.ip += skip;
+        Ok(false)
+    }
+
+    fn op_load_bytes(&mut self) -> Result<bool> {
+        let bytes = self.code.get_bytes();
+        let code = bytes.get_slice();
+        let op = code[self.ip];
+        let target_reg = code[self.ip+1];
+        let rest = &code[self.ip+2..];
+        let v = rest.first_chunk::<4>().unwrap();
+        let size = u32::from_ne_bytes(*v) as usize;
+        let bytes = &rest[4..4+size];
+        let res = Value::from(Bytes::with(&mut self.heap, bytes));
+        self.regs[target_reg as usize] = res;
+        self.ip += 5+size;
+        Ok(false)
+    }
+
+
+    fn op_move(&mut self) -> Result<bool> {
+        let bytes = self.code.get_bytes();
+        let code = bytes.get_slice();
+        let target_reg = code[self.ip+1] as usize;
+        let source_reg = code[self.ip+2] as usize;
+        self.regs[target_reg] = self.regs[source_reg];
+        self.ip += 3;
+        Ok(false)
+    }
+
+    fn op_push(&mut self) -> Result<bool> {
+        let bytes = self.code.get_bytes();
+        let code = bytes.get_slice();
+        let source_reg = code[self.ip+1];
+        self.stack.push(self.regs[source_reg as usize]);
+        self.ip += 2;
+        Ok(false)
+    }
+
+    fn op_pop(&mut self) -> Result<bool> {
+        let bytes = self.code.get_bytes();
+        let code = bytes.get_slice();
+        let target_reg = code[self.ip+1];
+        let Some(val) = self.stack.pop() else {
+            return self.error("Popping empty stack");
+        };
+        self.regs[target_reg as usize] = val;
+        Ok(false)
+    }
+
+    fn op_type(&mut self) -> Result<bool> {
+        let bytes = self.code.get_bytes();
+        let code = bytes.get_slice();
+        let target = code[self.ip+1] as usize;
+        let reg = code[self.ip+2] as usize;
+        let val = self.regs[reg];
+        let typ = match val.get_repr() {
+            ValueRepr::Nil => self.get_global(&Symbol::from("nil_type")),
+            ValueRepr::Undefined => Value::nil(),
+            ValueRepr::Bool => self.get_global(&Symbol::from("bool")),
+            ValueRepr::Integer => self.get_global(&Symbol::from("int")),
+            ValueRepr::Pointer => self.get_global(&Symbol::from("pointer")),
+            ValueRepr::Char => self.get_global(&Symbol::from("char")),
+            ValueRepr::Float => self.get_global(&Symbol::from("float")),
+            ValueRepr::BoxedInteger => todo!(),
+            ValueRepr::Symbol => self.get_global(&Symbol::from("symbol")),
+            ValueRepr::Array => {
+                let arr = val.get_array();
+                let mut type_table = arr.type_table();
+                if type_table == Value::nil() {
+                    type_table = self.get_global(&Symbol::from("array"));
+                }
+                type_table
+            },
+            ValueRepr::Bytes => {
+                let bytes = val.get_bytes();
+                let mut type_table = bytes.type_table();
+                if type_table == Value::nil() {
+                    type_table = self.get_global(&Symbol::from("bytes"));
+                }
+                type_table
+            },
+            ValueRepr::Table => {
+                let table = val.get_table();
+                let mut type_table = table.type_table();
+                if type_table == Value::nil() {
+                    type_table = self.get_global(&Symbol::from("table"));
+                }
+                type_table
+            },
+            ValueRepr::Closure => {
+                let closure = val.get_closure();
+                let mut type_table = closure.type_table();
+                if type_table == Value::nil() {
+                    type_table = self.get_global(&Symbol::from("closure"));
+                }
+                type_table
+            },
+            ValueRepr::Object => todo!(),
+        };
+        self.regs[target] = typ;
+        self.ip += 3;
+        Ok(false)
+    }
+
+    fn op_set_type(&mut self) -> Result<bool> {
+        Ok(false)
+    }
+
+    fn op_alloc(&mut self) -> Result<bool> {
+        Ok(false)
+    }
+
+    fn op_array_get(&mut self) -> Result<bool> {
+        Ok(false)
+    }
+
+    fn op_array_set(&mut self) -> Result<bool> {
+        Ok(false)
+    }
+
+    fn op_bytes_get(&mut self) -> Result<bool> {
+        Ok(false)
+    }
+
+    fn op_bytes_set(&mut self) -> Result<bool> {
+        Ok(false)
+    }
+
+    fn op_table_get(&mut self) -> Result<bool> {
+        Ok(false)
+    }
+
+    fn op_table_set(&mut self) -> Result<bool> {
+        Ok(false)
+    }
+
+    fn op_halt(&mut self) -> Result<bool> {
         Ok(false)
     }
 

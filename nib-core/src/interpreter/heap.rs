@@ -794,7 +794,7 @@ impl Table {
         if let Some(index) = self.find(key) {
             self.storage().at(index + 1)
         } else {
-            Value::bool(false)
+            Value::nil()
         }
     }
 

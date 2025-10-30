@@ -82,8 +82,8 @@ pub enum Instruction {
 }
 
 // Arithmetic
-pub const INSTR_ADD:u8 = 33;
-pub const INSTR_SUB:u8 = 34;
+pub const INSTR_ADD:u8 = 33; 
+pub const INSTR_SUB:u8 = 34; 
 pub const INSTR_MUL:u8 = 35;
 pub const INSTR_DIV:u8 = 36;
 pub const INSTR_MOD:u8 = 37;
@@ -121,9 +121,6 @@ pub const INSTR_TOPTR:u8 = 59;
 // Calls
 pub const INSTR_CALL:u8 = 60;
 pub const INSTR_CALL_TAIL:u8 = 61;
-pub const INSTR_CALL_PRIM:u8 = 62;
-pub const INSTR_CALL_FOREIGN:u8 = 63;
-
 // Moves
 pub const INSTR_MOVE:u8 = 64;
 pub const INSTR_LOAD_IMM8:u8 = 65;
@@ -142,28 +139,20 @@ pub const INSTR_STORE_STACK:u8 = 76;
 // Branches
 pub const INSTR_JUMP:u8 = 77;
 pub const INSTR_JUMP_IMM8:u8 = 78;
-pub const INSTR_JUMP_IMM32:u8 = 79;
 pub const INSTR_JZ:u8 = 80;
 pub const INSTR_JZ_IMM8:u8 = 81;
-pub const INSTR_JZ_IMM32:u8 = 82;
 pub const INSTR_JPOS:u8 = 83;
 pub const INSTR_JPOS_IMM8:u8 = 84;
-pub const INSTR_JPOS_IMM32:u8 = 85;
 pub const INSTR_JNEG:u8 = 86;
 pub const INSTR_JNEG_IMM8:u8 = 87;
-pub const INSTR_JNEG_IMM32:u8 = 88;
 pub const INSTR_JNPOS:u8 = 89;
 pub const INSTR_JNPOS_IMM8:u8 = 90;
-pub const INSTR_JNPOS_IMM32:u8 = 91;
 pub const INSTR_JNNEG:u8 = 92;
 pub const INSTR_JNNEG_IMM8:u8 = 93;
-pub const INSTR_JNNEG_IMM32:u8 = 94;
 pub const INSTR_JFALSE:u8 = 95;
 pub const INSTR_JFALSE_IMM8:u8 = 96;
-pub const INSTR_JFALSE_IMM32:u8 = 97;
 pub const INSTR_JNFALSE:u8 = 98;
 pub const INSTR_JNFALSE_IMM8:u8 = 99;
-pub const INSTR_JNFALSE_IMM32:u8 = 100;
 
 // Type
 pub const INSTR_TYPE:u8 = 101;
@@ -193,5 +182,6 @@ pub const INSTR_BYTES_SET:u8 = 114;
 pub const INSTR_EXIT:u8 = 115;
 pub const INSTR_PANIC:u8 = 116;
 pub const INSTR_INVALID:u8 = 117;
+pub const INSTR_HALT:u8 = 118;
 pub const INSTR_NOP:u8 = 0;
 pub const INSTR_RETURN:u8 = 119;

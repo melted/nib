@@ -7,7 +7,7 @@ pub type PrimFn = fn (&mut Runtime)->Result<()>;
 impl Runtime {
     pub(super) fn register_primitives(&mut self) -> Result<()> {
         let prim_ceiling = self.make_closure(prim_ceiling, Arity::Fixed(1));
-        self.add_global(&Symbol::from("_prim_ceiling"), &prim_ceiling)?;
+        self.set_global(&Symbol::from("_prim_ceiling"), &prim_ceiling);
         Ok(())         
     }
 
