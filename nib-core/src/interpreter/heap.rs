@@ -898,8 +898,6 @@ pub enum Code {
     Bytecode(Vec<u8>),
     Core(*const Vec<Expression>),
     Extern(*const c_void),
-    ExternMut(*const c_void),
-    Foreign(*const Signature, *const c_void),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -911,11 +909,9 @@ pub const TYPE_INCOMPLETE: u16 = 0xffff;
 pub const TYPE_BYTECODE: u16 = 0;
 pub const TYPE_CORE: u16 = 1;
 pub const TYPE_EXTERN: u16 = 2;
-pub const TYPE_EXTERN_MUT: u16 = 3;
-pub const TYPE_FOREIGN: u16 = 4;
 
 impl Closure {
-    fn make(
+    pub fn make(
         heap: &mut Heap,
         code: &Code,
         captures: &[Value],
@@ -966,17 +962,6 @@ impl Closure {
                 self.set_tag(TYPE_EXTERN);
                 set_value(self.ptr, 1, Value::cpointer(ptr));
             }
-            Code::ExternMut(ptr) => {
-                self.set_tag(TYPE_EXTERN_MUT);
-                set_value(self.ptr, 1, Value::cpointer(ptr));
-            }
-            Code::Foreign(sig_ptr, code_ptr) => {
-                self.set_tag(TYPE_EXTERN_MUT);
-                let arr = Array::make(heap, 2);
-                arr.set(0, Value::cpointer(sig_ptr));
-                arr.set(1, Value::cpointer(code_ptr));
-                set_value(self.ptr, 1, Value::from(arr));
-            }
         }
     }
 
@@ -989,11 +974,6 @@ impl Closure {
             }
             TYPE_CORE => Code::Core(val.get_cpointer()),
             TYPE_EXTERN => Code::Extern(val.get_cpointer()),
-            TYPE_EXTERN_MUT => Code::ExternMut(val.get_cpointer()),
-            TYPE_FOREIGN => {
-                let arr = val.get_array();
-                Code::Foreign(arr.at(0).get_cpointer(), arr.at(1).get_cpointer())
-            }
             _ => panic!("Unexpected code type tag in get_code"),
         }
     }
@@ -1008,5 +988,9 @@ impl Closure {
 
     pub fn env(&self) -> Value {
         get_value(self.ptr, 2)
+    }
+
+    pub fn fun(&self) -> Value {
+        get_value(self.ptr, 1)
     }
 }
