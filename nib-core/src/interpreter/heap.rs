@@ -937,6 +937,26 @@ impl Closure {
         me
     }
 
+    pub fn make_low(
+        heap: &mut Heap,
+        code: &Bytes,
+        captures: Value,
+        arity: Value,
+        vararg: Value,
+    ) -> Self {
+        let header = ObjectHeader::make(heap, 48, ValueRepr::Closure);
+        let mut me = Closure { ptr: header };
+        me.set_type_table(Value::nil());
+
+        me.set_tag(TYPE_BYTECODE);
+        set_value(header, 1, Value::from(code.clone()));
+        set_value(header, 2, captures);
+        set_value(header, 3, arity);
+        set_value(header, 4, vararg);
+        me
+    }
+
+
     pub fn set_tag(&mut self, tag: u16) {
         unsafe {
             (*self.ptr).tag = tag;

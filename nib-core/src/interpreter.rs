@@ -8,9 +8,12 @@ use std::collections::HashMap;
 use std::ffi::c_void;
 use std::ops::BitXor;
 
+use region::page::size;
+
+use crate::capi;
 use crate::common::{Error, Result, Symbol};
 use crate::interpreter::bytecode::*;
-use crate::interpreter::heap::{Bytes, Heap, Table, Value, ValueRepr, TYPE_BYTECODE, TYPE_CORE, TYPE_EXTERN};
+use crate::interpreter::heap::{set_value, Array, Bytes, Closure, Code, Heap, ObjectHeader, Table, Value, ValueRepr, TYPE_BYTECODE, TYPE_CORE, TYPE_EXTERN};
 use crate::interpreter::prims::PrimFn;
 
 pub mod bytecode;
@@ -472,39 +475,163 @@ impl Runtime {
     }
 
     fn op_set_type(&mut self) -> Result<bool> {
+        let bytes = self.code.get_bytes();
+        let code = bytes.get_slice();
+        let obj_reg = code[self.ip+1] as usize;
+        let typ_reg = code[self.ip+2] as usize;
+        let val = self.regs[obj_reg];
+        let typ = self.regs[typ_reg];
+        ensure_type(&typ, ValueRepr::Table)?;
+        match val.get_repr() {
+            ValueRepr::Array | ValueRepr::Bytes | ValueRepr::Table | ValueRepr::Closure => {
+                let obj = val.get_object();
+                set_value(obj, 0, typ);
+            }
+            _ => {
+                return self.error("settype op on illegal value");
+            }
+        }
+        self.ip += 3;
         Ok(false)
     }
 
     fn op_alloc(&mut self) -> Result<bool> {
+        let bytes = self.code.get_bytes();
+        let code = bytes.get_slice();
+        let op = code[self.ip];
+        let target_reg = code[self.ip+1] as usize;
+        let (val, dist) = match op {
+            INSTR_ALLOC_ARRAY => {
+                let size_reg = code[self.ip + 2] as usize;
+                let size = self.regs[size_reg];
+                ensure_type(&size, ValueRepr::Integer)?;
+                let arr = Array::make(&mut self.heap, size.get_integer() as usize);
+                (Value::from(arr), 3)
+            }
+            INSTR_ALLOC_BYTES => {
+                let size_reg = code[self.ip + 2] as usize;
+                let fill = code[self.ip + 3];
+                let size = self.regs[size_reg];
+                ensure_type(&size, ValueRepr::Integer)?;
+                let bytes = Bytes::make(&mut self.heap, size.get_integer() as usize, fill);
+                (Value::from(bytes), 4)
+            }
+            INSTR_ALLOC_FLOAT => {
+                let bytes_reg = code[self.ip + 2] as usize;
+                let val = self.regs[bytes_reg];
+                ensure_type(&val, ValueRepr::Bytes)?;
+                let b = val.get_bytes();
+                let x = b.get_slice().first_chunk::<8>().unwrap();
+                let f = f64::from_ne_bytes(*x);
+                let v = Value::alloc_float(&mut self.heap, f);
+                (v, 3)
+            }
+            INSTR_ALLOC_TABLE => {
+                (Value::from(Table::make(&mut self.heap)), 2)
+            }
+            INSTR_ALLOC_CLOSURE => {
+                let code_reg = code[self.ip + 2] as usize;
+                let capture_reg = code[self.ip + 3] as usize;
+                let arity_reg = code[self.ip + 4] as usize;
+                let vararg_reg = code[self.ip + 5] as usize;
+                let code = self.regs[code_reg];
+                ensure_type(&code, ValueRepr::Bytes)?;
+                let captures = self.regs[capture_reg];
+                let arity = self.regs[arity_reg];
+                ensure_type(&arity, ValueRepr::Integer)?;
+                let vararg = self.regs[vararg_reg];
+                let code_bytes = code.get_bytes();
+
+                let closure = Closure::make_low(&mut self.heap, &code_bytes, captures, arity, vararg);
+                (Value::from(closure), 6)
+            }
+            _ => unreachable!()
+        };
+        self.regs[target_reg] = val;
+        self.ip += dist;
         Ok(false)
     }
 
     fn op_array_get(&mut self) -> Result<bool> {
+        let bytes = self.code.get_bytes();
+        let code = bytes.get_slice();
+        let target_reg = code[self.ip+1] as usize;
+        let obj_reg = code[self.ip+2] as usize;
+        let pos_reg = code[self.ip+3] as usize;
+        let obj = self.regs[obj_reg];
+        let pos = self.regs[pos_reg];
+        let val = obj.get_array().at(pos.get_integer() as usize);
+        self.regs[target_reg] = val;
         Ok(false)
     }
 
     fn op_array_set(&mut self) -> Result<bool> {
+        let bytes = self.code.get_bytes();
+        let code = bytes.get_slice();
+        let obj_reg = code[self.ip+1] as usize;
+        let pos_reg = code[self.ip+2] as usize;
+        let val_reg = code[self.ip+3] as usize;
+        let obj = self.regs[obj_reg];
+        let pos = self.regs[pos_reg];
+        let val = self.regs[val_reg];
+        obj.get_array().set(pos.get_integer() as usize, val);
         Ok(false)
     }
 
     fn op_bytes_get(&mut self) -> Result<bool> {
+        let bytes = self.code.get_bytes();
+        let code = bytes.get_slice();
+        let target_reg = code[self.ip+1] as usize;
+        let obj_reg = code[self.ip+2] as usize;
+        let pos_reg = code[self.ip+3] as usize;
+        let obj = self.regs[obj_reg];
+        let pos = self.regs[pos_reg];
+        let val = obj.get_bytes().at(pos.get_integer() as usize);
+        self.regs[target_reg] = Value::integer(val as i64);
         Ok(false)
     }
 
     fn op_bytes_set(&mut self) -> Result<bool> {
+        let bytes = self.code.get_bytes();
+        let code = bytes.get_slice();
+        let obj_reg = code[self.ip+1] as usize;
+        let pos_reg = code[self.ip+2] as usize;
+        let val_reg = code[self.ip+3] as usize;
+        let obj = self.regs[obj_reg];
+        let pos = self.regs[pos_reg];
+        let val = self.regs[val_reg].get_integer() as u8;
+        obj.get_bytes().set(pos.get_integer() as usize, val);
         Ok(false)
     }
 
     fn op_table_get(&mut self) -> Result<bool> {
+        let bytes = self.code.get_bytes();
+        let code = bytes.get_slice();
+        let target_reg = code[self.ip+1] as usize;
+        let obj_reg = code[self.ip+2] as usize;
+        let sym_reg = code[self.ip+3] as usize;
+        let obj = self.regs[obj_reg];
+        let sym = self.regs[sym_reg];
+        let val = obj.get_table().get(sym);
+        self.regs[target_reg] = val;
         Ok(false)
     }
 
     fn op_table_set(&mut self) -> Result<bool> {
+        let bytes = self.code.get_bytes();
+        let code = bytes.get_slice();
+        let obj_reg = code[self.ip+1] as usize;
+        let sym_reg = code[self.ip+2] as usize;
+        let val_reg = code[self.ip+3] as usize;
+        let obj = self.regs[obj_reg];
+        let sym = self.regs[sym_reg];
+        let val = self.regs[val_reg];
+        obj.get_table().insert(&mut self.heap, sym, val);
         Ok(false)
     }
 
     fn op_halt(&mut self) -> Result<bool> {
-        Ok(false)
+        Ok(true)
     }
 
     pub fn error<T>(&self, msg: &str) -> Result<T> {
