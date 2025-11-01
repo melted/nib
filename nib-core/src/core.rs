@@ -741,10 +741,12 @@ impl Display for Expression {
                 write!(f, "{{ ")?;
                 let ellipsis = match lam.arity {
                     Arity::Fixed(_) => None,
-                    Arity::VarArg(_, n) => Some(n as usize)
+                    Arity::VarArg(_, n) => Some(n as usize),
                 };
                 for (i, a) in lam.args.iter().enumerate() {
-                    if let Some(n) = ellipsis && n == i {
+                    if let Some(n) = ellipsis
+                        && n == i
+                    {
                         write!(f, "...")?;
                     }
                     write!(f, "{} ", a.name())?;

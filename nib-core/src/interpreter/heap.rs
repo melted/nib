@@ -956,7 +956,6 @@ impl Closure {
         me
     }
 
-
     pub fn set_tag(&mut self, tag: u16) {
         unsafe {
             (*self.ptr).tag = tag;

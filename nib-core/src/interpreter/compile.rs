@@ -2,8 +2,9 @@ use crate::common::{Metadata, Name};
 use crate::common::{Result, Symbol};
 use crate::core::Binder;
 use crate::interpreter::heap::Value;
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 use std::mem;
+use std::sync::LazyLock;
 
 pub fn compile(from: crate::core::Module) -> Result<Module> {
     let mut module = Module::new();
@@ -27,6 +28,7 @@ pub struct Module {
     bcode: Vec<u8>,
     local_env_size: usize,
     /// A list of symbol literals that should be put into the local environment.
+    // TODO: Remove. Not needed. Can just load the symbol as an imm64 
     want_symbols: HashMap<Symbol, usize>,
     /// Global variables used by the module.
     captures: HashMap<Symbol, usize>,
@@ -86,3 +88,8 @@ impl Compilation {
         n
     }
 }
+
+
+static RESERVED_REGISTERS: LazyLock<BTreeSet<u8>> = LazyLock::new(|| {
+    BTreeSet::from_iter(vec![0,1,254])
+});

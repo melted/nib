@@ -197,6 +197,10 @@ pub fn align_int(value: usize, alignment: usize) -> usize {
 
 pub type Symbol = symbol_table::GlobalSymbol;
 
+pub fn sym(s: &str) -> Symbol {
+    Symbol::from(s)
+}
+
 pub fn symbol_id(symbol: &Symbol) -> u32 {
     NonZeroU32::from(*symbol).get()
 }
