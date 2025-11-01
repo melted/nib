@@ -104,6 +104,8 @@ impl Runtime {
             INSTR_LOAD_BYTES_IMM => self.op_load_bytes(),
             INSTR_PUSH => self.op_push(),
             INSTR_POP => self.op_pop(),
+            INSTR_PUSH_RANGE => self.op_push_range(),
+            INSTR_POP_RANGE => self.op_pop_range(),
             INSTR_ALLOC_FLOAT..=INSTR_ALLOC_CLOSURE => self.op_alloc(),
             INSTR_ARRAY_REF => self.op_array_get(),
             INSTR_ARRAY_SET => self.op_array_set(),
@@ -416,6 +418,33 @@ impl Runtime {
             return self.error("Popping empty stack");
         };
         self.regs[target_reg as usize] = val;
+        Ok(false)
+    }
+
+    fn op_push_range(&mut self) -> Result<bool> {
+        let bytes = self.code.get_bytes();
+        let code = bytes.get_slice();
+        let source_reg_from = code[self.ip+1] as usize;
+        let source_reg_to = code[self.ip+2] as usize;
+        for r in source_reg_from..=source_reg_to {
+            self.stack.push(self.regs[r]);
+        }
+        self.ip += 3;
+        Ok(false)
+    }
+
+    fn op_pop_range(&mut self) -> Result<bool> {
+        let bytes = self.code.get_bytes();
+        let code = bytes.get_slice();
+        let target_reg_from = code[self.ip+1] as usize;
+        let target_reg_to = code[self.ip+2] as usize;
+        for r in (target_reg_from..=target_reg_to).rev() {
+            let Some(val) = self.stack.pop() else {
+                return self.error("Popping empty stack");
+            };
+            self.regs[r] = val;
+        }
+        self.ip += 3;
         Ok(false)
     }
 
