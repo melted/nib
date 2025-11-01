@@ -95,7 +95,7 @@ impl Runtime {
             INSTR_ADD..=INSTR_MOD => self.op_arithmetic(),
             INSTR_NEG => self.op_negate(),
             INSTR_CMP..=INSTR_NEQ => self.op_compare(),
-            INSTR_CALL => self.op_call(),
+            INSTR_CALL..=INSTR_CALL_TAIL => self.op_call(),
             INSTR_RETURN => self.op_return(),
             INSTR_JUMP..=INSTR_JUMP_IMM8 => self.op_jump(),
             INSTR_JZ..=INSTR_JNFALSE_IMM8 => self.op_conditional_jump(),
@@ -246,6 +246,7 @@ impl Runtime {
     fn op_call(&mut self) -> Result<bool> {
         let bytes = self.code.get_bytes();
         let code = bytes.get_slice();
+        let op = code[self.ip];
         let reg = code[self.ip+1] as usize;
         let val = self.regs[reg];
         ensure_type(&val, ValueRepr::Closure)?;
@@ -254,9 +255,11 @@ impl Runtime {
         self.ip += 2;
         match closure.get_tag() {
             TYPE_BYTECODE => {
-                self.base = self.stack.len();
-                self.stack.push(self.code.clone());
-                self.stack.push(Value::integer(self.ip as i64));
+                if op == INSTR_CALL {
+                    self.base = self.stack.len();
+                    self.stack.push(self.code.clone());
+                    self.stack.push(Value::integer(self.ip as i64));
+                }
                 self.code = fun_code;
                 self.ip = 0;
             }
