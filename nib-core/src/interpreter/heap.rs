@@ -1012,4 +1012,12 @@ impl Closure {
     pub fn fun(&self) -> Value {
         get_value(self.ptr, 1)
     }
+
+    pub fn is_vararg(&self) -> bool {
+        !get_value(self.ptr, 4).is_bool()
+    }
+
+    pub fn num_args(&self) -> usize {
+        get_value(self.ptr, 3).get_integer() as usize
+    } 
 }

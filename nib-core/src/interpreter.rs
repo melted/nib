@@ -347,14 +347,35 @@ impl Runtime {
         let val = self.regs[reg];
         ensure_type(&val, ValueRepr::Closure)?;
         let closure = val.get_closure();
+        self.make_call(op, args, closure)?;
+        Ok(false)
+    }
+
+    fn make_call(&mut self, op: u8, args: usize, closure: Closure) -> Result<()> {
         let fun_code = closure.fun();
+        if args < closure.num_args() {
+            // underapplication, create new closure
+    
+        }
+        let remaining = if closure.is_vararg() {
+            0
+        } else {
+            args - closure.num_args()
+        };
         self.ip += 2;
         match closure.get_tag() {
             TYPE_BYTECODE => {
-                if op == INSTR_CALL {
+                if op == INSTR_CALL || remaining > 0 {
                     self.base = self.stack.len();
                     self.stack.push(self.code.clone());
                     self.stack.push(Value::integer(self.ip as i64));
+                    if remaining > 0 {
+                        for r in (args+1)..(args+1+remaining) {
+                            let over_arg = self.regs[r];
+                            self.stack.push(over_arg);
+                        }
+                    }
+                    self.stack.push(Value::integer(remaining as i64));
                 }
                 self.code = fun_code;
                 self.ip = 0;
@@ -369,11 +390,22 @@ impl Runtime {
             _ => {
                 return self.error("Core code not supported in bytecode interpreter");
             }
-        }
-        Ok(false)
+        };
+        Ok(())
     }
-
+    
     fn op_return(&mut self) -> Result<bool> {
+        let Some(remaining) = self.stack.pop() else {
+            return Ok(true);
+        };
+        let mut args = vec![];
+        for r in 2..(remaining.get_integer()+2) {
+            let Some(val) = self.stack.pop() else {
+                return Ok(true);
+            };
+            args.push(val);
+
+        } 
         let Some(ip) = self.stack.pop() else {
             return Ok(true);
         };
