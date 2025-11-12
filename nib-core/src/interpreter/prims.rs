@@ -235,47 +235,87 @@ fn prim_ceiling(rt: &mut Runtime) -> Result<()> {
     let x = rt.regs[2];
     ensure_type(&x, ValueRepr::Float)?;
     let res = x.get_float().ceil();
-    rt.regs[1] = Value::alloc_float(&mut rt.heap, res);
+    rt.regs[2] = Value::alloc_float(&mut rt.heap, res);
     Ok(())
 }
 
 fn prim_floor(rt: &mut Runtime) -> Result<()> {
+    let x = rt.regs[2];
+    ensure_type(&x, ValueRepr::Float)?;
+    let res = x.get_float().floor();
+    rt.regs[2] = Value::alloc_float(&mut rt.heap, res);
     Ok(())
 }
 
 fn prim_round(rt: &mut Runtime) -> Result<()> {
+    let x = rt.regs[2];
+    ensure_type(&x, ValueRepr::Float)?;
+    let res = x.get_float().round();
+    rt.regs[2] = Value::alloc_float(&mut rt.heap, res);
     Ok(())
 }
 
 fn prim_sin(rt: &mut Runtime) -> Result<()> {
+    let x = rt.regs[2];
+    ensure_type(&x, ValueRepr::Float)?;
+    let res = x.get_float().sin();
+    rt.regs[2] = Value::alloc_float(&mut rt.heap, res);
     Ok(())
 }
 
 fn prim_cos(rt: &mut Runtime) -> Result<()> {
+    let x = rt.regs[2];
+    ensure_type(&x, ValueRepr::Float)?;
+    let res = x.get_float().cos();
+    rt.regs[2] = Value::alloc_float(&mut rt.heap, res);
     Ok(())
 }
 
 fn prim_tan(rt: &mut Runtime) -> Result<()> {
+    let x = rt.regs[2];
+    ensure_type(&x, ValueRepr::Float)?;
+    let res = x.get_float().tan();
+    rt.regs[2] = Value::alloc_float(&mut rt.heap, res);
     Ok(())
 }
 
 fn prim_asin(rt: &mut Runtime) -> Result<()> {
+    let x = rt.regs[2];
+    ensure_type(&x, ValueRepr::Float)?;
+    let res = x.get_float().asin();
+    rt.regs[2] = Value::alloc_float(&mut rt.heap, res);
     Ok(())
 }
 
 fn prim_acos(rt: &mut Runtime) -> Result<()> {
+    let x = rt.regs[2];
+    ensure_type(&x, ValueRepr::Float)?;
+    let res = x.get_float().acos();
+    rt.regs[2] = Value::alloc_float(&mut rt.heap, res);
     Ok(())
 }
 
 fn prim_atan(rt: &mut Runtime) -> Result<()> {
+    let x = rt.regs[2];
+    ensure_type(&x, ValueRepr::Float)?;
+    let res = x.get_float().atan();
+    rt.regs[2] = Value::alloc_float(&mut rt.heap, res);
     Ok(())
 }
 
 fn prim_log(rt: &mut Runtime) -> Result<()> {
+    let x = rt.regs[2];
+    ensure_type(&x, ValueRepr::Float)?;
+    let res = x.get_float().ln();
+    rt.regs[2] = Value::alloc_float(&mut rt.heap, res);
     Ok(())
 }
 
 fn prim_exp(rt: &mut Runtime) -> Result<()> {
+    let x = rt.regs[2];
+    ensure_type(&x, ValueRepr::Float)?;
+    let res = x.get_float().exp();
+    rt.regs[2] = Value::alloc_float(&mut rt.heap, res);
     Ok(())
 }
 
