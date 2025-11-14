@@ -136,6 +136,9 @@ impl Runtime {
 }
 
 fn prim_print_representation(rt: &mut Runtime) -> Result<()> {
+    let val = rt.regs[2];
+    print!("{:?}", val);
+    rt.regs[2] = Value::nil();
     Ok(())
 }
 

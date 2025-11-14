@@ -1,6 +1,6 @@
 use crate::common::{Metadata, Name};
 use crate::common::{Result, Symbol};
-use crate::core::Binder;
+use crate::core::{Binder, Expression, Var};
 use crate::interpreter::heap::Value;
 use std::collections::{BTreeSet, HashMap};
 use std::mem;
@@ -78,8 +78,15 @@ impl Compilation {
         Ok(())
     }
 
+
+
     fn compile_binding(&mut self, binding: &crate::core::Binding) -> Result<()> {
         todo!();
+    }
+
+    fn compile_expression(&mut self, expression: Expression, res_reg:u8) -> Result<Vec<u8>> {
+        let v = vec![];
+        Ok(v)
     }
 
     fn fresh_env_location(&mut self) -> usize {
