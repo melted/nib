@@ -1,12 +1,5 @@
 use core::slice;
-use std::{
-    collections::HashMap,
-    ffi::c_void,
-    fmt::Debug,
-    hash::{DefaultHasher, Hash, Hasher},
-    ptr::copy_nonoverlapping,
-    slice::from_raw_parts,
-};
+use std::{collections::HashMap, ffi::c_void, fmt::Debug, hash::{DefaultHasher, Hash, Hasher}, mem, ptr::copy_nonoverlapping, slice::from_raw_parts};
 
 use region::Allocation;
 
@@ -101,19 +94,35 @@ impl Runtime {
             let obj = self.heap.to_space.get_object_at(scan);
             scan += self.trace_object(obj);
         }
+        let mut to_delete = vec![];
+        for (k, v) in self.heap.big_objects.iter_mut() {
+            if v.count == 0 {
+                to_delete.push(*k);
+            }
+            v.count = 0;
+        }
+        for k in to_delete {
+            self.heap.big_objects.remove(&k);
+        }
     }
 
     fn trace_roots(&mut self) {
-        let new_env = self.heap.to_space.copy_object(self.global_env);
+        let new_env = self.copy_object(self.global_env);
         self.global_env = new_env;
-        for r in self.stack.iter_mut() {
-            let new_r = self.heap.to_space.copy_object(r.clone());
+        let mut stack = mem::take(&mut self.stack);
+        for r in stack.iter_mut() {
+            let new_r = self.copy_object(r.clone());
             *r = new_r;
         }
-        for reg in self.regs.iter_mut() {
-            let new_reg = self.heap.to_space.copy_object(reg.clone());
+        mem::swap(&mut stack, &mut self.stack);
+
+        let mut regs = [Value::nil(); 256];
+        mem::swap(&mut regs, &mut self.regs);
+        for reg in regs.iter_mut() {
+            let new_reg = self.copy_object(reg.clone());
             *reg = new_reg;
         }
+        mem::swap(&mut regs, &mut self.regs);
     }
 
     fn trace_object(&mut self, obj: *mut ObjectHeader) -> usize {
@@ -123,29 +132,57 @@ impl Runtime {
             match repr {
                 ValueRepr::Array => {
                     let arr = Array { ptr: obj };
-                    self.heap.to_space.copy_object(arr.type_table());
+                    self.copy_object(arr.type_table());
                     for v in arr.values() {
-                        self.heap.to_space.copy_object(*v);
+                        self.copy_object(*v);
                     }
                 }
                 ValueRepr::Bytes => {
                     let bytes = Bytes { ptr: obj };
-                    self.heap.to_space.copy_object(bytes.type_table());
+                    self.copy_object(bytes.type_table());
                 }
                 ValueRepr::Closure => {
                     let closure = Closure { ptr: obj };
-                    self.heap.to_space.copy_object(closure.type_table());
-                    self.heap.to_space.copy_object(get_value(obj, 1));
-                    self.heap.to_space.copy_object(closure.env());
+                    self.copy_object(closure.type_table());
+                    self.copy_object(get_value(obj, 1));
+                    self.copy_object(closure.env());
                 }
                 ValueRepr::Table => {
                     let table = Table { ptr: obj };
-                    self.heap.to_space.copy_object(table.type_table());
-                    self.heap.to_space.copy_object(Value::from(table.storage()));
+                    self.copy_object(table.type_table());
+                    self.copy_object(Value::from(table.storage()));
                 }
                 _ => {}
             }
             size
+        }
+    }
+
+    fn copy_object(&mut self, value: Value) -> Value {
+        if value.is_immediate() {
+            return value;
+        }
+
+        unsafe {
+            let obj = value.get_object();
+            if (*obj).flags & BIG_OBJECT_FLAG == BIG_OBJECT_FLAG {
+                if let Some(big_obj) = self.heap.big_objects.get_mut(&obj.addr()) {
+                    big_obj.count += 1;
+                }
+                return value;
+            }
+            if (*obj).flags & FORWARD_FLAG == FORWARD_FLAG {
+                return get_value(obj, 0);
+            }
+            let tag = value.get_tag();
+            let size = (*obj).size as usize;
+            let dst = self.heap.to_space.get_object_at(self.heap.to_space.top);
+            copy_nonoverlapping(obj, dst, size);
+            self.heap.to_space.top += align_int(size, 8);
+            (*obj).flags &= FORWARD_FLAG;
+            let new_value = Value::with_tag(dst, tag);
+            set_value(obj, 0, new_value);
+            new_value
         }
     }
 
@@ -166,28 +203,6 @@ impl Space {
     pub(super) fn get_object_at(&mut self, pos: usize) -> *mut ObjectHeader {
         unsafe { self.alloc.as_mut_ptr::<ObjectHeader>().byte_add(pos) }
     }
-
-
-    fn copy_object(&mut self, value: Value) -> Value {
-        if value.is_immediate() {
-            return value;
-        }
-        unsafe {
-            let obj = value.get_object();
-            if (*obj).flags & FORWARD_FLAG == FORWARD_FLAG {
-                return get_value(obj, 0);
-            }
-            let tag = value.get_tag();
-            let size = (*obj).size as usize;
-            let dst = self.get_object_at(self.top);
-            copy_nonoverlapping(obj, dst, size);
-            self.top += align_int(size, 8);
-            (*obj).flags &= FORWARD_FLAG;
-            let new_value = Value::with_tag(dst, tag);
-            set_value(obj, 0, new_value);
-            new_value
-        }
-    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -203,7 +218,7 @@ impl ObjectHeader {
         let space: *mut Self = rt.allocate(size as usize);
         unsafe {
             (*space).size = size;
-            (*space).flags = 0;
+            (*space).flags = if size > BIG_OBJECT_THRESHOLD as u32 { BIG_OBJECT_FLAG } else { 0 };
             (*space).repr = repr;
             (*space).tag = 0;
         }
@@ -267,6 +282,7 @@ pub enum ValueRepr {
 }
 
 const FORWARD_FLAG: u8 = 0x01;
+const BIG_OBJECT_FLAG: u8 = 0x02;
 
 const TAG_MASK: u64 = 0x07;
 const STAG_MASK: u64 = 0xf7;
