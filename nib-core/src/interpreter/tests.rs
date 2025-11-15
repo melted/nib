@@ -4,11 +4,11 @@ use crate::core::desugar;
 use crate::interpreter::Runtime;
 use crate::interpreter::bytecode::INSTR_ADD;
 use crate::interpreter::compile::Compilation;
-use crate::interpreter::heap::Bytes;
+use crate::interpreter::heap::{Bytes, Space};
 use crate::parser::parse_declarations;
 use crate::{
     common::{Result, Symbol},
-    interpreter::heap::{Array, Heap, Space, Table, Value, ValueRepr},
+    interpreter::heap::{Array, Heap, Table, Value, ValueRepr},
 };
 
 #[test]

@@ -24,26 +24,24 @@ pub struct BigObject {
     object: Allocation,
 }
 
-pub struct Heap {
+pub(super) struct Heap {
     from_space: Space,
     to_space: Space,
     big_objects: HashMap<usize, BigObject>,
-    roots: Vec<Value>,
 }
 
-pub struct Space {
+pub(super) struct Space {
     pub alloc: Allocation,
     pub size: usize,
     pub top: usize,
 }
 
 impl Heap {
-    pub fn new(size: usize) -> Self {
+    pub(super) fn new(size: usize) -> Self {
         Heap {
             from_space: Space::new(size),
             to_space: Space::new(size),
             big_objects: HashMap::new(),
-            roots: Vec::new(),
         }
     }
 }
