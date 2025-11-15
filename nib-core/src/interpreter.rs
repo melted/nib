@@ -9,7 +9,6 @@ use std::ffi::c_void;
 use std::ops::BitXor;
 
 use region::page::size;
-
 use crate::capi;
 use crate::common::{Error, Name, Result, Symbol};
 use crate::interpreter::bytecode::*;
@@ -28,7 +27,7 @@ mod tests;
 pub struct Runtime {
     heap: Heap,
     global_env: Value,
-    pub stack: Vec<Value>,
+    pub stack: Stack,
     pub base: usize,
     code: Value,
     ip: usize,
@@ -36,6 +35,7 @@ pub struct Runtime {
 }
 
 const DEFAULT_HEAP_SIZE: usize = 1000000;
+const DEFAULT_STACK_SIZE:usize = 1000;
 
 impl Runtime {
     pub fn new() -> Self {
@@ -43,14 +43,16 @@ impl Runtime {
         let mut runtime = Runtime {
             heap,
             global_env: Value::nil(),
-            stack: Vec::new(),
+            stack: Stack::new(Value::nil()), // Dummy stack
             base: 0,
             code: Value::nil(),
             ip: 0,
             regs: [Value::nil(); 256],
         };
         let global_env = Value::from(Table::make(&mut runtime));
+        let stack = Value::from(Array::make(&mut runtime, DEFAULT_STACK_SIZE));
         runtime.global_env = global_env;
+        runtime.stack = Stack::new(stack);
         runtime
     }
 
@@ -368,15 +370,15 @@ impl Runtime {
             TYPE_BYTECODE => {
                 if op == INSTR_CALL || remaining > 0 {
                     self.base = self.stack.len();
-                    self.stack.push(self.code.clone());
-                    self.stack.push(Value::integer(self.ip as i64));
+                    self.stack_push(self.code.clone());
+                    self.stack_push(Value::integer(self.ip as i64));
                     if remaining > 0 {
                         for r in (args+1)..(args+1+remaining) {
                             let over_arg = self.regs[r];
-                            self.stack.push(over_arg);
+                            self.stack_push(over_arg);
                         }
                     }
-                    self.stack.push(Value::integer(remaining as i64));
+                    self.stack_push(Value::integer(remaining as i64));
                 }
                 self.code = fun_code;
                 self.ip = 0;
@@ -396,23 +398,15 @@ impl Runtime {
     }
     
     fn op_return(&mut self) -> Result<bool> {
-        let Some(remaining) = self.stack.pop() else {
-            return Ok(true);
-        };
+        // TODO: if stack is empty return true
+        let remaining = self.stack.pop();
         let mut args = vec![];
         for r in 2..(remaining.get_integer()+2) {
-            let Some(val) = self.stack.pop() else {
-                return Ok(true);
-            };
+            let val = self.stack.pop();
             args.push(val);
-
         } 
-        let Some(ip) = self.stack.pop() else {
-            return Ok(true);
-        };
-        let Some(code) = self.stack.pop() else {
-            return Ok(true);
-        };
+        let ip = self.stack.pop();
+        let code = self.stack.pop();
         self.code = code;
         self.ip = ip.get_integer() as usize;
         Ok(false)
@@ -535,7 +529,7 @@ impl Runtime {
         let bytes = self.code.get_bytes();
         let code = bytes.get_slice();
         let source_reg = code[self.ip + 1];
-        self.stack.push(self.regs[source_reg as usize]);
+        self.stack_push(self.regs[source_reg as usize]);
         self.ip += 2;
         Ok(false)
     }
@@ -544,9 +538,7 @@ impl Runtime {
         let bytes = self.code.get_bytes();
         let code = bytes.get_slice();
         let target_reg = code[self.ip + 1];
-        let Some(val) = self.stack.pop() else {
-            return self.error("Popping empty stack");
-        };
+        let val = self.stack.pop();
         self.regs[target_reg as usize] = val;
         Ok(false)
     }
@@ -557,7 +549,7 @@ impl Runtime {
         let source_reg_from = code[self.ip + 1] as usize;
         let source_reg_to = code[self.ip + 2] as usize;
         for r in source_reg_from..=source_reg_to {
-            self.stack.push(self.regs[r]);
+            self.stack_push(self.regs[r]);
         }
         self.ip += 3;
         Ok(false)
@@ -569,9 +561,7 @@ impl Runtime {
         let target_reg_from = code[self.ip + 1] as usize;
         let target_reg_to = code[self.ip + 2] as usize;
         for r in (target_reg_from..=target_reg_to).rev() {
-            let Some(val) = self.stack.pop() else {
-                return self.error("Popping empty stack");
-            };
+            let val = self.stack.pop();
             self.regs[r] = val;
         }
         self.ip += 3;
@@ -830,6 +820,66 @@ impl Runtime {
             msg: msg.to_owned(),
             loc: None,
         })
+    }
+
+    // Because we want to allocate a new stack instead of overflowing,
+    // wrap stack pushes.
+    pub(super) fn stack_push(&mut self, val:Value) {
+        if self.stack.top == self.stack.stack.get_array().size() {
+            self.stack_expand();
+        }
+        self.stack.push(val);
+    }
+
+    fn stack_expand(&mut self) {
+        let old_array = self.stack.stack.get_array();
+        let size = old_array.size();
+        let mut new_array = Array::make(self, size*2);
+        let values = old_array.values();
+        new_array.fill(values, 0, values.len());
+        self.stack.stack = Value::from(new_array);
+    }
+}
+
+pub struct Stack {
+    pub stack: Value,
+    top: usize,
+    base: usize
+}
+
+impl Stack {
+    pub(super) fn new(stack: Value) -> Self {
+        Self { stack, top: 0, base: 0 }
+    }
+
+    pub(super) fn push(&mut self, val : Value) {
+        if self.top == self.stack.get_array().size() {
+            panic!("stack overflow");
+        }
+        self.stack.get_array().set(self.top, val);
+        self.top += 1;
+    }
+
+    pub(super) fn pop(&mut self) -> Value {
+        if self.top == 0 {
+            panic!("stack underflow");
+        }
+        self.top -= 1;
+        let elem = self.stack.get_array().at(self.top);
+        self.stack.get_array().set(self.top, Value::nil());
+        elem
+    }
+
+    pub(super) fn len(&self) -> usize {
+        self.top
+    }
+
+    pub(super) fn set_base(&mut self) {
+        self.base = self.top;
+    }
+
+    pub(super) fn current_frame(&self) -> usize {
+        self.top - self.base
     }
 }
 

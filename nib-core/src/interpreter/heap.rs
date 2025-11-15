@@ -109,12 +109,8 @@ impl Runtime {
     fn trace_roots(&mut self) {
         let new_env = self.copy_object(self.global_env);
         self.global_env = new_env;
-        let mut stack = mem::take(&mut self.stack);
-        for r in stack.iter_mut() {
-            let new_r = self.copy_object(r.clone());
-            *r = new_r;
-        }
-        mem::swap(&mut stack, &mut self.stack);
+        let new_stack = self.copy_object(self.stack.stack);
+        self.stack.stack = new_stack;
 
         let mut regs = [Value::nil(); 256];
         mem::swap(&mut regs, &mut self.regs);
