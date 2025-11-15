@@ -40,17 +40,18 @@ const DEFAULT_HEAP_SIZE: usize = 1000000;
 impl Runtime {
     pub fn new() -> Self {
         let mut heap = Heap::new(DEFAULT_HEAP_SIZE);
-        let global_env = Value::from(Table::make(&mut heap));
-
-        Runtime {
+        let mut runtime = Runtime {
             heap,
-            global_env,
+            global_env: Value::nil(),
             stack: Vec::new(),
             base: 0,
             code: Value::nil(),
             ip: 0,
             regs: [Value::nil(); 256],
-        }
+        };
+        let global_env = Value::from(Table::make(&mut runtime));
+        runtime.global_env = global_env;
+        runtime
     }
 
     pub fn load(&mut self, reload: bool) -> Result<()> {
@@ -67,7 +68,7 @@ impl Runtime {
 
     pub fn set_global(&mut self, sym: &Symbol, value: &Value) {
         let mut env = self.global_env.get_table();
-        env.insert(&mut self.heap, Value::symbol(sym), value.clone());
+        env.insert(self, Value::symbol(sym), value.clone());
     }
 
     pub fn get_global(&self, sym: &Symbol) -> Value {
@@ -80,7 +81,7 @@ impl Runtime {
             Name::Qualified(path, leaf) => {
                 let s = Value::from(leaf.clone());
                 let t = self.get_or_create_module_path(path, self.global_env)?;
-                t.get_table().insert(&mut self.heap, s, *val);
+                t.get_table().insert(self, s, *val);
             }
             Name::Plain(n) => {
                 self.set_global(n, &val);
@@ -141,8 +142,8 @@ impl Runtime {
                 match v.get_repr() {
                     ValueRepr::Table => v,
                     ValueRepr::Nil => {
-                        let nt = Value::from(Table::make(&mut self.heap));
-                        t.insert(&mut self.heap, key, nt);
+                        let nt = Value::from(Table::make(self));
+                        t.insert(self, key, nt);
                         nt
                     }
                     _ => {
@@ -230,7 +231,7 @@ impl Runtime {
                 INSTR_DIV => lf / rf,
                 _ => unreachable!(),
             };
-            Value::alloc_float(&mut self.heap, r)
+            Value::alloc_float(self, r)
         } else if left.is_pointer()
             && right.is_immediate_integer()
             && (op == INSTR_ADD || op == INSTR_SUB)
@@ -259,7 +260,7 @@ impl Runtime {
             }
         } else if val.is_float() {
             let f = -val.get_float();
-            Value::alloc_float(&mut self.heap, f)
+            Value::alloc_float(self, f)
         } else {
             // crash and burn
             todo!()
@@ -514,7 +515,7 @@ impl Runtime {
         let v = rest.first_chunk::<4>().unwrap();
         let size = u32::from_ne_bytes(*v) as usize;
         let bytes = &rest[4..4 + size];
-        let res = Value::from(Bytes::with(&mut self.heap, bytes));
+        let res = Value::from(Bytes::with(self, bytes));
         self.regs[target_reg as usize] = res;
         self.ip += 5 + size;
         Ok(false)
@@ -663,7 +664,7 @@ impl Runtime {
                 let size_reg = code[self.ip + 2] as usize;
                 let size = self.regs[size_reg];
                 ensure_type(&size, ValueRepr::Integer)?;
-                let arr = Array::make(&mut self.heap, size.get_integer() as usize);
+                let arr = Array::make(self, size.get_integer() as usize);
                 (Value::from(arr), 3)
             }
             INSTR_ALLOC_BYTES => {
@@ -671,7 +672,7 @@ impl Runtime {
                 let fill = code[self.ip + 3];
                 let size = self.regs[size_reg];
                 ensure_type(&size, ValueRepr::Integer)?;
-                let bytes = Bytes::make(&mut self.heap, size.get_integer() as usize, fill);
+                let bytes = Bytes::make(self, size.get_integer() as usize, fill);
                 (Value::from(bytes), 4)
             }
             INSTR_ALLOC_FLOAT => {
@@ -681,10 +682,10 @@ impl Runtime {
                 let b = val.get_bytes();
                 let x = b.get_slice().first_chunk::<8>().unwrap();
                 let f = f64::from_ne_bytes(*x);
-                let v = Value::alloc_float(&mut self.heap, f);
+                let v = Value::alloc_float(self, f);
                 (v, 3)
             }
-            INSTR_ALLOC_TABLE => (Value::from(Table::make(&mut self.heap)), 2),
+            INSTR_ALLOC_TABLE => (Value::from(Table::make(self)), 2),
             INSTR_ALLOC_CLOSURE => {
                 let code_reg = code[self.ip + 2] as usize;
                 let capture_reg = code[self.ip + 3] as usize;
@@ -699,7 +700,7 @@ impl Runtime {
                 let code_bytes = code.get_bytes();
 
                 let closure =
-                    Closure::make_low(&mut self.heap, &code_bytes, captures, arity, vararg);
+                    Closure::make_low(self, &code_bytes, captures, arity, vararg);
                 (Value::from(closure), 6)
             }
             _ => unreachable!(),
@@ -805,7 +806,7 @@ impl Runtime {
         let obj = self.regs[obj_reg];
         let sym = self.regs[sym_reg];
         let val = self.regs[val_reg];
-        obj.get_table().insert(&mut self.heap, sym, val);
+        obj.get_table().insert(self, sym, val);
         Ok(false)
     }
 

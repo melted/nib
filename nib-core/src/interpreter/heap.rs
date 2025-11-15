@@ -14,7 +14,7 @@ use crate::{
     ast::Expression,
     common,
     common::{Symbol, align_int},
-    treewalker::Signature,
+    interpreter::Runtime,
 };
 
 const BIG_OBJECT_THRESHOLD: usize = 0x3fff;
@@ -46,19 +46,21 @@ impl Heap {
             roots: Vec::new(),
         }
     }
+}
 
+impl Runtime {
     pub fn allocate<T>(&mut self, size: usize) -> *mut T {
         unsafe {
             let aligned_size = align_int(size, 8);
             if aligned_size > BIG_OBJECT_THRESHOLD {
                 return self.allocate_big_object(aligned_size);
             }
-            if self.from_space.top + aligned_size > self.from_space.size {
+            if self.heap.from_space.top + aligned_size > self.heap.from_space.size {
                 self.collect(aligned_size);
             }
-            let base_ptr = self.from_space.alloc.as_mut_ptr() as *mut T;
-            let top_ptr = base_ptr.byte_add(self.from_space.top);
-            self.from_space.top += aligned_size;
+            let base_ptr = self.heap.from_space.alloc.as_mut_ptr() as *mut T;
+            let top_ptr = base_ptr.byte_add(self.heap.from_space.top);
+            self.heap.from_space.top += aligned_size;
             top_ptr
         }
     }
@@ -68,7 +70,7 @@ impl Heap {
             panic!("Couldn't allocate {size} bytes!");
         };
         let ptr = alloc.as_mut_ptr() as *mut T;
-        self.big_objects.insert(
+        self.heap.big_objects.insert(
             ptr.addr(),
             BigObject {
                 count: 0,
@@ -79,37 +81,41 @@ impl Heap {
     }
 
     pub fn collect(&mut self, needed: usize) {
-        let new_size = if self.from_space.top > (3 * self.from_space.size) / 4 {
-            self.from_space.size + usize::min(self.from_space.size / 2, 1000000)
+        let new_size = if self.heap.from_space.top > (3 * self.heap.from_space.size) / 4 {
+            self.heap.from_space.size + usize::min(self.heap.from_space.size / 2, 1000000)
         } else {
-            self.from_space.size
+            self.heap.from_space.size
         };
-        if new_size > self.to_space.size {
-            self.to_space = Space::new(new_size);
+        if new_size > self.heap.to_space.size {
+            self.heap.to_space = Space::new(new_size);
         }
 
         unsafe {
             self.copy_live();
         }
-        std::mem::swap(&mut self.to_space, &mut self.from_space);
+        std::mem::swap(&mut self.heap.to_space, &mut self.heap.from_space);
     }
 
     unsafe fn copy_live(&mut self) {
         let mut scan = 0;
         self.trace_roots();
-        while scan < self.to_space.top {
-            let obj = self.to_space.get_object_at(scan);
+        while scan < self.heap.to_space.top {
+            let obj = self.heap.to_space.get_object_at(scan);
             scan += self.trace_object(obj);
         }
     }
 
     fn trace_roots(&mut self) {
-        let mut new_roots = Vec::new();
-        for root in &self.roots {
-            let new_root = Self::copy_object(*root, &mut self.to_space);
-            new_roots.push(new_root);
+        let new_env = self.heap.to_space.copy_object(self.global_env);
+        self.global_env = new_env;
+        for r in self.stack.iter_mut() {
+            let new_r = self.heap.to_space.copy_object(r.clone());
+            *r = new_r;
         }
-        self.roots = new_roots;
+        for reg in self.regs.iter_mut() {
+            let new_reg = self.heap.to_space.copy_object(reg.clone());
+            *reg = new_reg;
+        }
     }
 
     fn trace_object(&mut self, obj: *mut ObjectHeader) -> usize {
@@ -119,25 +125,25 @@ impl Heap {
             match repr {
                 ValueRepr::Array => {
                     let arr = Array { ptr: obj };
-                    Self::copy_object(arr.type_table(), &mut self.to_space);
+                    self.heap.to_space.copy_object(arr.type_table());
                     for v in arr.values() {
-                        Self::copy_object(*v, &mut self.to_space);
+                        self.heap.to_space.copy_object(*v);
                     }
                 }
                 ValueRepr::Bytes => {
                     let bytes = Bytes { ptr: obj };
-                    Self::copy_object(bytes.type_table(), &mut self.to_space);
+                    self.heap.to_space.copy_object(bytes.type_table());
                 }
                 ValueRepr::Closure => {
                     let closure = Closure { ptr: obj };
-                    Self::copy_object(closure.type_table(), &mut self.to_space);
-                    Self::copy_object(get_value(obj, 1), &mut self.to_space);
-                    Self::copy_object(closure.env(), &mut self.to_space);
+                    self.heap.to_space.copy_object(closure.type_table());
+                    self.heap.to_space.copy_object(get_value(obj, 1));
+                    self.heap.to_space.copy_object(closure.env());
                 }
                 ValueRepr::Table => {
                     let table = Table { ptr: obj };
-                    Self::copy_object(table.type_table(), &mut self.to_space);
-                    Self::copy_object(Value::from(table.storage()), &mut self.to_space);
+                    self.heap.to_space.copy_object(table.type_table());
+                    self.heap.to_space.copy_object(Value::from(table.storage()));
                 }
                 _ => {}
             }
@@ -145,26 +151,6 @@ impl Heap {
         }
     }
 
-    fn copy_object(value: Value, to_space: &mut Space) -> Value {
-        if value.is_immediate() {
-            return value;
-        }
-        unsafe {
-            let obj = value.get_object();
-            if (*obj).flags & FORWARD_FLAG == FORWARD_FLAG {
-                return get_value(obj, 0);
-            }
-            let tag = value.get_tag();
-            let size = (*obj).size as usize;
-            let dst = to_space.get_object_at(to_space.top);
-            copy_nonoverlapping(obj, dst, size);
-            to_space.top += align_int(size, 8);
-            (*obj).flags &= FORWARD_FLAG;
-            let new_value = Value::with_tag(dst, tag);
-            set_value(obj, 0, new_value);
-            new_value
-        }
-    }
 }
 
 impl Space {
@@ -182,6 +168,28 @@ impl Space {
     pub(super) fn get_object_at(&mut self, pos: usize) -> *mut ObjectHeader {
         unsafe { self.alloc.as_mut_ptr::<ObjectHeader>().byte_add(pos) }
     }
+
+
+    fn copy_object(&mut self, value: Value) -> Value {
+        if value.is_immediate() {
+            return value;
+        }
+        unsafe {
+            let obj = value.get_object();
+            if (*obj).flags & FORWARD_FLAG == FORWARD_FLAG {
+                return get_value(obj, 0);
+            }
+            let tag = value.get_tag();
+            let size = (*obj).size as usize;
+            let dst = self.get_object_at(self.top);
+            copy_nonoverlapping(obj, dst, size);
+            self.top += align_int(size, 8);
+            (*obj).flags &= FORWARD_FLAG;
+            let new_value = Value::with_tag(dst, tag);
+            set_value(obj, 0, new_value);
+            new_value
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -193,8 +201,8 @@ pub struct ObjectHeader {
 }
 
 impl ObjectHeader {
-    pub(super) fn make(heap: &mut Heap, size: u32, repr: ValueRepr) -> *mut Self {
-        let space: *mut Self = heap.allocate(size as usize);
+    pub(super) fn make(rt: &mut Runtime, size: u32, repr: ValueRepr) -> *mut Self {
+        let space: *mut Self = rt.allocate(size as usize);
         unsafe {
             (*space).size = size;
             (*space).flags = 0;
@@ -346,8 +354,8 @@ impl Value {
         }
     }
 
-    pub fn alloc_float(heap: &mut Heap, x: f64) -> Self {
-        let object = ObjectHeader::make(heap, 16, ValueRepr::Float);
+    pub fn alloc_float(rt: &mut Runtime, x: f64) -> Self {
+        let object = ObjectHeader::make(rt, 16, ValueRepr::Float);
         let ptr = get_object_ptr(object, 0) as *mut f64;
         unsafe {
             *ptr = x;
@@ -624,8 +632,8 @@ pub struct Array {
 }
 
 impl Array {
-    pub fn make(heap: &mut Heap, size: usize) -> Self {
-        let header = ObjectHeader::make(heap, ((size + 2) * CELL_SIZE) as u32, ValueRepr::Array);
+    pub fn make(rt: &mut Runtime, size: usize) -> Self {
+        let header = ObjectHeader::make(rt, ((size + 2) * CELL_SIZE) as u32, ValueRepr::Array);
         let me = Array { ptr: header };
         me.set_type_table(Value::nil());
         for i in 0..size {
@@ -634,9 +642,9 @@ impl Array {
         me
     }
 
-    pub fn with(heap: &mut Heap, values: &[Value]) -> Self {
+    pub fn with(rt: &mut Runtime, values: &[Value]) -> Self {
         let header = ObjectHeader::make(
-            heap,
+            rt,
             ((values.len() + 2) * CELL_SIZE) as u32,
             ValueRepr::Array,
         );
@@ -699,17 +707,17 @@ pub struct Table {
 const INITIAL_SIZE: usize = 16;
 
 impl Table {
-    pub fn make(heap: &mut Heap) -> Self {
-        let header = ObjectHeader::make(heap, 32, ValueRepr::Table);
+    pub fn make(rt: &mut Runtime, ) -> Self {
+        let header = ObjectHeader::make(rt, 32, ValueRepr::Table);
         let mut me = Table { ptr: header };
-        me.clear(heap);
+        me.clear(rt);
         me
     }
 
-    fn resize(&mut self, heap: &mut Heap) {
+    fn resize(&mut self, rt: &mut Runtime) {
         let new_size = self.capacity() * 2;
         let storage = self.storage();
-        let new_storage = Array::make(heap, new_size * 2);
+        let new_storage = Array::make(rt, new_size * 2);
         for i in 0..self.capacity() {
             let key = storage.at(i * 2);
             if Self::valid_key(key) {
@@ -728,12 +736,12 @@ impl Table {
         !(key.is_nil() || key.is_undefined())
     }
 
-    pub fn insert(&mut self, heap: &mut Heap, key: Value, value: Value) {
+    pub fn insert(&mut self, rt: &mut Runtime, key: Value, value: Value) {
         if !Self::valid_key(key) {
             return;
         }
         if 4 * self.size() > 3 * self.capacity() {
-            self.resize(heap);
+            self.resize(rt);
         }
         let storage = self.storage();
         let new_size = self.size() + 1;
@@ -784,8 +792,8 @@ impl Table {
         }
     }
 
-    pub fn clear(&mut self, heap: &mut Heap) {
-        let storage = Array::make(heap, INITIAL_SIZE);
+    pub fn clear(&mut self, rt: &mut Runtime) {
+        let storage = Array::make(rt, INITIAL_SIZE);
         set_value(self.ptr, 1, Value::integer(0));
         set_value(self.ptr, 2, Value::from(storage));
     }
@@ -798,8 +806,8 @@ impl Table {
         }
     }
 
-    pub fn keys(&self, heap: &mut Heap) -> Value {
-        let keys = Array::make(heap, self.size());
+    pub fn keys(&self, rt: &mut Runtime) -> Value {
+        let keys = Array::make(rt, self.size());
         let mut key_index = 0;
         let storage = self.storage();
         for i in 0..self.capacity() {
@@ -836,8 +844,8 @@ pub struct Bytes {
 }
 
 impl Bytes {
-    pub fn make(heap: &mut Heap, size: usize, v: u8) -> Self {
-        let header = ObjectHeader::make(heap, (size + 2 * CELL_SIZE) as u32, ValueRepr::Bytes);
+    pub fn make(rt: &mut Runtime, size: usize, v: u8) -> Self {
+        let header = ObjectHeader::make(rt, (size + 2 * CELL_SIZE) as u32, ValueRepr::Bytes);
         let me = Bytes { ptr: header };
         me.set_type_table(Value::nil());
         for i in 0..size {
@@ -846,9 +854,9 @@ impl Bytes {
         me
     }
 
-    pub fn with(heap: &mut Heap, bytes: &[u8]) -> Self {
+    pub fn with(rt: &mut Runtime, bytes: &[u8]) -> Self {
         let header =
-            ObjectHeader::make(heap, (bytes.len() + 2 * CELL_SIZE) as u32, ValueRepr::Bytes);
+            ObjectHeader::make(rt, (bytes.len() + 2 * CELL_SIZE) as u32, ValueRepr::Bytes);
         let me = Bytes { ptr: header };
         let from = bytes.as_ptr();
         let to = get_object_ptr::<u8>(me.ptr, CELL_SIZE);
@@ -912,20 +920,20 @@ pub const TYPE_EXTERN: u16 = 2;
 
 impl Closure {
     pub fn make(
-        heap: &mut Heap,
+        rt: &mut Runtime,
         code: &Code,
         captures: &[Value],
         arity: usize,
         vararg: Option<usize>,
     ) -> Self {
-        let header = ObjectHeader::make(heap, 48, ValueRepr::Closure);
+        let header = ObjectHeader::make(rt, 48, ValueRepr::Closure);
         let mut me = Closure { ptr: header };
         me.set_type_table(Value::nil());
 
         let env_size = captures.len() + arity + if vararg.is_some() { 1 } else { 0 };
-        let mut env = Array::make(heap, env_size);
+        let mut env = Array::make(rt, env_size);
         env.fill(captures, 0, captures.len());
-        me.set_code(heap, &code);
+        me.set_code(rt, &code);
         set_value(header, 2, Value::from(env));
         set_value(header, 3, Value::integer(arity as i64));
         let var_pos = if let Some(pos) = vararg {
@@ -938,13 +946,13 @@ impl Closure {
     }
 
     pub fn make_low(
-        heap: &mut Heap,
+        rt: &mut Runtime,
         code: &Bytes,
         captures: Value,
         arity: Value,
         vararg: Value,
     ) -> Self {
-        let header = ObjectHeader::make(heap, 48, ValueRepr::Closure);
+        let header = ObjectHeader::make(rt, 48, ValueRepr::Closure);
         let mut me = Closure { ptr: header };
         me.set_type_table(Value::nil());
 
@@ -966,10 +974,10 @@ impl Closure {
         unsafe { (*self.ptr).tag }
     }
 
-    pub fn set_code(&mut self, heap: &mut Heap, code: &Code) {
+    pub fn set_code(&mut self, rt: &mut Runtime, code: &Code) {
         match code {
             Code::Bytecode(items) => {
-                let bc = Bytes::with(heap, &items);
+                let bc = Bytes::with(rt, &items);
                 self.set_tag(TYPE_BYTECODE);
                 set_value(self.ptr, 1, Value::from(bc));
             }

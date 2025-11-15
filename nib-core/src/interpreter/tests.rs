@@ -54,12 +54,12 @@ fn create_space() {
 
 #[test]
 fn make_heap() {
-    let mut heap = Heap::new(10000);
-    let array = Array::make(&mut heap, 5);
+    let mut runtime = Runtime::new();
+    let array = Array::make(&mut runtime, 5);
     array.set(2, Value::integer(4));
     let val = array.at(2);
     assert_eq!(val.get_integer(), 4);
-    let array2 = Array::make(&mut heap, 100);
+    let array2 = Array::make(&mut runtime, 100);
     array.set(3, Value::from(array2));
     assert_eq!(array.size(), 5);
     assert_eq!(array2.size(), 100);
@@ -67,11 +67,11 @@ fn make_heap() {
 
 #[test]
 fn make_table() {
-    let mut heap = Heap::new(10000);
-    let mut table = Table::make(&mut heap);
+    let mut runtime = Runtime::new();
+    let mut table = Table::make(&mut runtime);
     let key = Value::from(Symbol::from("key"));
-    table.insert(&mut heap, key, Value::integer(42));
-    let keys = table.keys(&mut heap);
+    table.insert(&mut runtime, key, Value::integer(42));
+    let keys = table.keys(&mut runtime);
     assert_eq!(keys.get_immediate_repr(), ValueRepr::Array);
     assert_eq!(keys.get_array().at(0), Value::from(key));
     assert_eq!(keys.get_array().size(), 1);
@@ -81,19 +81,19 @@ fn make_table() {
 
 #[test]
 fn alloc_float() {
-    let mut heap = Heap::new(10000);
-    let fl = Value::alloc_float(&mut heap, 1.111);
+    let mut runtime = Runtime::new();
+    let fl = Value::alloc_float(&mut runtime, 1.111);
     dbg!(fl.get_float());
 }
 
 #[test]
 fn hash_stuff() {
-    let mut heap = Heap::new(10000);
-    let mut table = Table::make(&mut heap);
+    let mut runtime = Runtime::new();
+    let mut table = Table::make(&mut runtime);
     let key = Value::from(Symbol::from("key"));
-    table.insert(&mut heap, key, Value::integer(42));
-    table.insert(&mut heap, Value::integer(12), Value::integer(22));
-    let keys = table.keys(&mut heap);
+    table.insert(&mut runtime, key, Value::integer(42));
+    table.insert(&mut runtime, Value::integer(12), Value::integer(22));
+    let keys = table.keys(&mut runtime);
     dbg!(key.hash());
     dbg!(keys.hash());
     dbg!(Value::from(table).hash());
@@ -113,7 +113,7 @@ fn add_numbers() -> Result<()> {
     let code = vec![INSTR_ADD, 1, 1, 2];
     rt.regs[1] = Value::integer(8);
     rt.regs[2] = Value::integer(7);
-    rt.code = Value::from(Bytes::with(&mut rt.heap, &code));
+    rt.code = Value::from(Bytes::with(&mut rt, &code));
     let err = rt.run();
     assert!(err.is_ok());
     let res = Value::get_integer(&rt.regs[1]);
