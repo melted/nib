@@ -148,7 +148,7 @@ impl<'a> super::ParserState<'a> {
         }
     }
 
-    pub(super) fn token_indent(&self, token: Token) -> i32 {
+    pub(super) fn token_indent(&self, token: &Token) -> i32 {
         let start = token.location.start;
         for i in self.metadata.newlines.iter().rev() {
             if *i <= start {
@@ -161,7 +161,7 @@ impl<'a> super::ParserState<'a> {
     pub(super) fn next_indent(&mut self) -> i32 {
         let tok = self.peek_next_token();
         match tok {
-            Ok(tok) => self.token_indent(tok),
+            Ok(tok) => self.token_indent(&tok),
             _ => 0,
         }
     }

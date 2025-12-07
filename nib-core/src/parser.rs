@@ -106,8 +106,12 @@ impl<'a> ParserState<'a> {
     }
 
     pub(self) fn indent(&self) -> i32 {
-        let last_newline = self.metadata.newlines.last().unwrap_or(&0);
-        (self.position() - last_newline) as i32
+        for nl in self.metadata.newlines.iter().rev() {
+            if self.position() > *nl {
+                return (self.position() - *nl) as i32
+            }
+        }
+        self.position() as i32
     }
 
     pub(self) fn position(&self) -> usize {

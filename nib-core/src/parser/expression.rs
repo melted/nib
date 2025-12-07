@@ -11,7 +11,7 @@ impl<'a> ParserState<'a> {
     }
 
     pub(super) fn parse_inner_expression(&mut self, min_pred: i32) -> Result<ExpressionNode> {
-        let indent = self.indent();
+        let indent = self.next_indent();
         let last = *self.indent_stack.last().unwrap_or(&0);
         let start = self.next_position();
         if indent < last {
