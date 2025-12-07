@@ -42,7 +42,13 @@ impl<'a> super::ParserState<'a> {
                     self.next();
                     if let Some((_, c)) = self.chars.peek() {
                         let c = *c;
-                        if !self.check_prefix("//") && operator_char(c) {
+                        if self.check_prefix("(-)") {
+                            // Special handling since we want to handle both (-) as a
+                            // prefix operator and (-10) as a number in parens
+                            self.advance(2);
+                            Some(self.token(TokenValue::Identifier(Symbol::from("(-)"))))
+                        } else if !self.check_prefix("//") &&
+                            !self.check_prefix("-") && operator_char(c) {
                             let id = self.read_parenthesized_operator()?;
                             Some(self.token(TokenValue::Identifier(Symbol::from(id))))
                         } else if c == ')' {

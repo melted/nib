@@ -28,7 +28,9 @@ pub struct Module {
     bcode: Vec<u8>,
     local_env_size: usize,
     /// A list of symbol literals that should be put into the local environment.
-    // TODO: Remove. Not needed. Can just load the symbol as an imm64 
+    // TODO: Remove. Not needed. Can just load the symbol as an imm64
+    // Note, this would make the output bound to the process, is this what I want?
+    // I can serialize the module if I import the symbols from the environment.
     want_symbols: HashMap<Symbol, usize>,
     /// Global variables used by the module.
     captures: HashMap<Symbol, usize>,
@@ -46,8 +48,10 @@ impl Module {
     }
 }
 
+/// State held during compilation. Everything that can be discarded when finished
+/// goes here.
 #[derive(Debug, Clone)]
-pub(in crate::interpreter) struct Compilation {
+pub(super) struct Compilation {
     module: Module,
     core_bindings: Vec<crate::core::Binding>,
     next_loc: usize,
@@ -77,8 +81,6 @@ impl Compilation {
         }
         Ok(())
     }
-
-
 
     fn compile_binding(&mut self, binding: &crate::core::Binding) -> Result<()> {
         todo!();
