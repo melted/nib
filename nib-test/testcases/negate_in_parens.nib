@@ -1,0 +1,17 @@
+// @Name: Parsing negative numbers in parens
+
+// Leading negative numbers should not be confused with operator in
+// parens.
+
+a n = (-10*n)+1
+
+// This should still work
+b = (-) 3
+
+_ = println (a 3)
+_ = println b
+// @Output:
+// -29
+// -3
+// @EndOutput
+// @ExitCode: 0
