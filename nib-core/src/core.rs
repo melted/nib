@@ -1,5 +1,5 @@
 use crate::ast::{ExpressionNode, Pattern};
-use crate::common::Symbol;
+use crate::common::{Symbol, next_source_id};
 use crate::{
     ast::{self, Literal, PatternNode},
     common::{Error, Metadata, Name, Node, Result},
@@ -35,7 +35,7 @@ pub fn desugar(module: ast::Module) -> Result<Module> {
 }
 
 pub fn desugar_expression(expr: ExpressionNode) -> Result<Expression> {
-    let meta = Metadata::new(None);
+    let meta = Metadata::new(None, next_source_id());
     let mut state = DesugarState::new(meta);
     state.desugar_expression(&expr)
 }

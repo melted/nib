@@ -1,5 +1,6 @@
 use anyhow::anyhow;
 use std::num::NonZeroU32;
+use std::sync::LazyLock;
 use std::{
     collections::{HashMap, HashSet},
     fmt::Display,
@@ -7,9 +8,19 @@ use std::{
 };
 use thiserror::Error;
 
+
+pub fn next_source_id() -> u32 {
+    unsafe {
+        static mut LOCAL_VAL:LazyLock<u32> = LazyLock::new(|| 0);
+        *LOCAL_VAL += 1;
+        *LOCAL_VAL
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct Metadata {
     pub file: Option<String>,
+    pub source_id: u32,
     pub trivia: Vec<Annotation>,
     pub annotations: HashMap<Node, Annotation>,
     pub locations: HashMap<Node, Location>,
@@ -20,9 +31,10 @@ pub struct Metadata {
 }
 
 impl Metadata {
-    pub fn new(file: Option<String>) -> Self {
+    pub fn new(file: Option<String>, source:u32) -> Self {
         Metadata {
             file,
+            source_id: source,
             trivia: Vec::new(),
             annotations: HashMap::new(),
             locations: HashMap::new(),
@@ -45,13 +57,22 @@ pub enum Annotation {
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Location {
-    pub start: usize,
-    pub end: usize,
+    pub source: u32,
+    pub start: u32,
+    pub end: u32,
 }
 
 impl Location {
-    pub fn at(start: usize, end: usize) -> Self {
-        Location { start, end }
+    pub fn at(source:u32, start: usize, end: usize) -> Self {
+        Location { source, start: start as u32, end: end as u32 }
+    }
+
+    pub fn start(&self) -> usize {
+        self.start as usize
+    }
+
+    pub fn end(&self) -> usize {
+        self.end as usize
     }
 }
 

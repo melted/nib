@@ -24,7 +24,7 @@ impl<'a> ParserState<'a> {
                 let pos = self.position();
                 self.metadata
                     .locations
-                    .insert(exp.id, Location::at(start, pos));
+                    .insert(exp.id, Location::at(self.metadata.source_id, start, pos));
                 exp
             }
             err @ Err(_) => {
@@ -81,7 +81,7 @@ impl<'a> ParserState<'a> {
                     let pos = self.position();
                     self.metadata
                         .locations
-                        .insert(exp.id, Location::at(start, pos));
+                        .insert(exp.id, Location::at(self.metadata.source_id, start, pos));
                     lhs = exp;
                 }
             }

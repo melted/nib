@@ -2,7 +2,7 @@ use std::iter::Peekable;
 use std::str::CharIndices;
 
 use crate::ast::{ExpressionNode, Module};
-use crate::common::{Error, Location, Metadata, Node, Result};
+use crate::common::{Error, Location, Metadata, Node, Result, next_source_id};
 use crate::parser::lexer::{Token, TokenValue};
 
 mod declaration;
@@ -74,7 +74,7 @@ struct ParserState<'a> {
 impl<'a> ParserState<'a> {
     fn new(code: &'a str) -> ParserState<'a> {
         let mut state = ParserState {
-            metadata: Metadata::new(None),
+            metadata: Metadata::new(None, next_source_id()),
             src: code,
             chars: code.char_indices().peekable(),
             token_start: 0,
@@ -97,7 +97,7 @@ impl<'a> ParserState<'a> {
     pub(self) fn new_error(&self, msg: &str) -> Error {
         Error::Syntax {
             msg: msg.to_string(),
-            loc: Location::at(self.token_start, self.position()), // TODO: extent of AST element
+            loc: Location::at(self.metadata.source_id, self.token_start, self.position()), // TODO: extent of AST element
         }
     }
 
@@ -119,7 +119,7 @@ impl<'a> ParserState<'a> {
     }
 
     pub(self) fn next_position(&mut self) -> usize {
-        self.peek_next_token().map_or(0, |x| x.location.start)
+        self.peek_next_token().map_or(0, |x| x.location.start())
     }
 
     pub(self) fn adjust_offset(&mut self, offset: usize) {

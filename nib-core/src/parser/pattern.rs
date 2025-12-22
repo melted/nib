@@ -49,7 +49,7 @@ impl<'a> ParserState<'a> {
         let pos = self.position();
         self.metadata
             .locations
-            .insert(pat.id, Location::at(start, pos));
+            .insert(pat.id, Location::at(self.metadata.source_id, start, pos));
         Ok(pat)
     }
 

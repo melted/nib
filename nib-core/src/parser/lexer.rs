@@ -11,7 +11,7 @@ impl<'a> super::ParserState<'a> {
         if tok.value != TokenValue::Eof {
             self.stashed_token = Some(tok.clone());
         }
-        self.pos = tok.location.start - self.offset;
+        self.pos = tok.location.start() - self.offset;
         self.token_start = self.position();
         Ok(tok)
     }
@@ -149,7 +149,7 @@ impl<'a> super::ParserState<'a> {
     }
 
     pub(super) fn token_indent(&self, token: &Token) -> i32 {
-        let start = token.location.start;
+        let start = token.location.start();
         for i in self.metadata.newlines.iter().rev() {
             if *i <= start {
                 return (start - i) as i32;
@@ -450,7 +450,7 @@ impl<'a> super::ParserState<'a> {
 
     fn location_current_token(&self) -> Location {
         // TODO: give InContext if applicable
-        Location::at(self.token_start, self.position())
+        Location::at(self.metadata.source_id, self.token_start, self.position())
     }
 }
 

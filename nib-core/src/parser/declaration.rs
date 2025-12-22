@@ -88,7 +88,7 @@ impl<'a> ParserState<'a> {
         let m = self.module_declaration(name);
         self.metadata
             .locations
-            .insert(m.id, Location::at(start, pos));
+            .insert(m.id, Location::at(self.metadata.source_id, start, pos));
         Ok(Declaration::Module(m))
     }
 
@@ -100,7 +100,7 @@ impl<'a> ParserState<'a> {
         let u = self.use_declaration(name);
         self.metadata
             .locations
-            .insert(u.id, Location::at(start, pos));
+            .insert(u.id, Location::at(self.metadata.source_id, start, pos));
         Ok(Declaration::Use(u))
     }
 
@@ -113,7 +113,7 @@ impl<'a> ParserState<'a> {
             let pos = self.position();
             self.metadata
                 .locations
-                .insert(bind.id, Location::at(start, pos));
+                .insert(bind.id, Location::at(self.metadata.source_id, start, pos));
             Ok(Binding::VarBinding(bind))
         } else if self.peek_operator()? {
             let op = self.parse_operator()?;
@@ -129,10 +129,10 @@ impl<'a> ParserState<'a> {
             let pos = self.position();
             self.metadata
                 .locations
-                .insert(bind.clauses[0].id, Location::at(start, pos));
+                .insert(bind.clauses[0].id, Location::at(self.metadata.source_id, start, pos));
             self.metadata
                 .locations
-                .insert(bind.id, Location::at(start, pos));
+                .insert(bind.id, Location::at(self.metadata.source_id, start, pos));
             Ok(Binding::OpBinding(bind))
         } else if let Pattern::Var(name) = initial.pattern {
             let (args, guard) = self.parse_fun_args()?;
@@ -142,10 +142,10 @@ impl<'a> ParserState<'a> {
             let pos = self.position();
             self.metadata
                 .locations
-                .insert(bind.clauses[0].id, Location::at(start, pos));
+                .insert(bind.clauses[0].id, Location::at(self.metadata.source_id, start, pos));
             self.metadata
                 .locations
-                .insert(bind.id, Location::at(start, pos));
+                .insert(bind.id, Location::at(self.metadata.source_id, start, pos));
             Ok(Binding::FunBinding(bind))
         } else {
             self.error("Binding pattern matches neither a var, fun or operator binding")
