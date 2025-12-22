@@ -1,7 +1,7 @@
 use std::ffi::c_void;
 
 use crate::{
-    common::{Error, Name, Result, Symbol, sym},
+    common::{Name, Result, Symbol, sym},
     core::Arity,
     interpreter::{
         Runtime, ensure_type,

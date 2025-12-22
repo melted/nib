@@ -4,7 +4,6 @@
 //! The byte code and functions to manipulate it.
 
 use std::collections::HashMap;
-use std::mem;
 
 pub struct BytecodeBuilder {
     pieces: Vec<Vec<u8>>,

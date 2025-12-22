@@ -9,7 +9,6 @@ use crate::{
     treewalker::evaluate::Environment,
 };
 use libffi::middle::{Cif, CodePtr};
-use std::fmt::Pointer;
 use std::{
     cell::RefCell,
     collections::{BTreeSet, HashMap, HashSet},
@@ -18,7 +17,6 @@ use std::{
     fs::read_to_string,
     rc::Rc,
 };
-use symbol_table::SymbolTable;
 
 mod evaluate;
 mod foreign;
@@ -132,18 +130,6 @@ impl Runtime {
         Ok(())
     }
 
-    pub fn get_name(&self, name: &Name) -> Option<Value> {
-        match name {
-            Name::Qualified(path, name) => {
-                if let Some(t) = self.get_module_path(path) {
-                    self.get_from_table(t, name)
-                } else {
-                    None
-                }
-            }
-            Name::Plain(name) => self.get_global(name),
-        }
-    }
 
     pub fn get_module_path(&self, path: &[Symbol]) -> Option<Rc<RefCell<Table>>> {
         let mut rest = path;

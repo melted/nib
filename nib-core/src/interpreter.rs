@@ -4,16 +4,13 @@
 //! Compile code to bytecode then run it
 
 use std::cmp::Ordering;
-use std::collections::HashMap;
 use std::ffi::c_void;
 use std::ops::BitXor;
 
-use region::page::size;
-use crate::capi;
 use crate::common::{Error, Name, Result, Symbol};
 use crate::interpreter::bytecode::*;
 use crate::interpreter::heap::{
-    Array, Bytes, Closure, Code, Heap, ObjectHeader, TYPE_BYTECODE, TYPE_CORE, TYPE_EXTERN, Table,
+    Array, Bytes, Closure, Heap, TYPE_BYTECODE, TYPE_EXTERN, Table,
     Value, ValueRepr, set_value,
 };
 use crate::interpreter::prims::PrimFn;
@@ -39,7 +36,7 @@ const DEFAULT_STACK_SIZE:usize = 1000;
 
 impl Runtime {
     pub fn new() -> Self {
-        let mut heap = Heap::new(DEFAULT_HEAP_SIZE);
+        let heap = Heap::new(DEFAULT_HEAP_SIZE);
         let mut runtime = Runtime {
             heap,
             global_env: Value::nil(),
@@ -422,7 +419,7 @@ impl Runtime {
             ensure_type(&val, ValueRepr::Integer)?;
             val.get_integer() as i64
         } else {
-            (arg as i64 - 128)
+            arg as i64 - 128
         };
         let target = (self.ip as i64 + dist) as usize;
         if target < code.len() {

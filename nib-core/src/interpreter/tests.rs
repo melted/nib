@@ -8,7 +8,7 @@ use crate::interpreter::heap::{Bytes, Space};
 use crate::parser::parse_declarations;
 use crate::{
     common::{Result, Symbol},
-    interpreter::heap::{Array, Heap, Table, Value, ValueRepr},
+    interpreter::heap::{Array, Table, Value, ValueRepr},
 };
 
 #[test]

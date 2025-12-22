@@ -1,13 +1,12 @@
 use crate::common::{Metadata, Name};
 use crate::common::{Result, Symbol};
-use crate::core::{Binder, Expression, Var};
-use crate::interpreter::heap::Value;
+use crate::core::{Binder, Expression};
 use std::collections::{BTreeSet, HashMap};
 use std::mem;
 use std::sync::LazyLock;
 
 pub fn compile(from: crate::core::Module) -> Result<Module> {
-    let mut module = Module::new();
+    let module = Module::new();
     let mut compilation = Compilation::new(from);
     compilation.compile()?;
     Ok(compilation.module)

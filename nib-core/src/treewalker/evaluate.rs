@@ -5,15 +5,13 @@ use crate::{
     core::{Arity, Binder, Binding, Expression, Lambda, Module, free_vars},
     treewalker::{CType, Closure, Code, Runtime, Value, new_ref},
 };
-use log::{info, log};
-use std::hash::Hash;
+use log::info;
 use std::{
     collections::{HashMap, HashSet},
     mem,
     ops::Deref,
     os::raw::c_void,
 };
-use symbol_table::GlobalSymbol;
 
 type ClosureRefs = HashMap<Symbol, HashSet<Symbol>>;
 
@@ -295,8 +293,7 @@ impl Runtime {
         info!("Applying {} to {} arguments", &vals[0], &vals[1..].len());
         match &vals[0] {
             Value::Closure(closure_rc) => {
-                let mut env: Environment;
-                let (mut args, code, arity) = {
+                let (mut env, mut args, code, arity) = {
                     let mut args = Vec::new();
                     let mut closure = closure_rc.borrow_mut();
 
@@ -309,11 +306,11 @@ impl Runtime {
                             .push(Value::Closure(new_ref(closure.with_args(&args))));
                         return Ok(());
                     }
-                    env = closure.env.clone();
-                    (args, closure.code.clone(), closure.arity.clone())
+                    let env = closure.env.clone();
+                    (env, args, closure.code.clone(), closure.arity.clone())
                 };
 
-                let mut remaining = match arity {
+                let remaining = match arity {
                     Arity::Fixed(n) => args.split_off(n as usize),
                     Arity::VarArg(_, _) => Vec::new(),
                 };

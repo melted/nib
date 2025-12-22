@@ -111,7 +111,7 @@ impl DesugarState {
         ast_binding: &ast::VarBinding,
         is_local: bool,
     ) -> Result<Vec<Binding>> {
-        let mut pat = &ast_binding.lhs;
+        let pat = &ast_binding.lhs;
         let rhs = self.desugar_expression(&ast_binding.rhs)?;
         match &pat.pattern {
             Pattern::Var(v) => {

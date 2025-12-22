@@ -1,0 +1,9 @@
+// @Name: Parsing arrays with indent
+
+// from pidigits.nib
+// This parses on one line but not lined up like this
+// Fixed now, turn this example to a regression test
+comp q r s t q2 r2 s2 t2 = [q * q2 + (r * s2),
+                            q * r2 + (r * t2),
+                            s * q2 + (t * s2),
+                            s * r2 + (t * t2)]

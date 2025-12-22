@@ -953,16 +953,15 @@ impl Runtime {
                 return Ok(from);
             }
             let tt = self.type_query(&from)?;
-            if let type_tab = tt.get_table()? {
-                let tab = &type_tab.borrow().table;
-                let res = if let Some(proj_fun) = tab.get(&Symbol::from("project")) {
-                    self.prim_apply(&vec![from, projections[0].clone()])?
-                } else {
-                    self.project_table(&from, &projections[0])?
-                };
-                from = res;
-                projections = &projections[1..];
-            }
+            let type_tab = tt.get_table()?;
+            let tab = &type_tab.borrow().table;
+            let res = if let Some(proj_fun) = tab.get(&Symbol::from("project")) {
+                self.prim_apply(&vec![from, projections[0].clone()])?
+            } else {
+                self.project_table(&from, &projections[0])?
+            };
+            from = res;
+            projections = &projections[1..];
         }
     }
 
