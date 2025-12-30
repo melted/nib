@@ -2,7 +2,7 @@ use std::iter::Peekable;
 use std::str::CharIndices;
 
 use crate::ast::{ExpressionNode, Module};
-use crate::common::{Error, Location, Metadata, Node, Result, next_source_id};
+use crate::common::{Error, Location, Metadata, Node, Result, next_source_id, SyntaxError};
 use crate::parser::lexer::{Token, TokenValue};
 
 mod declaration;
@@ -15,12 +15,21 @@ mod tests;
 pub fn parse_declarations(file: Option<String>, code: &str) -> Result<Module> {
     let mut state = ParserState::new(code);
     let decls = state.parse_declarations()?;
-    state.metadata.last_id = state.counter;
-    state.metadata.file = file;
-    Ok(Module {
-        metadata: state.metadata,
-        declarations: decls,
-    })
+    if (state.errors.is_empty()) {
+        state.metadata.last_id = state.counter;
+        state.metadata.file = file;
+        Ok(Module {
+            metadata: state.metadata,
+            declarations: decls,
+        })
+    } else {
+        let count = state.errors.len();
+        for err in state.errors {
+            let (line, col) = state.metadata.linecol(&err.loc);
+            log::error!("{} at line {}, col {}", err.msg, line, col);
+        }
+        Err(Error::runtime_error(&format!("{} syntax errors", count)))
+    }
 }
 
 pub fn parse_expression(code: &str) -> Result<ExpressionNode> {
@@ -60,6 +69,7 @@ pub fn dump_prog(code: &str) -> Result<()> {
 
 struct ParserState<'a> {
     metadata: Metadata,
+    errors: Vec<SyntaxError>,
     src: &'a str,
     chars: Peekable<CharIndices<'a>>,
     token_start: usize,
@@ -76,6 +86,7 @@ impl<'a> ParserState<'a> {
         let mut state = ParserState {
             metadata: Metadata::new(None, next_source_id()),
             src: code,
+            errors: Vec::new(),
             chars: code.char_indices().peekable(),
             token_start: 0,
             pos: 0,
@@ -95,10 +106,10 @@ impl<'a> ParserState<'a> {
     }
 
     pub(self) fn new_error(&self, msg: &str) -> Error {
-        Error::Syntax {
+        Error::from(SyntaxError {
             msg: msg.to_string(),
             loc: Location::at(self.metadata.source_id, self.token_start, self.position()), // TODO: extent of AST element
-        }
+        })
     }
 
     pub(self) fn error<T>(&self, msg: &str) -> Result<T> {

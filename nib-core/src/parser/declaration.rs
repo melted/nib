@@ -6,15 +6,34 @@ use crate::{
     common::{Location, Name, Node, Result},
     parser::{ParserState, lexer::TokenValue},
 };
+use crate::common::Error;
 
 impl<'a> ParserState<'a> {
     pub(super) fn parse_declarations(&mut self) -> Result<Vec<Declaration>> {
         let mut decls = Vec::new();
         loop {
-            if self.is_next(TokenValue::Eof)? {
+            if let Ok(true) =self.is_next(TokenValue::Eof) {
                 break;
             }
-            self.parse_add_declaration(&mut decls)?
+            match self.parse_add_declaration(&mut decls) {
+                Ok(_) => {}
+                Err(Error::Syntax { err: syntax_error}) => {
+                    self.errors.push(syntax_error);
+                    // Now recover
+                    self.resync();
+                    loop {
+                        if let Some(res) = self.try_parse(&mut Self::parse_declaration)? {
+                            decls.push(res);
+                            break;
+                        }
+                        let tok = self.get_next_token()?;
+                        if tok.value == TokenValue::Eof {
+                            break;
+                        }
+                    }
+                }
+                Err(e) => { return Err(e) }
+            }
         }
         Ok(decls)
     }
@@ -214,6 +233,15 @@ impl<'a> ParserState<'a> {
             id: self.counter,
             op,
             clauses,
+        }
+    }
+
+    pub(super) fn resync(&mut self) {
+        if let Some(&indent) = self.indent_stack.first() {
+            while self.next_indent() >= indent {
+                self.get_next_token();
+            }
+            self.indent_stack.clear();
         }
     }
 }

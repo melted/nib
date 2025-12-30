@@ -1,0 +1,12 @@
+fib 0 = 0
+fib 1 = 1
+fib n = fib (n-1) + fib (n-2)
+
+
+fast_fib n = go 0 1 n
+              where
+                go a _ 0 = a
+                go _ b 1 = b
+                go a b n = go b (a+b) (n-1)
+
+_ = print (fast_fib 40)

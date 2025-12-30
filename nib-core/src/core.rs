@@ -583,7 +583,7 @@ pub fn get_arity(patterns: &[PatternNode]) -> Arity {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub struct Module {
     pub metadata: Metadata,
     pub bindings: Vec<Binding>,

@@ -1,6 +1,6 @@
 use unicode_categories::UnicodeCategories;
 
-use crate::common::Error;
+use crate::common::{Error, SyntaxError};
 use crate::common::Location;
 use crate::common::Result;
 use crate::common::Symbol;
@@ -432,10 +432,10 @@ impl<'a> super::ParserState<'a> {
     }
 
     fn lex_error<T>(&self, msg: &str) -> Result<T> {
-        Err(Error::Syntax {
+        Err(Error::from(SyntaxError {
             msg: msg.to_string(),
             loc: self.location_current_token(),
-        })
+        }))
     }
 
     fn token(&mut self, token: TokenValue) -> Token {

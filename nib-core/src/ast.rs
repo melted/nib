@@ -4,7 +4,7 @@ use crate::{
 };
 use std::{collections::HashSet, fmt::Display};
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub struct Module {
     pub metadata: Metadata,
     pub declarations: Vec<Declaration>,

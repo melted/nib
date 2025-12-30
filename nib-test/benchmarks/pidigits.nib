@@ -1,0 +1,40 @@
+// Pidigits from Benchmarks Game
+// Adapted from the Racket code at
+// https://benchmarksgame-team.pages.debian.net/benchmarksgame/program/pidigits-racket-1.html
+
+
+floor_ev q r s t x = (q * x + r) / (s * x + t)
+
+comp q r s t q2 r2 s2 t2 = [q * q2 + (r * s2),
+                            q * r2 + (r * t2),
+                            s * q2 + (t * s2),
+                            s * r2 + (t * t2)]
+
+next q r s t = floor_ev q r s t 3
+is_safe q r s t n = n == (floor_ev q r s t 4)
+prod q r s t n = comp 10 (-10*n) 0 1 q r s t
+mk q r s t k = comp q r s t k (4*k+2) 0 (2*k+1)
+
+digit k q r s t 0 row col = print (spaces ++ "\t:" ++ to_string (row+col) ++ "\n")
+                                                 where
+                                                    spaces = bytes.create (10-col) 32
+                                                    _ = set_type spaces string
+digit k q r s t n row col
+   = calc ()
+        where
+            y = next q r s t
+            printn _ = print ("\t:" ++ to_string (row+10) ++"\n" ++ to_string y)
+            next_digit nq nr ns nt | col == 10 = printn () & digit k nq nr ns nt (n-1) (row+10) 1
+            next_digit nq nr ns nt = print y & digit k nq nr ns nt (n-1) row (col + 1)
+            calc _ | is_safe q r s t y
+                = next_digit nq nr ns nt
+                    where
+                        [nq, nr, ns, nt] = prod q r s t y
+            calc _ = digit (k+1) nq nr ns nt n row col
+                        where
+                        [nq, nr, ns, nt] = mk q r s t k
+
+
+digits n = digit 1 1 0 0 1 n 0 0
+
+_ = digits 105

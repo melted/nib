@@ -17,7 +17,7 @@ pub fn next_source_id() -> u32 {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub struct Metadata {
     pub file: Option<String>,
     pub source_id: u32,
@@ -43,6 +43,18 @@ impl Metadata {
             newlines: Vec::new(),
             last_id: 0,
         }
+    }
+
+    pub fn linecol(&self, loc:&Location) -> (usize, usize) {
+        let target = loc.start as usize;
+        if (self.newlines.is_empty()) {
+            return (0, target);
+        }
+        let line = match self.newlines.binary_search(&target) {
+            Ok(l) | Err(l) => l
+        };
+        let col = if line == 0 { target } else { target - self.newlines[line-1] };
+        (line, col)
     }
 }
 
@@ -83,10 +95,17 @@ impl Display for Location {
     }
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct SyntaxError {
+    pub msg: String,
+    pub loc: Location
+}
+
+
 #[derive(Error, Debug)]
 pub enum Error {
-    #[error("Syntax error: {} at {}", msg, loc)]
-    Syntax { msg: String, loc: Location },
+    #[error("Syntax error: {} at {}", err.msg, err.loc)]
+    Syntax { err: SyntaxError },
     #[error(transparent)]
     General { err: anyhow::Error },
     #[error("Runtime error: {}", msg)]
@@ -100,6 +119,12 @@ pub enum Error {
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
+
+impl From<SyntaxError> for Error {
+    fn from(value: SyntaxError) -> Self {
+        Error::Syntax { err: value }
+    }
+}
 
 impl Error {
     pub fn runtime_error(msg: &str) -> Error {
