@@ -4,7 +4,7 @@ use crate::{
         Operator, Pattern, PatternNode, UseDirective, VarBinding,
     },
     common::{Location, Name, Node, Result},
-    parser::{ParserState, lexer::TokenValue},
+    parser::{ParserState, lexer::{Token, TokenValue}},
 };
 use crate::common::Error;
 
@@ -18,7 +18,7 @@ impl<'a> ParserState<'a> {
             match self.parse_add_declaration(&mut decls) {
                 Ok(_) => {}
                 Err(Error::Syntax { err: syntax_error}) => {
-                    self.errors.push(syntax_error);
+                    self.metadata.errors.push(syntax_error);
                     // Now recover
                     self.resync();
                     loop {
@@ -239,7 +239,7 @@ impl<'a> ParserState<'a> {
     pub(super) fn resync(&mut self) {
         if let Some(&indent) = self.indent_stack.first() {
             while self.next_indent() >= indent {
-                self.get_next_token();
+                let tok = self.get_next_token().unwrap_or(Token::from(TokenValue::Eof));
             }
             self.indent_stack.clear();
         }

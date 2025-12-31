@@ -61,7 +61,8 @@ impl Runtime {
     }
 
     pub fn add_code(&mut self, name: &str, code: &str) -> Result<()> {
-        let ast_module = parse_declarations(Some(name.to_owned()), code)?;
+        let mut ast_module = crate::ast::Module::new(Some(name.to_owned()), code);
+        parse_declarations(&mut ast_module)?;
         let mut module = desugar(ast_module)?;
         if self.output_core {
             for b in &module.bindings {

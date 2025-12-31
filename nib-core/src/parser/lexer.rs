@@ -563,3 +563,9 @@ impl PartialEq<Token> for Token {
         self.value == other.value
     }
 }
+
+impl From<TokenValue> for Token {
+    fn from(value: TokenValue) -> Self {
+        Token { value, location: Location::at(0, 0, 0), on_new_line: false }
+    }
+}

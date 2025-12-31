@@ -14,13 +14,14 @@ pub extern "C" fn nib_parse(source: *const c_char, mod_ptr: *mut *mut Module) ->
     let Ok(c_str) = unsafe { CStr::from_ptr(source) }.to_str() else {
         return NIB_ERROR;
     };
-    let res = parse_declarations(None, c_str);
+    let mut module = Module::new(None, c_str);
+    let res = parse_declarations(&mut module);
+    let mod_box = Box::new(module);
+    unsafe {
+        *mod_ptr = Box::into_raw(mod_box);
+    }
     match res {
-        Ok(module) => {
-            let mod_box = Box::new(module);
-            unsafe {
-                *mod_ptr = Box::into_raw(mod_box);
-            }
+        Ok(()) => {
             NIB_SUCCESS
         }
         Err(_) => NIB_ERROR,

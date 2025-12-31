@@ -1,10 +1,11 @@
 #![cfg(test)]
 
-use crate::{common::Result, core::desugar, parser::parse_declarations};
+use crate::{ast::Module, common::Result, core::desugar, parser::parse_declarations};
 
 #[test]
 fn desugar_simple() -> Result<()> {
-    let t = parse_declarations(None, "a = 1")?;
+    let mut t = Module::new(None, "a = 1");
+    parse_declarations(&mut t)?;
     let co = desugar(t)?;
     assert_eq!(co.bindings.len(), 1);
     Ok(())
@@ -12,7 +13,8 @@ fn desugar_simple() -> Result<()> {
 
 #[test]
 fn desugar_pattern() -> Result<()> {
-    let t = parse_declarations(None, "[a, b] = [1, 2]")?;
+    let mut t = Module::new(None, "[a, b] = [1, 2]");
+    parse_declarations(&mut t)?;
     let co = desugar(t)?;
     dbg!(co);
     Ok(())
@@ -22,7 +24,8 @@ fn desugar_pattern() -> Result<()> {
 fn desugar_function() -> Result<()> {
     let prog = "fac 0 = 1
 fac n = n * (fac (n - 1))";
-    let t = parse_declarations(None, prog)?;
+    let mut t = Module::new(None, prog);
+    parse_declarations(&mut t)?;
     let co = desugar(t)?;
     dbg!(co);
     Ok(())

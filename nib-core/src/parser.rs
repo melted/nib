@@ -2,7 +2,7 @@ use std::iter::Peekable;
 use std::str::CharIndices;
 
 use crate::ast::{ExpressionNode, Module};
-use crate::common::{Error, Location, Metadata, Node, Result, next_source_id, SyntaxError};
+use crate::common::{Error, Location, Metadata, Node, Result, SyntaxError};
 use crate::parser::lexer::{Token, TokenValue};
 
 mod declaration;
@@ -12,19 +12,17 @@ pub(crate) mod lexer;
 mod pattern;
 mod tests;
 
-pub fn parse_declarations(file: Option<String>, code: &str) -> Result<Module> {
-    let mut state = ParserState::new(code);
+pub fn parse_declarations(module: &mut Module) -> Result<()> {
+    let src = module.metadata.source.clone();
+    let mut state = ParserState::new(&src, &mut module.metadata);
     let decls = state.parse_declarations()?;
-    if (state.errors.is_empty()) {
-        state.metadata.last_id = state.counter;
-        state.metadata.file = file;
-        Ok(Module {
-            metadata: state.metadata,
-            declarations: decls,
-        })
+    state.metadata.last_id = state.counter;
+    module.declarations = decls;
+    if state.metadata.errors.is_empty() {
+        Ok(())
     } else {
-        let count = state.errors.len();
-        for err in state.errors {
+        let count = state.metadata.errors.len();
+        for err in &state.metadata.errors {
             let (line, col) = state.metadata.linecol(&err.loc);
             log::error!("{} at line {}, col {}", err.msg, line, col);
         }
@@ -33,12 +31,14 @@ pub fn parse_declarations(file: Option<String>, code: &str) -> Result<Module> {
 }
 
 pub fn parse_expression(code: &str) -> Result<ExpressionNode> {
-    let mut state = ParserState::new(code);
+    let mut meta = Metadata::empty();
+    let mut state = ParserState::new(code, &mut meta);
     state.parse_expression()
 }
 
 pub fn lex(code: &str) -> Result<Vec<Token>> {
-    let mut state = ParserState::new(code);
+    let mut meta = Metadata::empty();
+    let mut state = ParserState::new(code, &mut meta);
     let mut tokens = Vec::new();
     loop {
         let tok = state.get_next_token()?;
@@ -60,7 +60,9 @@ pub fn dump_lex(code: &str) -> Result<()> {
 }
 
 pub fn dump_prog(code: &str) -> Result<()> {
-    let module = parse_declarations(None, code)?;
+
+    let mut module = Module::new(None, code);
+    parse_declarations(&mut module)?;
     for d in module.declarations {
         println!("{}", d);
     }
@@ -68,8 +70,7 @@ pub fn dump_prog(code: &str) -> Result<()> {
 }
 
 struct ParserState<'a> {
-    metadata: Metadata,
-    errors: Vec<SyntaxError>,
+    metadata: &'a mut Metadata,
     src: &'a str,
     chars: Peekable<CharIndices<'a>>,
     token_start: usize,
@@ -82,11 +83,11 @@ struct ParserState<'a> {
 }
 
 impl<'a> ParserState<'a> {
-    fn new(code: &'a str) -> ParserState<'a> {
+    fn new(code: &'a str, metadata: &'a mut Metadata) -> ParserState<'a> {
+
         let mut state = ParserState {
-            metadata: Metadata::new(None, next_source_id()),
+            metadata: metadata,
             src: code,
-            errors: Vec::new(),
             chars: code.char_indices().peekable(),
             token_start: 0,
             pos: 0,
@@ -96,9 +97,9 @@ impl<'a> ParserState<'a> {
             on_new_line: true,
             counter: 0,
         };
-        if code.starts_with("#!") {
-            let start = code.find("\n").unwrap_or(code.len());
-            state.chars = code[start..].char_indices().peekable();
+        if state.src.starts_with("#!") {
+            let start = state.src.find("\n").unwrap_or(state.src.len());
+            state.chars = state.src[start..].char_indices().peekable();
             state.offset = start;
             state.metadata.newlines.push(start);
         }

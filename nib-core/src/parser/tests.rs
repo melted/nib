@@ -1,6 +1,6 @@
 #![cfg(test)]
 use crate::ast::{Binding, Cond, Declaration, Expression, Literal, Pattern};
-use crate::common::{Name, Result, Symbol};
+use crate::common::{Metadata, Name, Result, Symbol};
 use crate::parser::lexer::TokenValue;
 use crate::parser::{ParserState, lex};
 
@@ -33,7 +33,8 @@ fn lex_squashed_tokens() -> Result<()> {
 
 #[test]
 fn parse_names() -> Result<()> {
-    let mut state = ParserState::new("a.name");
+    let mut meta = Metadata::empty();
+    let mut state = ParserState::new("a.name", &mut meta);
     let ret = state.parse_qualified_name();
     assert!(ret.is_ok());
     match ret {
@@ -49,7 +50,8 @@ fn parse_names() -> Result<()> {
 
 #[test]
 fn parse_string_literal() -> Result<()> {
-    let mut state = ParserState::new("\"hello, world\"");
+    let mut meta = Metadata::empty();
+    let mut state = ParserState::new("\"hello, world\"", &mut meta);
     let lit = state.parse_literal()?;
     assert!(Literal::String("hello, world".to_string()) == lit);
     Ok(())
@@ -57,7 +59,8 @@ fn parse_string_literal() -> Result<()> {
 
 #[test]
 fn parse_bytearray_literal() -> Result<()> {
-    let mut state = ParserState::new("#[123,133,123]");
+    let mut meta = Metadata::empty();
+    let mut state = ParserState::new("#[123,133,123]", &mut meta);
     let lit = state.parse_literal()?;
     assert!(Literal::Bytearray(vec![123, 133, 123]) == lit);
     Ok(())
@@ -65,7 +68,8 @@ fn parse_bytearray_literal() -> Result<()> {
 
 #[test]
 fn parse_invalid_bytearray_literal() -> Result<()> {
-    let mut state = ParserState::new("#[123,333,123]");
+    let mut meta = Metadata::empty();
+    let mut state = ParserState::new("#[123,333,123]", &mut meta);
     let lit = state.parse_literal();
     assert!(lit.is_err());
     Ok(())
@@ -73,28 +77,32 @@ fn parse_invalid_bytearray_literal() -> Result<()> {
 
 #[test]
 fn parse_literal_expression() -> Result<()> {
-    let mut state = ParserState::new("a");
+    let mut meta = Metadata::empty();
+    let mut state = ParserState::new("a", &mut meta);
     let exp = state.parse_expression()?;
     Ok(())
 }
 
 #[test]
 fn parse_binop_expression() -> Result<()> {
-    let mut state = ParserState::new("1 + 2");
+    let mut meta = Metadata::empty();
+    let mut state = ParserState::new("1 + 2", &mut meta);
     let exp = state.parse_expression()?;
     Ok(())
 }
 
 #[test]
 fn parse_literal_pattern() -> Result<()> {
-    let mut state = ParserState::new("1");
+    let mut meta = Metadata::empty();
+    let mut state = ParserState::new("1", &mut meta);
     let pat = state.parse_pattern()?;
     Ok(())
 }
 
 #[test]
 fn parse_module_declaration() -> Result<()> {
-    let mut state = ParserState::new("module cool.mod");
+    let mut meta = Metadata::empty();
+    let mut state = ParserState::new("module cool.mod", &mut meta);
     let decl = state.parse_declaration()?;
     if let Declaration::Module(module) = decl {
         assert_eq!(
@@ -109,7 +117,8 @@ fn parse_module_declaration() -> Result<()> {
 
 #[test]
 fn parse_custom_pattern() -> Result<()> {
-    let mut state = ParserState::new("(pair a b)");
+    let mut meta = Metadata::empty();
+    let mut state = ParserState::new("(pair a b)", &mut meta);
     let pat = state.parse_pattern()?;
     match &pat.pattern {
         Pattern::Custom(name, fields) => {
@@ -124,7 +133,8 @@ fn parse_custom_pattern() -> Result<()> {
 
 #[test]
 fn parse_simple_binding() -> Result<()> {
-    let mut state = ParserState::new("a = 1");
+    let mut meta = Metadata::empty();
+    let mut state = ParserState::new("a = 1", &mut meta);
     let decl = state.parse_declaration()?;
     match decl {
         Declaration::Binding(Binding::VarBinding(bind)) => {
@@ -139,7 +149,8 @@ fn parse_simple_binding() -> Result<()> {
 
 #[test]
 fn parse_lambda_expression() -> Result<()> {
-    let mut state = ParserState::new("{ a -> a + 1 }");
+    let mut meta = Metadata::empty();
+    let mut state = ParserState::new("{ a -> a + 1 }", &mut meta);
     let expr = state.parse_expression()?;
     match expr.expr {
         Expression::Lambda(fc) => {
@@ -161,7 +172,8 @@ fn parse_lambda_expression() -> Result<()> {
 
 #[test]
 fn parse_double_binop() -> Result<()> {
-    let mut state = ParserState::new("1+2+3");
+    let mut meta = Metadata::empty();
+    let mut state = ParserState::new("1+2+3", &mut meta);
     let expr = state.parse_expression()?;
     match expr.expr {
         Expression::Binop(op) => {
@@ -180,7 +192,8 @@ fn parse_double_binop() -> Result<()> {
 
 #[test]
 fn lex_double_peek_at_end() -> Result<()> {
-    let mut state = ParserState::new("a = 1 + 2");
+    let mut meta = Metadata::empty();
+    let mut state = ParserState::new("a = 1 + 2", &mut meta);
     for i in 0..5 {
         state.get_next_token()?;
     }
@@ -192,21 +205,24 @@ fn lex_double_peek_at_end() -> Result<()> {
 
 #[test]
 fn parse_guarded_decl() -> Result<()> {
-    let mut state = ParserState::new("f n | n > 5 = 10");
+    let mut meta = Metadata::empty();
+    let mut state = ParserState::new("f n | n > 5 = 10", &mut meta);
     let decl = state.parse_declaration()?;
     Ok(())
 }
 
 #[test]
 fn parse_implicit_lambda() -> Result<()> {
-    let mut state = ParserState::new("{ a*b*c }");
+    let mut meta = Metadata::empty();
+    let mut state = ParserState::new("{ a*b*c }", &mut meta);
     let expr = state.parse_expression()?;
     Ok(())
 }
 
 #[test]
 fn parse_implicit_lambda_no_args() -> Result<()> {
-    let mut state = ParserState::new("{ print \"hello\" }");
+    let mut meta = Metadata::empty();
+    let mut state = ParserState::new("{ print \"hello\" }", &mut meta);
     let expr = state.parse_expression()?;
     match expr.expr {
         Expression::Lambda(clauses) => {
@@ -220,7 +236,8 @@ fn parse_implicit_lambda_no_args() -> Result<()> {
 
 #[test]
 fn test_rewind_lexer() -> Result<()> {
-    let mut state = ParserState::new("{ a*b*c }");
+    let mut meta = Metadata::empty();
+    let mut state = ParserState::new("{ a*b*c }", &mut meta);
     let t = state.get_next_token()?;
     let t2 = state.get_next_token()?;
     let t3 = state.get_next_token()?;
@@ -232,21 +249,24 @@ fn test_rewind_lexer() -> Result<()> {
 
 #[test]
 fn parse_simple_call() -> Result<()> {
-    let mut state = ParserState::new("f a b c");
+    let mut meta = Metadata::empty();
+    let mut state = ParserState::new("f a b c", &mut meta);
     let expr = state.parse_expression();
     Ok(())
 }
 
 #[test]
 fn parse_composite_call() -> Result<()> {
-    let mut state = ParserState::new("go (b) a");
+    let mut meta = Metadata::empty();
+    let mut state = ParserState::new("go (b) a", &mut meta);
     let expr = state.parse_expression();
     Ok(())
 }
 
 #[test]
 fn parse_conditional_expression() -> Result<()> {
-    let mut state = ParserState::new("x < y => x; y");
+    let mut meta = Metadata::empty();
+    let mut state = ParserState::new("x < y => x; y", &mut meta);
     let exp = state.parse_expression()?;
     match exp.expr {
         Expression::Cond(Cond {
@@ -263,7 +283,8 @@ fn parse_conditional_expression() -> Result<()> {
 
 #[test]
 fn disallow_multiple_ellipsises() -> Result<()> {
-    let mut state = ParserState::new("evil ... ... x = x");
+    let mut meta = Metadata::empty();
+    let mut state = ParserState::new("evil ... ... x = x", &mut meta);
     let res = state.parse_declaration();
     assert!(res.is_err());
     Ok(())

@@ -1,5 +1,6 @@
 #![cfg(test)]
 
+use crate::ast::Module;
 use crate::core::desugar;
 use crate::interpreter::Runtime;
 use crate::interpreter::bytecode::INSTR_ADD;
@@ -101,7 +102,8 @@ fn hash_stuff() {
 
 #[test]
 fn create_compilation() -> Result<()> {
-    let ast_mod = parse_declarations(None, "a = 1")?;
+    let mut ast_mod = Module::new(None, "a = 1");
+    parse_declarations(&mut ast_mod)?;
     let core_mod = desugar(ast_mod)?;
     let comp = Compilation::new(core_mod);
     Ok(())

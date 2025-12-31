@@ -9,4 +9,6 @@ fast_fib n = go 0 1 n
                 go _ b 1 = b
                 go a b n = go b (a+b) (n-1)
 
-_ = print (fast_fib 40)
+_ = println (fib 20)
+_ = println (fast_fib 40)
+_ = println (fast_fib 20 == fib 20)

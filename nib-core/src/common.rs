@@ -21,6 +21,8 @@ pub fn next_source_id() -> u32 {
 pub struct Metadata {
     pub file: Option<String>,
     pub source_id: u32,
+    pub source: String,
+    pub errors: Vec<SyntaxError>,
     pub trivia: Vec<Annotation>,
     pub annotations: HashMap<Node, Annotation>,
     pub locations: HashMap<Node, Location>,
@@ -31,10 +33,16 @@ pub struct Metadata {
 }
 
 impl Metadata {
-    pub fn new(file: Option<String>, source:u32) -> Self {
+    pub fn empty() -> Self {
+        Self::new(None, "")
+    }
+
+    pub fn new(file: Option<String>, code: &str) -> Self {
         Metadata {
             file,
-            source_id: source,
+            source_id: next_source_id(),
+            source: code.to_owned(),
+            errors: Vec::new(),
             trivia: Vec::new(),
             annotations: HashMap::new(),
             locations: HashMap::new(),
@@ -47,7 +55,7 @@ impl Metadata {
 
     pub fn linecol(&self, loc:&Location) -> (usize, usize) {
         let target = loc.start as usize;
-        if (self.newlines.is_empty()) {
+        if self.newlines.is_empty() {
             return (0, target);
         }
         let line = match self.newlines.binary_search(&target) {
@@ -75,6 +83,10 @@ pub struct Location {
 }
 
 impl Location {
+    pub fn empty() -> Self {
+        Location::at(0, 0, 0)
+    }
+
     pub fn at(source:u32, start: usize, end: usize) -> Self {
         Location { source, start: start as u32, end: end as u32 }
     }

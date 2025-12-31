@@ -1,4 +1,4 @@
-use crate::common::{Metadata, Name, next_source_id};
+use crate::common::{Metadata, Name};
 use crate::common::{Result, Symbol};
 use crate::core::{Binder, Expression};
 use std::collections::{BTreeSet, HashMap};
@@ -15,7 +15,7 @@ pub fn compile(from: crate::core::Module) -> Result<Module> {
 pub fn compile_expression(expr: crate::core::Expression) -> Result<Module> {
     let binding = crate::core::Binding::binding(0, Binder::Local(Name::str("it")), expr);
     let module = crate::core::Module {
-        metadata: Metadata::new(None, next_source_id()),
+        metadata: Metadata::empty(),
         bindings: vec![binding],
     };
     compile(module)

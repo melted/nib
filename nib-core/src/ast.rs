@@ -10,6 +10,22 @@ pub struct Module {
     pub declarations: Vec<Declaration>,
 }
 
+impl Module {
+    pub fn empty() -> Self {
+        Module {
+            metadata: Metadata::empty(),
+            declarations: Vec::new()
+        }
+    }
+
+    pub fn new(file: Option<String>, code: &str) -> Self {
+        Module {
+            metadata: Metadata::new(file, code),
+            declarations: Vec::new()
+        }
+    }
+}
+
 // Declarations
 #[derive(Debug, Clone, PartialEq)]
 pub enum Declaration {
