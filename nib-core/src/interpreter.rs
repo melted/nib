@@ -27,12 +27,11 @@ pub struct Runtime {
     pub stack: Stack,
     pub base: usize,
     code: Value,
-    ip: usize,
-    pub regs: [Value; 256],
+    ip: usize
 }
 
 const DEFAULT_HEAP_SIZE: usize = 1000000;
-const DEFAULT_STACK_SIZE:usize = 1000;
+const DEFAULT_STACK_SIZE:usize = 10000;
 
 impl Runtime {
     pub fn new() -> Self {
@@ -43,8 +42,7 @@ impl Runtime {
             stack: Stack::new(Value::nil()), // Dummy stack
             base: 0,
             code: Value::nil(),
-            ip: 0,
-            regs: [Value::nil(); 256],
+            ip: 0
         };
         let global_env = Value::from(Table::make(&mut runtime));
         let stack = Value::from(Array::make(&mut runtime, DEFAULT_STACK_SIZE));
@@ -169,25 +167,24 @@ impl Runtime {
         let bytes = self.code.get_bytes();
         let code = bytes.get_slice();
         let instr = code[self.ip];
+        self.ip += 1;
         match instr {
             INSTR_NOP => {
-                self.ip += 1;
                 Ok(false)
             }
-            INSTR_ADD..=INSTR_MOD => self.op_arithmetic(),
+            INSTR_ADD..=INSTR_MOD => self.op_arithmetic(instr),
             INSTR_NEG => self.op_negate(),
-            INSTR_CMP..=INSTR_NEQ => self.op_compare(),
-            INSTR_CALL..=INSTR_CALL_TAIL => self.op_call(),
+            INSTR_CMP..=INSTR_NEQ => self.op_compare(instr),
+            INSTR_CALL..=INSTR_CALL_TAIL => self.op_call(instr),
             INSTR_RETURN => self.op_return(),
-            INSTR_JUMP..=INSTR_JUMP_IMM8 => self.op_jump(),
-            INSTR_JZ..=INSTR_JNFALSE_IMM8 => self.op_conditional_jump(),
-            INSTR_MOVE => self.op_move(),
-            INSTR_LOAD_IMM8..=INSTR_LOAD_IMM64 => self.op_load_imm(),
+            INSTR_JUMP..=INSTR_JUMP_IMM8 => self.op_jump(instr),
+            INSTR_JZ..=INSTR_JNFALSE_IMM8 => self.op_conditional_jump(instr),
+            INSTR_PICK => self.op_pick(),
+            INSTR_LOAD_IMM8..=INSTR_LOAD_IMM64 => self.op_load_imm(instr),
             INSTR_LOAD_BYTES_IMM => self.op_load_bytes(),
-            INSTR_PUSH => self.op_push(),
-            INSTR_POP => self.op_pop(),
-            INSTR_PUSH_RANGE => self.op_push_range(),
-            INSTR_POP_RANGE => self.op_pop_range(),
+            INSTR_DUP => self.op_dup(),
+            INSTR_SWAP => self.op_swap(),
+            INSTR_DROP => self.op_drop(),
             INSTR_ALLOC_FLOAT..=INSTR_ALLOC_CLOSURE => self.op_alloc(),
             INSTR_ARRAY_REF => self.op_array_get(),
             INSTR_ARRAY_SET => self.op_array_set(),
@@ -202,15 +199,9 @@ impl Runtime {
         }
     }
 
-    fn op_arithmetic(&mut self) -> Result<bool> {
-        let bytes = self.code.get_bytes();
-        let code = bytes.get_slice();
-        let op = code[self.ip];
-        let reg_target = code[self.ip + 1];
-        let reg_left = code[self.ip + 2];
-        let reg_right = code[self.ip + 3];
-        let left = self.regs[reg_left as usize];
-        let right = self.regs[reg_right as usize];
+    fn op_arithmetic(&mut self, op:u8) -> Result<bool> {
+        let left = self.stack.pop();
+        let right = self.stack.pop();
         let res = if left.is_immediate_integer() && right.is_immediate_integer() {
             match op {
                 INSTR_ADD => Value::integer(left.get_integer() + right.get_integer()),
@@ -241,17 +232,12 @@ impl Runtime {
         } else {
             todo!()
         };
-        self.ip += 4;
-        self.regs[reg_target as usize] = res;
+        self.stack_push(res);
         Ok(false)
     }
 
     fn op_negate(&mut self) -> Result<bool> {
-        let bytes = self.code.get_bytes();
-        let code = bytes.get_slice();
-        let target = code[self.ip + 1] as usize;
-        let src = code[self.ip + 2] as usize;
-        let val = self.regs[src];
+        let val = self.stack.pop();
         let res = if val.is_immediate_integer() {
             const MSB: u64 = 1 << 63;
             Value {
@@ -264,20 +250,13 @@ impl Runtime {
             // crash and burn
             todo!()
         };
-        self.regs[target] = res;
-        self.ip += 3;
+        self.stack_push(res);
         Ok(false)
     }
 
-    fn op_compare(&mut self) -> Result<bool> {
-        let bytes = self.code.get_bytes();
-        let code = bytes.get_slice();
-        let op = code[self.ip];
-        let reg_target = code[self.ip + 1] as usize;
-        let reg_left = code[self.ip + 2];
-        let reg_right = code[self.ip + 3];
-        let left = self.regs[reg_left as usize];
-        let right = self.regs[reg_right as usize];
+    fn op_compare(&mut self, op:u8) -> Result<bool> {
+        let left = self.stack.pop();
+        let right = self.stack.pop();
         let res = match (left.get_immediate_repr(), right.get_immediate_repr()) {
             (ValueRepr::Integer, ValueRepr::Integer) => {
                 let order = left.get_integer().cmp(&right.get_integer());
@@ -333,18 +312,13 @@ impl Runtime {
             INSTR_NEQ => Value::bool(res != 0),
             _ => unreachable!(),
         };
-        self.ip += 4;
-        self.regs[reg_target] = val;
+        self.stack_push(val);
         Ok(false)
     }
 
-    fn op_call(&mut self) -> Result<bool> {
-        let bytes = self.code.get_bytes();
-        let code = bytes.get_slice();
-        let op = code[self.ip];
-        let reg = code[self.ip + 1] as usize;
-        let args = code[self.ip + 2] as usize;
-        let val = self.regs[reg];
+    fn op_call(&mut self, op:u8) -> Result<bool> {
+        let val = self.stack.pop();
+        let args = self.stack.pop().get_integer() as usize;
         ensure_type(&val, ValueRepr::Closure)?;
         let closure = val.get_closure();
         self.make_call(op, args, closure)?;
@@ -362,19 +336,13 @@ impl Runtime {
         } else {
             args - closure.num_args()
         };
-        self.ip += 2;
         match closure.get_tag() {
             TYPE_BYTECODE => {
                 if op == INSTR_CALL || remaining > 0 {
-                    self.base = self.stack.len();
+                    self.base = self.stack.top();
                     self.stack_push(self.code.clone());
                     self.stack_push(Value::integer(self.ip as i64));
-                    if remaining > 0 {
-                        for r in (args+1)..(args+1+remaining) {
-                            let over_arg = self.regs[r];
-                            self.stack_push(over_arg);
-                        }
-                    }
+                    self.stack_push(Value::integer(args as i64));
                     self.stack_push(Value::integer(remaining as i64));
                 }
                 self.code = fun_code;
@@ -409,20 +377,10 @@ impl Runtime {
         Ok(false)
     }
 
-    fn op_jump(&mut self) -> Result<bool> {
-        let bytes = self.code.get_bytes();
-        let code = bytes.get_slice();
-        let op = code[self.ip];
-        let arg = code[self.ip + 1];
-        let dist = if op == INSTR_JUMP {
-            let val = self.regs[arg as usize];
-            ensure_type(&val, ValueRepr::Integer)?;
-            val.get_integer() as i64
-        } else {
-            arg as i64 - 128
-        };
+    fn op_jump(&mut self, op:u8) -> Result<bool> {
+        let dist = self.stack.pop().get_integer();
         let target = (self.ip as i64 + dist) as usize;
-        if target < code.len() {
+        if target < self.code.get_bytes().size() {
             self.ip = target;
             Ok(false)
         } else {
@@ -430,12 +388,17 @@ impl Runtime {
         }
     }
 
-    fn op_conditional_jump(&mut self) -> Result<bool> {
+    fn op_conditional_jump(&mut self, op:u8) -> Result<bool> {
         let bytes = self.code.get_bytes();
         let code = bytes.get_slice();
-        let op = code[self.ip];
-        let check = code[self.ip + 1];
-        let val = self.regs[check as usize];
+        let dist = if is_immediate_jump(op) {
+            let next = code[self.ip] as i64;
+            self.ip += 1;
+            next
+        } else {
+            self.stack.pop().get_integer()
+        };
+        let val = self.stack.pop();
         let do_jump = match op {
             INSTR_JZ | INSTR_JZ_IMM8 => val.get_integer() == 0,
             INSTR_JPOS | INSTR_JPOS_IMM8 => val.get_integer() > 0,
@@ -447,52 +410,37 @@ impl Runtime {
             _ => unreachable!(),
         };
         if do_jump {
-            let arg = code[self.ip + 1];
-            let dist = match op {
-                INSTR_JPOS | INSTR_JNEG | INSTR_JNPOS | INSTR_JNNEG | INSTR_JFALSE
-                | INSTR_JNFALSE => {
-                    let val = self.regs[arg as usize];
-                    ensure_type(&val, ValueRepr::Integer)?;
-                    val.get_integer() as i64
-                }
-                _ => arg as i64 - 128,
-            };
             let target = (self.ip as i64 + dist) as usize;
             if target < code.len() {
                 self.ip = target;
-                Ok(false)
             } else {
-                self.error("Jump outside of code")
+                return self.error("Jump outside of code");
             }
-        } else {
-            self.ip += 3;
-            Ok(false)
         }
+        Ok(false)
     }
 
-    fn op_load_imm(&mut self) -> Result<bool> {
+    fn op_load_imm(&mut self, op:u8) -> Result<bool> {
         let bytes = self.code.get_bytes();
         let code = bytes.get_slice();
-        let op = code[self.ip];
-        let target_reg = code[self.ip + 1];
-        let rest = &code[self.ip + 2..];
+        let rest = &code[self.ip..];
         let (val, skip) = match op {
-            INSTR_LOAD_IMM8 => (code[self.ip + 2] as u64, 3),
+            INSTR_LOAD_IMM8 => (code[self.ip] as u64, 1),
             INSTR_LOAD_IMM16 => {
                 let v = rest.first_chunk::<2>().unwrap();
-                (u16::from_ne_bytes(*v) as u64, 4)
+                (u16::from_ne_bytes(*v) as u64, 2)
             }
             INSTR_LOAD_IMM32 => {
                 let v = rest.first_chunk::<4>().unwrap();
-                (u32::from_ne_bytes(*v) as u64, 6)
+                (u32::from_ne_bytes(*v) as u64, 4)
             }
             INSTR_LOAD_IMM64 => {
                 let v = rest.first_chunk::<8>().unwrap();
-                (u64::from_ne_bytes(*v), 10)
+                (u64::from_ne_bytes(*v), 8)
             }
             _ => unreachable!(),
         };
-        self.regs[target_reg as usize] = Value { val };
+        self.stack_push(Value { val });
         self.ip += skip;
         Ok(false)
     }
@@ -500,77 +448,42 @@ impl Runtime {
     fn op_load_bytes(&mut self) -> Result<bool> {
         let bytes = self.code.get_bytes();
         let code = bytes.get_slice();
-        let op = code[self.ip];
-        let target_reg = code[self.ip + 1];
-        let rest = &code[self.ip + 2..];
+        let rest = &code[self.ip..];
         let v = rest.first_chunk::<4>().unwrap();
         let size = u32::from_ne_bytes(*v) as usize;
         let bytes = &rest[4..4 + size];
         let res = Value::from(Bytes::with(self, bytes));
-        self.regs[target_reg as usize] = res;
-        self.ip += 5 + size;
+        self.stack_push(res);
+        self.ip += 4 + size;
         Ok(false)
     }
 
-    fn op_move(&mut self) -> Result<bool> {
-        let bytes = self.code.get_bytes();
-        let code = bytes.get_slice();
-        let target_reg = code[self.ip + 1] as usize;
-        let source_reg = code[self.ip + 2] as usize;
-        self.regs[target_reg] = self.regs[source_reg];
-        self.ip += 3;
+    fn op_pick(&mut self) -> Result<bool> {
+        let depth = self.stack.pop().get_integer() as usize;
+        self.stack.pick(depth);
         Ok(false)
     }
 
-    fn op_push(&mut self) -> Result<bool> {
-        let bytes = self.code.get_bytes();
-        let code = bytes.get_slice();
-        let source_reg = code[self.ip + 1];
-        self.stack_push(self.regs[source_reg as usize]);
-        self.ip += 2;
+    fn op_dup(&mut self) -> Result<bool> {
+        self.stack.pick(0);
         Ok(false)
     }
 
-    fn op_pop(&mut self) -> Result<bool> {
-        let bytes = self.code.get_bytes();
-        let code = bytes.get_slice();
-        let target_reg = code[self.ip + 1];
-        let val = self.stack.pop();
-        self.regs[target_reg as usize] = val;
+    fn op_swap(&mut self) -> Result<bool> {
+        let top = self.stack.array.at(self.stack.top());
+        let next = self.stack.array.at(self.stack.top()-1);
+        self.stack.array.set(self.stack.top(), next);
+        self.stack.array.set(self.stack.top()-1, top);
         Ok(false)
     }
 
-    fn op_push_range(&mut self) -> Result<bool> {
-        let bytes = self.code.get_bytes();
-        let code = bytes.get_slice();
-        let source_reg_from = code[self.ip + 1] as usize;
-        let source_reg_to = code[self.ip + 2] as usize;
-        for r in source_reg_from..=source_reg_to {
-            self.stack_push(self.regs[r]);
-        }
-        self.ip += 3;
-        Ok(false)
-    }
-
-    fn op_pop_range(&mut self) -> Result<bool> {
-        let bytes = self.code.get_bytes();
-        let code = bytes.get_slice();
-        let target_reg_from = code[self.ip + 1] as usize;
-        let target_reg_to = code[self.ip + 2] as usize;
-        for r in (target_reg_from..=target_reg_to).rev() {
-            let val = self.stack.pop();
-            self.regs[r] = val;
-        }
-        self.ip += 3;
+    fn op_drop(&mut self) -> Result<bool> {
+        let _ = self.stack.pop();
         Ok(false)
     }
 
     fn op_type(&mut self) -> Result<bool> {
-        let bytes = self.code.get_bytes();
-        let code = bytes.get_slice();
-        let target = code[self.ip + 1] as usize;
-        let reg = code[self.ip + 2] as usize;
-        let val = self.regs[reg];
+        let val = self.stack.pop();
         let typ = match val.get_repr() {
             ValueRepr::Nil => self.get_global(&Symbol::from("nil_type")),
             ValueRepr::Undefined => Value::nil(),
@@ -615,18 +528,13 @@ impl Runtime {
             }
             ValueRepr::Object => todo!(),
         };
-        self.regs[target] = typ;
-        self.ip += 3;
+        self.stack_push(typ);
         Ok(false)
     }
 
     fn op_set_type(&mut self) -> Result<bool> {
-        let bytes = self.code.get_bytes();
-        let code = bytes.get_slice();
-        let obj_reg = code[self.ip + 1] as usize;
-        let typ_reg = code[self.ip + 2] as usize;
-        let val = self.regs[obj_reg];
-        let typ = self.regs[typ_reg];
+        let val = self.stack.pop();
+        let typ = self.stack.pop();
         ensure_type(&typ, ValueRepr::Table)?;
         match val.get_repr() {
             ValueRepr::Array | ValueRepr::Bytes | ValueRepr::Table | ValueRepr::Closure => {
@@ -637,7 +545,6 @@ impl Runtime {
                 return self.error("settype op on illegal value");
             }
         }
-        self.ip += 3;
         Ok(false)
     }
 
@@ -645,166 +552,116 @@ impl Runtime {
         let bytes = self.code.get_bytes();
         let code = bytes.get_slice();
         let op = code[self.ip];
-        let target_reg = code[self.ip + 1] as usize;
-        let (val, dist) = match op {
+        let val = match op {
             INSTR_ALLOC_ARRAY => {
-                let size_reg = code[self.ip + 2] as usize;
-                let size = self.regs[size_reg];
+                let size = self.stack.pop();
                 ensure_type(&size, ValueRepr::Integer)?;
                 let arr = Array::make(self, size.get_integer() as usize);
-                (Value::from(arr), 3)
+                Value::from(arr)
             }
             INSTR_ALLOC_BYTES => {
-                let size_reg = code[self.ip + 2] as usize;
-                let fill = code[self.ip + 3];
-                let size = self.regs[size_reg];
+                let size = self.stack.pop();
+                let fill = self.stack.pop().get_integer() as u8;
                 ensure_type(&size, ValueRepr::Integer)?;
                 let bytes = Bytes::make(self, size.get_integer() as usize, fill);
-                (Value::from(bytes), 4)
+                Value::from(bytes)
             }
             INSTR_ALLOC_FLOAT => {
-                let bytes_reg = code[self.ip + 2] as usize;
-                let val = self.regs[bytes_reg];
+                let val = self.stack.pop();
                 ensure_type(&val, ValueRepr::Bytes)?;
                 let b = val.get_bytes();
                 let x = b.get_slice().first_chunk::<8>().unwrap();
                 let f = f64::from_ne_bytes(*x);
                 let v = Value::alloc_float(self, f);
-                (v, 3)
+                v
             }
-            INSTR_ALLOC_TABLE => (Value::from(Table::make(self)), 2),
+            INSTR_ALLOC_TABLE => Value::from(Table::make(self)),
             INSTR_ALLOC_CLOSURE => {
-                let code_reg = code[self.ip + 2] as usize;
-                let capture_reg = code[self.ip + 3] as usize;
-                let arity_reg = code[self.ip + 4] as usize;
-                let vararg_reg = code[self.ip + 5] as usize;
-                let code = self.regs[code_reg];
+                let code = self.stack.pop();
                 ensure_type(&code, ValueRepr::Bytes)?;
-                let captures = self.regs[capture_reg];
-                let arity = self.regs[arity_reg];
+                let captures = self.stack.pop();
+                let arity = self.stack.pop();
                 ensure_type(&arity, ValueRepr::Integer)?;
-                let vararg = self.regs[vararg_reg];
+                let vararg = self.stack.pop();
                 let code_bytes = code.get_bytes();
 
                 let closure =
                     Closure::make_low(self, &code_bytes, captures, arity, vararg);
-                (Value::from(closure), 6)
+                Value::from(closure)
             }
             _ => unreachable!(),
         };
-        self.regs[target_reg] = val;
-        self.ip += dist;
+        self.stack_push(val);
         Ok(false)
     }
 
     fn op_array_get(&mut self) -> Result<bool> {
-        let bytes = self.code.get_bytes();
-        let code = bytes.get_slice();
-        let target_reg = code[self.ip + 1] as usize;
-        let obj_reg = code[self.ip + 2] as usize;
-        let pos_reg = code[self.ip + 3] as usize;
-        let obj = self.regs[obj_reg];
-        let pos = self.regs[pos_reg];
+        let obj = self.stack.pop();
+        let pos = self.stack.pop();
         let val = obj.get_array().at(pos.get_integer() as usize);
-        self.regs[target_reg] = val;
+        self.stack_push(val);
         Ok(false)
     }
 
     fn op_array_set(&mut self) -> Result<bool> {
-        let bytes = self.code.get_bytes();
-        let code = bytes.get_slice();
-        let obj_reg = code[self.ip + 1] as usize;
-        let pos_reg = code[self.ip + 2] as usize;
-        let val_reg = code[self.ip + 3] as usize;
-        let obj = self.regs[obj_reg];
-        let pos = self.regs[pos_reg];
-        let val = self.regs[val_reg];
+        let obj = self.stack.pop();
+        let pos = self.stack.pop();
+        let val = self.stack.pop();
         obj.get_array().set(pos.get_integer() as usize, val);
         Ok(false)
     }
 
     fn op_array_size(&mut self) -> Result<bool> {
-        let bytes = self.code.get_bytes();
-        let code = bytes.get_slice();
-        let target_reg = code[self.ip + 1] as usize;
-        let obj_reg = code[self.ip + 2] as usize;
-        let obj = self.regs[obj_reg];
+        let obj = self.stack.pop();
         let val = Value::integer(obj.get_array().size() as i64);
-        self.regs[target_reg] = val;
+        self.stack_push(val);
         Ok(false)
     }
 
     fn op_bytes_get(&mut self) -> Result<bool> {
-        let bytes = self.code.get_bytes();
-        let code = bytes.get_slice();
-        let target_reg = code[self.ip + 1] as usize;
-        let obj_reg = code[self.ip + 2] as usize;
-        let pos_reg = code[self.ip + 3] as usize;
-        let obj = self.regs[obj_reg];
-        let pos = self.regs[pos_reg];
+        let obj = self.stack.pop();
+        let pos = self.stack.pop();
         let val = obj.get_bytes().at(pos.get_integer() as usize);
-        self.regs[target_reg] = Value::integer(val as i64);
+        self.stack_push(Value::integer(val as i64));
         Ok(false)
     }
 
     fn op_bytes_set(&mut self) -> Result<bool> {
-        let bytes = self.code.get_bytes();
-        let code = bytes.get_slice();
-        let obj_reg = code[self.ip + 1] as usize;
-        let pos_reg = code[self.ip + 2] as usize;
-        let val_reg = code[self.ip + 3] as usize;
-        let obj = self.regs[obj_reg];
-        let pos = self.regs[pos_reg];
-        let val = self.regs[val_reg].get_integer() as u8;
+        let obj = self.stack.pop();
+        let pos = self.stack.pop();
+        let byte = self.stack.pop();
+        let val = byte.get_integer() as u8;
         obj.get_bytes().set(pos.get_integer() as usize, val);
         Ok(false)
     }
 
     fn op_bytes_size(&mut self) -> Result<bool> {
-        let bytes = self.code.get_bytes();
-        let code = bytes.get_slice();
-        let target_reg = code[self.ip + 1] as usize;
-        let obj_reg = code[self.ip + 2] as usize;
-        let obj = self.regs[obj_reg];
+        let obj = self.stack.pop();
         let val = Value::integer(obj.get_bytes().size() as i64);
-        self.regs[target_reg] = val;
+        self.stack_push(val);
         Ok(false)
     }
 
     fn op_table_get(&mut self) -> Result<bool> {
-        let bytes = self.code.get_bytes();
-        let code = bytes.get_slice();
-        let target_reg = code[self.ip + 1] as usize;
-        let obj_reg = code[self.ip + 2] as usize;
-        let sym_reg = code[self.ip + 3] as usize;
-        let obj = self.regs[obj_reg];
-        let sym = self.regs[sym_reg];
+        let obj = self.stack.pop();
+        let sym = self.stack.pop();
         let val = obj.get_table().get(sym);
-        self.regs[target_reg] = val;
+        self.stack_push(val);
         Ok(false)
     }
 
     fn op_table_set(&mut self) -> Result<bool> {
-        let bytes = self.code.get_bytes();
-        let code = bytes.get_slice();
-        let obj_reg = code[self.ip + 1] as usize;
-        let sym_reg = code[self.ip + 2] as usize;
-        let val_reg = code[self.ip + 3] as usize;
-        let obj = self.regs[obj_reg];
-        let sym = self.regs[sym_reg];
-        let val = self.regs[val_reg];
+        let obj = self.stack.pop();
+        let sym = self.stack.pop();
+        let val = self.stack.pop();
         obj.get_table().insert(self, sym, val);
         Ok(false)
     }
 
     fn op_table_size(&mut self) -> Result<bool> {
-        let bytes = self.code.get_bytes();
-        let code = bytes.get_slice();
-        let target_reg = code[self.ip + 1] as usize;
-        let obj_reg = code[self.ip + 2] as usize;
-        let obj = self.regs[obj_reg];
+        let obj = self.stack.pop();
         let val = Value::integer(obj.get_table().size() as i64);
-        self.regs[target_reg] = val;
+        self.stack_push(val);
         Ok(false)
     }
 
@@ -822,38 +679,38 @@ impl Runtime {
     // Because we want to allocate a new stack instead of overflowing,
     // wrap stack pushes.
     pub(super) fn stack_push(&mut self, val:Value) {
-        if self.stack.top == self.stack.stack.get_array().size() {
+        if self.stack.top == self.stack.array.size() {
             self.stack_expand();
         }
         self.stack.push(val);
     }
 
     fn stack_expand(&mut self) {
-        let old_array = self.stack.stack.get_array();
+        let old_array = self.stack.array;
         let size = old_array.size();
         let mut new_array = Array::make(self, size*2);
         let values = old_array.values();
         new_array.fill(values, 0, values.len());
-        self.stack.stack = Value::from(new_array);
+        self.stack.array = new_array;
     }
 }
 
 pub struct Stack {
-    pub stack: Value,
+    pub array: Array,
     top: usize,
     base: usize
 }
 
 impl Stack {
     pub(super) fn new(stack: Value) -> Self {
-        Self { stack, top: 0, base: 0 }
+        Self { array: stack.get_array(), top: 0, base: 0 }
     }
 
     pub(super) fn push(&mut self, val : Value) {
-        if self.top == self.stack.get_array().size() {
+        if self.top == self.array.size() {
             panic!("stack overflow");
         }
-        self.stack.get_array().set(self.top, val);
+        self.array.set(self.top, val);
         self.top += 1;
     }
 
@@ -862,12 +719,17 @@ impl Stack {
             panic!("stack underflow");
         }
         self.top -= 1;
-        let elem = self.stack.get_array().at(self.top);
-        self.stack.get_array().set(self.top, Value::nil());
+        let elem = self.array.at(self.top);
+        self.array.set(self.top, Value::nil());
         elem
     }
 
-    pub(super) fn len(&self) -> usize {
+    pub(super) fn pick(&mut self, i:usize) {
+        let elem = self.array.at(self.top - i);
+        self.push(elem);
+    } 
+
+    pub(super) fn top(&self) -> usize {
         self.top
     }
 
@@ -877,6 +739,10 @@ impl Stack {
 
     pub(super) fn current_frame(&self) -> usize {
         self.top - self.base
+    }
+
+    pub(super) fn to_value(&self) -> Value {
+        Value::from(self.array)
     }
 }
 

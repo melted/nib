@@ -112,13 +112,13 @@ fn create_compilation() -> Result<()> {
 #[test]
 fn add_numbers() -> Result<()> {
     let mut rt = Runtime::new();
-    let code = vec![INSTR_ADD, 1, 1, 2];
-    rt.regs[1] = Value::integer(8);
-    rt.regs[2] = Value::integer(7);
+    let code = vec![INSTR_ADD];
+    rt.stack_push(Value::integer(8));
+    rt.stack_push(Value::integer(7));
     rt.code = Value::from(Bytes::with(&mut rt, &code));
     let err = rt.run();
     assert!(err.is_ok());
-    let res = Value::get_integer(&rt.regs[1]);
+    let res = Value::get_integer(&rt.stack.pop());
     assert_eq!(res, 15);
     Ok(())
 }

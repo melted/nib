@@ -121,19 +121,16 @@ pub const INSTR_TOPTR: u8 = 59;
 pub const INSTR_CALL: u8 = 60;
 pub const INSTR_CALL_TAIL: u8 = 61;
 // Moves
-pub const INSTR_MOVE: u8 = 64;
+pub const INSTR_PICK: u8 = 64;
 pub const INSTR_LOAD_IMM8: u8 = 65;
 pub const INSTR_LOAD_IMM16: u8 = 66;
 pub const INSTR_LOAD_IMM32: u8 = 67;
 pub const INSTR_LOAD_IMM64: u8 = 68;
 pub const INSTR_LOAD_BYTES_IMM: u8 = 69;
-pub const INSTR_PUSH: u8 = 70;
-pub const INSTR_POP: u8 = 71;
-pub const INSTR_PUSH_RANGE: u8 = 72;
-pub const INSTR_POP_RANGE: u8 = 73;
-pub const INSTR_LOAD_MEM: u8 = 74;
-pub const INSTR_LOAD_STACK: u8 = 75;
-pub const INSTR_STORE_STACK: u8 = 76;
+pub const INSTR_DUP:u8 = 70;
+pub const INSTR_SWAP:u8 = 71;
+pub const INSTR_DROP:u8 = 72;
+
 
 // Branches
 pub const INSTR_JUMP: u8 = 77;
@@ -190,3 +187,7 @@ pub const INSTR_RETURN: u8 = 119;
 pub const INSTR_APPLY: u8 = 123;
 pub const INSTR_APPLY_TAIL: u8 = 124;
 
+pub(super) fn is_immediate_jump(op:u8) -> bool {
+    matches!(op, INSTR_JUMP_IMM8 | INSTR_JFALSE_IMM8 | INSTR_JNEG_IMM8 | INSTR_JNFALSE_IMM8
+        | INSTR_JNNEG_IMM8 | INSTR_JNPOS_IMM8 | INSTR_JPOS_IMM8 | INSTR_JZ_IMM8)
+}
