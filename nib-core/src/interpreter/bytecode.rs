@@ -179,6 +179,9 @@ pub const INSTR_BYTES_SET: u8 = 114;
 pub const INSTR_BYTES_SIZE: u8 = 122;
 
 // Misc
+pub const INSTR_GET_LOCAL: u8 = 74;
+pub const INSTR_SET_LOCAL: u8 = 75;
+pub const INSTR_GLOBAL_ENV:u8 = 76;
 pub const INSTR_EXIT: u8 = 115;
 pub const INSTR_PANIC: u8 = 116;
 pub const INSTR_INVALID: u8 = 117;

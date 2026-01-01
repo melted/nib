@@ -7,6 +7,8 @@ use std::cmp::Ordering;
 use std::ffi::c_void;
 use std::ops::BitXor;
 
+use libffi::high::call;
+
 use crate::common::{Error, Name, Result, Symbol};
 use crate::interpreter::bytecode::*;
 use crate::interpreter::heap::{
@@ -24,14 +26,17 @@ mod tests;
 pub struct Runtime {
     heap: Heap,
     global_env: Value,
-    pub stack: Stack,
-    pub base: usize,
+    local_env: Value,
+    stack: Stack,
+    call_stack: Stack,
+    closure: Value,
     code: Value,
     ip: usize
 }
 
 const DEFAULT_HEAP_SIZE: usize = 1000000;
 const DEFAULT_STACK_SIZE:usize = 10000;
+const DEFAULT_CALL_STACK_SIZE:usize = 10000;
 
 impl Runtime {
     pub fn new() -> Self {
@@ -39,15 +44,19 @@ impl Runtime {
         let mut runtime = Runtime {
             heap,
             global_env: Value::nil(),
+            local_env:Value::nil(),
             stack: Stack::new(Value::nil()), // Dummy stack
-            base: 0,
+            call_stack: Stack::new(Value::nil()), // Dummy stack
             code: Value::nil(),
+            closure: Value::nil(),
             ip: 0
         };
         let global_env = Value::from(Table::make(&mut runtime));
         let stack = Value::from(Array::make(&mut runtime, DEFAULT_STACK_SIZE));
+        let call_stack = Value::from(Array::make(&mut runtime, DEFAULT_CALL_STACK_SIZE));
         runtime.global_env = global_env;
         runtime.stack = Stack::new(stack);
+        runtime.call_stack = Stack::new(call_stack);
         runtime
     }
 
@@ -196,6 +205,9 @@ impl Runtime {
             INSTR_TABLE_GET => self.op_table_get(),
             INSTR_TABLE_SET => self.op_table_set(),
             INSTR_TABLE_SIZE => self.op_table_size(),
+            INSTR_GET_LOCAL => self.op_get_local(),
+            INSTR_SET_LOCAL => self.op_set_local(),
+            INSTR_GLOBAL_ENV => self.op_global_env(),
             _ => self.error(&format!("unimplemented opcode: {}", instr)),
         }
     }
@@ -323,39 +335,46 @@ impl Runtime {
         ensure_type(&val, ValueRepr::Closure)?;
         let closure = val.get_closure();
         let argv = self.stack.take(args);
-        self.make_call(op, args, &argv, closure)?;
+        self.make_call(op, &argv, closure)?;
         Ok(false)
     }
 
-    fn make_call(&mut self, op: u8, args: usize, argv: &[Value],closure: Closure) -> Result<()> {
-        let fun_code = closure.fun();
+    fn make_call(&mut self, op: u8, argv: &[Value],closure: Closure) -> Result<()> {
+        let fun_code = closure.code_value();
+        let args = argv.len();
         if args < closure.num_args() {
             // underapplication, create new closure
     
         }
-        let remaining = if closure.is_vararg() {
-            0
+        let mut extra_args = args - closure.num_args();
+        let mut new_args = Vec::new();
+        if let Some(pos) = closure.vararg() {
+            let var_arg = Array::with(self, &argv[pos..pos+extra_args]);
+            new_args.extend_from_slice(&argv[0..pos]);
+            new_args.push(Value::from(var_arg));
+            new_args.extend_from_slice(&argv[pos+extra_args..args]);
+            extra_args = 0;
         } else {
-            args - closure.num_args()
+            new_args.extend_from_slice(&argv[0..closure.num_args()]);
         };
         match closure.get_tag() {
             TYPE_BYTECODE => {
-                if op == INSTR_CALL || remaining > 0 {
+                if op == INSTR_CALL || extra_args > 0 {
                     // Not a tail call, set up a new frame
-                    self.stack_push(self.code.clone());
-                    self.stack_push(Value::integer(self.ip as i64));
-                    self.stack_push(Value::integer(self.stack.base as i64));
+                    self.ensure_call_stack(4);
+                    let frame = vec![self.closure.clone(), Value::integer(self.ip as i64), Value::integer(self.stack.base as i64), Value::integer(extra_args as i64)];
+                    self.call_stack.pushv(&frame);
                     self.stack.base = self.stack.top();
                 }
-                let (r, a) = argv.split_at(remaining);
-                for x in r {
-                    self.stack_push(x.clone());
+                if extra_args > 0 {
+                    for i in argv[closure.num_args()..argv.len()].iter().rev() {
+                        self.stack_push(*i);
+                    }
                 }
-                self.stack_push(Value::integer(remaining as i64));
-                for x in a {
-                    self.stack_push(x.clone());
+                for i in new_args.iter().rev() {
+                    self.stack_push(*i);
                 }
-                self.stack_push(Value::integer((args - remaining) as i64));
+                self.local_env = self.closure.get_closure().env();
                 self.code = fun_code;
                 self.ip = 0;
             }
@@ -377,16 +396,18 @@ impl Runtime {
         // TODO: if stack is empty return true
         let retval = self.stack.pop();
         self.stack.set_top(self.stack.base);
-        let remaining = self.stack.pop().get_integer() as usize;
+        let remaining = self.call_stack.pop().get_integer() as usize;
         if remaining > 0 {
             ensure_type(&retval, ValueRepr::Closure)?;
             let argv = self.stack.take(remaining);
-            self.make_call(INSTR_CALL_TAIL, remaining, &argv, retval.get_closure()).map(|_| false)
+            self.make_call(INSTR_CALL_TAIL, &argv, retval.get_closure()).map(|_| false)
         } else {
-            let old_base = self.stack.pop().get_integer() as usize;
-            let ip = self.stack.pop().get_integer() as usize;
-            let code = self.stack.pop();
-            self.code = code;
+            let old_base = self.call_stack.pop().get_integer() as usize;
+            let ip = self.call_stack.pop().get_integer() as usize;
+            let closure = self.call_stack.pop();
+            self.closure = closure;
+            self.code = closure.get_closure().code_value();
+            self.local_env = closure.get_closure().env();
             self.ip = ip;
             Ok(false)
         }
@@ -689,6 +710,26 @@ impl Runtime {
         Ok(true)
     }
 
+    fn op_get_local(&mut self) -> Result<bool> {
+        let index = self.stack.pop().get_integer() as usize;
+        let val = self.local_env.get_array().at(index);
+        self.stack_push(val);
+        Ok(false)
+    }
+
+    fn op_set_local(&mut self) -> Result<bool> {
+        let index = self.stack.pop().get_integer() as usize;
+        let val = self.stack.pop();
+        self.local_env.get_array().set(index, val);
+        Ok(false)
+    }
+
+    fn op_global_env(&mut self) -> Result<bool> {
+        self.stack_push(self.global_env);
+        Ok(false)
+    }
+
+
     pub fn error<T>(&self, msg: &str) -> Result<T> {
         Err(Error::Runtime {
             msg: msg.to_owned(),
@@ -700,27 +741,44 @@ impl Runtime {
     // wrap stack pushes.
     pub(super) fn stack_push(&mut self, val:Value) {
         if self.stack.top == self.stack.array.size() {
-            self.stack_expand();
+            self.stack = self.stack_expand(self.stack);
         }
         self.stack.push(val);
     }
 
-    fn stack_expand(&mut self) {
-        let old_array = self.stack.array;
+    fn stack_expand(&mut self, mut stack: Stack) -> Stack {
+        let old_array = stack.array;
         let size = old_array.size();
         let mut new_array = Array::make(self, size*2);
         let values = old_array.values();
         new_array.fill(values, 0, values.len());
-        self.stack.array = new_array;
+        stack.array = new_array;
+        stack
     }
 
     fn ensure_stack(&mut self, extra:usize) {
         if self.stack.top + extra == self.stack.array.size() {
-            self.stack_expand();
+            self.stack = self.stack_expand(self.stack);
         }
+    }
+
+    fn ensure_call_stack(&mut self, extra:usize) {
+        if self.stack.top + extra == self.call_stack.array.size() {
+            self.call_stack = self.stack_expand(self.call_stack);
+        }
+    }
+
+    fn make_underapplied_closure(&mut self, inner:Value, args: &[Value], arity:usize) -> Value {
+        // Todo: see if we can get the instructions from the bytecode compiler
+        let instrs = vec![];
+        let code = heap::Code::Bytecode(instrs);
+        let closure = Closure::make(self, &code, args, arity, None);
+        Value::from(closure)
     }
 }
 
+
+#[derive(Debug, Clone, Copy)]
 pub struct Stack {
     pub array: Array,
     top: usize,
@@ -756,6 +814,15 @@ impl Stack {
         v.clone_from_slice(slice);
         self.top -= n;
         v
+    }
+
+    pub(super) fn pushv(&mut self, vals:&[Value]) {
+        let n = vals.len();
+        if self.top + n >= self.array.size() {
+            panic!("stack overflow");
+        }
+        self.array.fill(vals, self.top+1, self.top+n);
+        self.top += n;
     }
 
     pub(super) fn pick(&mut self, i:usize) {

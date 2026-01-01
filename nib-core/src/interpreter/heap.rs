@@ -1007,6 +1007,10 @@ impl Closure {
         }
     }
 
+    pub fn code_value(&self) -> Value {
+        get_value(self.ptr, 1)
+    }
+
     pub fn type_table(&self) -> Value {
         get_value(self.ptr, 0)
     }
@@ -1019,12 +1023,17 @@ impl Closure {
         get_value(self.ptr, 2)
     }
 
-    pub fn fun(&self) -> Value {
-        get_value(self.ptr, 1)
-    }
-
     pub fn is_vararg(&self) -> bool {
         !get_value(self.ptr, 4).is_bool()
+    }
+
+    pub fn vararg(&self) -> Option<usize> {
+        let val = get_value(self.ptr, 4);
+        if val.is_immediate_integer() {
+            Some(val.get_integer() as usize)
+        } else {
+            None
+        }
     }
 
     pub fn num_args(&self) -> usize {
