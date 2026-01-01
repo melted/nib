@@ -130,6 +130,7 @@ pub const INSTR_LOAD_BYTES_IMM: u8 = 69;
 pub const INSTR_DUP:u8 = 70;
 pub const INSTR_SWAP:u8 = 71;
 pub const INSTR_DROP:u8 = 72;
+pub const INSTR_DROP_FRAME:u8 = 73;
 
 
 // Branches

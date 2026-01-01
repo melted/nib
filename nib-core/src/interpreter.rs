@@ -185,6 +185,7 @@ impl Runtime {
             INSTR_DUP => self.op_dup(),
             INSTR_SWAP => self.op_swap(),
             INSTR_DROP => self.op_drop(),
+            INSTR_DROP_FRAME => self.op_drop_frame(),
             INSTR_ALLOC_FLOAT..=INSTR_ALLOC_CLOSURE => self.op_alloc(),
             INSTR_ARRAY_REF => self.op_array_get(),
             INSTR_ARRAY_SET => self.op_array_set(),
@@ -321,11 +322,12 @@ impl Runtime {
         let args = self.stack.pop().get_integer() as usize;
         ensure_type(&val, ValueRepr::Closure)?;
         let closure = val.get_closure();
-        self.make_call(op, args, closure)?;
+        let argv = self.stack.take(args);
+        self.make_call(op, args, &argv, closure)?;
         Ok(false)
     }
 
-    fn make_call(&mut self, op: u8, args: usize, closure: Closure) -> Result<()> {
+    fn make_call(&mut self, op: u8, args: usize, argv: &[Value],closure: Closure) -> Result<()> {
         let fun_code = closure.fun();
         if args < closure.num_args() {
             // underapplication, create new closure
@@ -339,12 +341,21 @@ impl Runtime {
         match closure.get_tag() {
             TYPE_BYTECODE => {
                 if op == INSTR_CALL || remaining > 0 {
-                    self.base = self.stack.top();
+                    // Not a tail call, set up a new frame
                     self.stack_push(self.code.clone());
                     self.stack_push(Value::integer(self.ip as i64));
-                    self.stack_push(Value::integer(args as i64));
-                    self.stack_push(Value::integer(remaining as i64));
+                    self.stack_push(Value::integer(self.stack.base as i64));
+                    self.stack.base = self.stack.top();
                 }
+                let (r, a) = argv.split_at(remaining);
+                for x in r {
+                    self.stack_push(x.clone());
+                }
+                self.stack_push(Value::integer(remaining as i64));
+                for x in a {
+                    self.stack_push(x.clone());
+                }
+                self.stack_push(Value::integer((args - remaining) as i64));
                 self.code = fun_code;
                 self.ip = 0;
             }
@@ -364,17 +375,21 @@ impl Runtime {
     
     fn op_return(&mut self) -> Result<bool> {
         // TODO: if stack is empty return true
-        let remaining = self.stack.pop();
-        let mut args = vec![];
-        for r in 2..(remaining.get_integer()+2) {
-            let val = self.stack.pop();
-            args.push(val);
-        } 
-        let ip = self.stack.pop();
-        let code = self.stack.pop();
-        self.code = code;
-        self.ip = ip.get_integer() as usize;
-        Ok(false)
+        let retval = self.stack.pop();
+        self.stack.set_top(self.stack.base);
+        let remaining = self.stack.pop().get_integer() as usize;
+        if remaining > 0 {
+            ensure_type(&retval, ValueRepr::Closure)?;
+            let argv = self.stack.take(remaining);
+            self.make_call(INSTR_CALL_TAIL, remaining, &argv, retval.get_closure()).map(|_| false)
+        } else {
+            let old_base = self.stack.pop().get_integer() as usize;
+            let ip = self.stack.pop().get_integer() as usize;
+            let code = self.stack.pop();
+            self.code = code;
+            self.ip = ip;
+            Ok(false)
+        }
     }
 
     fn op_jump(&mut self, op:u8) -> Result<bool> {
@@ -479,6 +494,11 @@ impl Runtime {
 
     fn op_drop(&mut self) -> Result<bool> {
         let _ = self.stack.pop();
+        Ok(false)
+    }
+
+    fn op_drop_frame(&mut self) -> Result<bool> {
+        self.stack.set_top(self.stack.base);
         Ok(false)
     }
 
@@ -693,6 +713,12 @@ impl Runtime {
         new_array.fill(values, 0, values.len());
         self.stack.array = new_array;
     }
+
+    fn ensure_stack(&mut self, extra:usize) {
+        if self.stack.top + extra == self.stack.array.size() {
+            self.stack_expand();
+        }
+    }
 }
 
 pub struct Stack {
@@ -724,13 +750,28 @@ impl Stack {
         elem
     }
 
+    pub(super) fn take(&mut self, n:usize) -> Vec<Value> {
+        let mut v = Vec::new();
+        let slice = &self.array.values()[self.top-n..self.top];
+        v.clone_from_slice(slice);
+        self.top -= n;
+        v
+    }
+
     pub(super) fn pick(&mut self, i:usize) {
         let elem = self.array.at(self.top - i);
         self.push(elem);
-    } 
+    }
 
     pub(super) fn top(&self) -> usize {
         self.top
+    }
+
+    pub(super) fn set_top(&mut self, new_top:usize) {
+        self.top = new_top;
+        if self.base > self.top {
+            self.base = self.top;
+        }
     }
 
     pub(super) fn set_base(&mut self) {
@@ -743,6 +784,17 @@ impl Stack {
 
     pub(super) fn to_value(&self) -> Value {
         Value::from(self.array)
+    }
+
+    pub(super) fn lift(&mut self, elems:usize, dist:usize) {
+        for i in 0..elems {
+            let from = self.array.at(self.top-i);
+            self.array.set(self.top-i+dist, from);
+        }
+        for i in elems..elems+dist {
+            self.array.set(self.top - i, Value::nil());
+        }
+        self.top += dist;
     }
 }
 
