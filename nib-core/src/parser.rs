@@ -1,4 +1,5 @@
 use std::iter::Peekable;
+use std::mem;
 use std::str::CharIndices;
 
 use crate::ast::{ExpressionNode, Module};
@@ -13,12 +14,13 @@ mod pattern;
 mod tests;
 
 pub fn parse_declarations(module: &mut Module) -> Result<()> {
-    let src = module.metadata.source.clone();
+    let src = mem::take(&mut module.metadata.source);
     let mut state = ParserState::new(&src, &mut module.metadata);
     let decls = state.parse_declarations()?;
     state.metadata.last_id = state.counter;
     module.declarations = decls;
     if state.metadata.errors.is_empty() {
+        module.metadata.source = src;
         Ok(())
     } else {
         let count = state.metadata.errors.len();
@@ -26,6 +28,7 @@ pub fn parse_declarations(module: &mut Module) -> Result<()> {
             let (line, col) = state.metadata.linecol(&err.loc);
             log::error!("{} at line {}, col {}", err.msg, line, col);
         }
+        module.metadata.source = src;
         Err(Error::runtime_error(&format!("{} syntax errors", count)))
     }
 }
