@@ -100,7 +100,7 @@ pub const INSTR_BXOR: u8 = 44;
 pub const INSTR_BNOT: u8 = 45;
 pub const INSTR_BSHIFT: u8 = 46;
 
-// Float Ops
+// Float Ops Unimplemented (has prims, so maybe delete)
 pub const INSTR_SIN: u8 = 47;
 pub const INSTR_COS: u8 = 48;
 pub const INSTR_TAN: u8 = 49;
@@ -113,15 +113,18 @@ pub const INSTR_ROUND: u8 = 55;
 pub const INSTR_LOG: u8 = 56;
 pub const INSTR_EXP: u8 = 57;
 
-// Conversions
+// Conversions TODO implement
 pub const INSTR_TOINT: u8 = 58;
 pub const INSTR_TOPTR: u8 = 59;
 
 // Calls
 pub const INSTR_CALL: u8 = 60;
 pub const INSTR_CALL_TAIL: u8 = 61;
+
 // Moves
-pub const INSTR_PICK: u8 = 64;
+pub const INSTR_STACK_LIFT:u8 = 62;
+pub const INSTR_STACK_STORE: u8 = 63;
+pub const INSTR_STACK_LOAD: u8 = 64;
 pub const INSTR_LOAD_IMM8: u8 = 65;
 pub const INSTR_LOAD_IMM16: u8 = 66;
 pub const INSTR_LOAD_IMM32: u8 = 67;
@@ -182,14 +185,12 @@ pub const INSTR_BYTES_SIZE: u8 = 122;
 pub const INSTR_GET_LOCAL: u8 = 74;
 pub const INSTR_SET_LOCAL: u8 = 75;
 pub const INSTR_GLOBAL_ENV:u8 = 76;
-pub const INSTR_EXIT: u8 = 115;
-pub const INSTR_PANIC: u8 = 116;
 pub const INSTR_INVALID: u8 = 117;
 pub const INSTR_HALT: u8 = 118;
 pub const INSTR_NOP: u8 = 0;
 pub const INSTR_RETURN: u8 = 119;
-pub const INSTR_APPLY: u8 = 123;
-pub const INSTR_APPLY_TAIL: u8 = 124;
+pub const INSTR_APPLY: u8 = 123; // TODO
+pub const INSTR_APPLY_TAIL: u8 = 124; // TODO
 
 pub(super) fn is_immediate_jump(op:u8) -> bool {
     matches!(op, INSTR_JUMP_IMM8 | INSTR_JFALSE_IMM8 | INSTR_JNEG_IMM8 | INSTR_JNFALSE_IMM8

@@ -164,17 +164,17 @@ impl Runtime {
 
     fn run(&mut self) -> Result<()> {
         let code_size = self.code.get_bytes().size();
+        let bytes = self.code.get_bytes();
+        let code = bytes.get_slice();
         while self.ip < code_size {
-            if self.step()? {
+            if self.step(code)? {
                 break;
             }
         }
         Ok(())
     }
 
-    fn step(&mut self) -> Result<bool> {
-        let bytes = self.code.get_bytes();
-        let code = bytes.get_slice();
+    fn step(&mut self, code:&[u8]) -> Result<bool> {
         let instr = code[self.ip];
         self.ip += 1;
         match instr {
@@ -188,14 +188,16 @@ impl Runtime {
             INSTR_RETURN => self.op_return(),
             INSTR_JUMP..=INSTR_JUMP_IMM8 => self.op_jump(instr),
             INSTR_JZ..=INSTR_JNFALSE_IMM8 => self.op_conditional_jump(instr),
-            INSTR_PICK => self.op_pick(),
+            INSTR_STACK_LOAD => self.op_pick(),
+            INSTR_STACK_STORE => self.op_put(),
             INSTR_LOAD_IMM8..=INSTR_LOAD_IMM64 => self.op_load_imm(instr),
             INSTR_LOAD_BYTES_IMM => self.op_load_bytes(),
             INSTR_DUP => self.op_dup(),
             INSTR_SWAP => self.op_swap(),
             INSTR_DROP => self.op_drop(),
             INSTR_DROP_FRAME => self.op_drop_frame(),
-            INSTR_ALLOC_FLOAT..=INSTR_ALLOC_CLOSURE => self.op_alloc(),
+            INSTR_STACK_LIFT => self.op_stack_lift(),
+            INSTR_ALLOC_FLOAT..=INSTR_ALLOC_CLOSURE => self.op_alloc(instr),
             INSTR_ARRAY_REF => self.op_array_get(),
             INSTR_ARRAY_SET => self.op_array_set(),
             INSTR_ARRAY_SIZE => self.op_array_size(),
@@ -500,6 +502,13 @@ impl Runtime {
         Ok(false)
     }
 
+    fn op_put(&mut self) -> Result<bool> {
+        let val = self.stack.pop();
+        let depth = self.stack.pop().get_integer() as usize;
+        self.stack.put(depth, val);
+        Ok(false)
+    }
+
     fn op_dup(&mut self) -> Result<bool> {
         self.stack.pick(0);
         Ok(false)
@@ -520,6 +529,13 @@ impl Runtime {
 
     fn op_drop_frame(&mut self) -> Result<bool> {
         self.stack.set_top(self.stack.base);
+        Ok(false)
+    }
+
+    fn op_stack_lift(&mut self) -> Result<bool> {
+        let n = self.stack.pop().get_integer() as usize;
+        let d = self.stack.pop().get_integer() as usize;
+        self.stack.lift(n, d);
         Ok(false)
     }
 
@@ -589,10 +605,7 @@ impl Runtime {
         Ok(false)
     }
 
-    fn op_alloc(&mut self) -> Result<bool> {
-        let bytes = self.code.get_bytes();
-        let code = bytes.get_slice();
-        let op = code[self.ip];
+    fn op_alloc(&mut self, op:u8) -> Result<bool> {
         let val = match op {
             INSTR_ALLOC_ARRAY => {
                 let size = self.stack.pop();
@@ -770,7 +783,10 @@ impl Runtime {
 
     fn make_underapplied_closure(&mut self, inner:Value, args: &[Value], arity:usize) -> Value {
         // Todo: see if we can get the instructions from the bytecode compiler
-        let instrs = vec![];
+        let instrs = Vec::new();
+        for i in 0..args.len() {
+
+        }
         let code = heap::Code::Bytecode(instrs);
         let closure = Closure::make(self, &code, args, arity, None);
         Value::from(closure)
@@ -828,6 +844,10 @@ impl Stack {
     pub(super) fn pick(&mut self, i:usize) {
         let elem = self.array.at(self.top - i);
         self.push(elem);
+    }
+
+    pub(super) fn put(&mut self, i:usize, val:Value) {
+        self.array.set(self.top - i, val);
     }
 
     pub(super) fn top(&self) -> usize {
