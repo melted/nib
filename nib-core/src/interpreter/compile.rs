@@ -1,9 +1,8 @@
 use crate::common::{Metadata, Name};
 use crate::common::{Result, Symbol};
 use crate::core::{Binder, Expression};
-use std::collections::{BTreeSet, HashMap};
+use std::collections::HashMap;
 use std::mem;
-use std::sync::LazyLock;
 
 pub fn compile(from: crate::core::Module) -> Result<Module> {
     let module = Module::new();
@@ -85,9 +84,8 @@ impl Compilation {
         todo!();
     }
 
-    fn compile_expression(&mut self, expression: Expression, res_reg:u8) -> Result<Vec<u8>> {
-        let v = vec![];
-        Ok(v)
+    fn compile_expression(&mut self, expression: Expression) -> Result<()> {
+        todo!()
     }
 
     fn fresh_env_location(&mut self) -> usize {
@@ -96,8 +94,3 @@ impl Compilation {
         n
     }
 }
-
-
-static RESERVED_REGISTERS: LazyLock<BTreeSet<u8>> = LazyLock::new(|| {
-    BTreeSet::from_iter(vec![0,1,254])
-});

@@ -7,8 +7,6 @@ use std::cmp::Ordering;
 use std::ffi::c_void;
 use std::ops::BitXor;
 
-use libffi::high::call;
-
 use crate::common::{Error, Name, Result, Symbol};
 use crate::interpreter::bytecode::*;
 use crate::interpreter::heap::{
@@ -334,19 +332,38 @@ impl Runtime {
     fn op_call(&mut self, op:u8) -> Result<bool> {
         let val = self.stack.pop();
         let args = self.stack.pop().get_integer() as usize;
-        ensure_type(&val, ValueRepr::Closure)?;
-        let closure = val.get_closure();
-        let argv = self.stack.take(args);
-        self.make_call(op, &argv, closure)?;
+        let mut argv = self.stack.take(args);
+        match val.get_repr() {
+            ValueRepr::Closure => {
+                let closure = val.get_closure();
+                self.make_call(op, &argv, closure)?;
+            }
+            ValueRepr::PartialApplication => {
+                let pap = val.get_array();
+                let closure = pap.at(0).get_closure();
+                argv.extend_from_slice(&pap.values()[1..]);
+                self.make_call(op, &argv, closure)?;
+            }
+            _ => {
+                // Other callables, implement later
+                todo!()
+            }
+        }
+
         Ok(false)
     }
 
     fn make_call(&mut self, op: u8, argv: &[Value],closure: Closure) -> Result<()> {
         let fun_code = closure.code_value();
         let args = argv.len();
+        let env = closure.env().get_array();
         if args < closure.num_args() {
-            // underapplication, create new closure
-    
+            // Underapplication, create a partial application
+            let mut pap = Array::make(self, args+1);
+            pap.set(0, Value::from(closure));
+            pap.fill(argv, 1, args+1);
+            self.stack.push(Value::partial_application(pap));
+            return Ok(())
         }
         let mut extra_args = args - closure.num_args();
         let mut new_args = Vec::new();
@@ -363,8 +380,8 @@ impl Runtime {
             TYPE_BYTECODE => {
                 if op == INSTR_CALL || extra_args > 0 {
                     // Not a tail call, set up a new frame
-                    self.ensure_call_stack(4);
-                    let frame = vec![self.closure.clone(), Value::integer(self.ip as i64), Value::integer(self.stack.base as i64), Value::integer(extra_args as i64)];
+                    self.ensure_call_stack(3);
+                    let frame = vec![self.closure.clone(), Value::integer(self.ip as i64), Value::integer(self.stack.base as i64)];
                     self.call_stack.pushv(&frame);
                     self.stack.base = self.stack.top();
                 }
@@ -372,6 +389,7 @@ impl Runtime {
                     for i in argv[closure.num_args()..argv.len()].iter().rev() {
                         self.stack_push(*i);
                     }
+                    self.stack_push(Value::call_continuation(extra_args));
                 }
                 for i in new_args.iter().rev() {
                     self.stack_push(*i);
@@ -398,8 +416,8 @@ impl Runtime {
         // TODO: if stack is empty return true
         let retval = self.stack.pop();
         self.stack.set_top(self.stack.base);
-        let remaining = self.call_stack.pop().get_integer() as usize;
-        if remaining > 0 {
+        if self.stack.peek(0).is_call_continuation() {
+            let remaining = self.stack.pop().get_cc_args();
             ensure_type(&retval, ValueRepr::Closure)?;
             let argv = self.stack.take(remaining);
             self.make_call(INSTR_CALL_TAIL, &argv, retval.get_closure()).map(|_| false)
@@ -551,6 +569,8 @@ impl Runtime {
             ValueRepr::Float => self.get_global(&Symbol::from("float")),
             ValueRepr::BoxedInteger => todo!(),
             ValueRepr::Symbol => self.get_global(&Symbol::from("symbol")),
+            ValueRepr::CallContinuation => self.get_global(&Symbol::from("call_continuation")),
+            ValueRepr::PartialApplication => self.get_global(&Symbol::from("partial_application")),
             ValueRepr::Array => {
                 let arr = val.get_array();
                 let mut type_table = arr.type_table();
@@ -579,7 +599,7 @@ impl Runtime {
                 let closure = val.get_closure();
                 let mut type_table = closure.type_table();
                 if type_table == Value::nil() {
-                    type_table = self.get_global(&Symbol::from("closure"));
+                    type_table = self.get_global(&Symbol::from("function"));
                 }
                 type_table
             }
@@ -848,6 +868,10 @@ impl Stack {
 
     pub(super) fn put(&mut self, i:usize, val:Value) {
         self.array.set(self.top - i, val);
+    }
+
+    pub(super) fn peek(&self, i:usize) -> Value {
+        self.array.at(self.top - i)
     }
 
     pub(super) fn top(&self) -> usize {

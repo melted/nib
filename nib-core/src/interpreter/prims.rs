@@ -60,9 +60,6 @@ impl Runtime {
         let ceiling = self.make_primitive(prim_ceiling, Arity::Fixed(1));
         self.set_global(&sym("_prim_ceiling"), &ceiling);
 
-
-
-
         Ok(())
     }
 
@@ -86,6 +83,8 @@ impl Runtime {
         self.register_type("array", "array");
         self.register_type("table", "table");
         self.register_type("function", "function");
+        self.register_type("call_continuation", "call_continuation");
+        self.register_type("partial_application", "partial_application");
         Ok(())
     }
 

@@ -111,6 +111,8 @@ impl Runtime {
         self.global_env = new_env;
         let new_stack = self.copy_object(self.stack.to_value());
         self.stack.array = new_stack.get_array();
+        let new_call_stack = self.copy_object(self.call_stack.to_value());
+        self.call_stack.array = new_call_stack.get_array();
     }
 
     fn trace_object(&mut self, obj: *mut ObjectHeader) -> usize {
@@ -118,7 +120,7 @@ impl Runtime {
             let repr = (*obj).repr;
             let size = (*obj).size as usize;
             match repr {
-                ValueRepr::Array => {
+                ValueRepr::Array | ValueRepr::PartialApplication => {
                     let arr = Array { ptr: obj };
                     self.copy_object(arr.type_table());
                     for v in arr.values() {
@@ -267,6 +269,8 @@ pub enum ValueRepr {
     Table,
     Closure,
     Object,
+    PartialApplication,
+    CallContinuation
 }
 
 const FORWARD_FLAG: u8 = 0x01;
@@ -289,6 +293,7 @@ const CHAR_STAG: u64 = 0x16;
 const BOOL_STAG: u64 = 0x26;
 const NIL_STAG: u64 = 0x36;
 const UDEF_STAG: u64 = 0x46;
+const CC_STAG: u64 = 0x56;
 
 const FALSE_BTAG: u64 = 0x26;
 const TRUE_BTAG: u64 = 0x2e;
@@ -310,7 +315,7 @@ impl Value {
                 let f = self.get_float();
                 hasher.write_u64(f.to_bits());
             }
-            ValueRepr::Array => {
+            ValueRepr::Array | ValueRepr::PartialApplication => {
                 let arr = self.get_array();
                 for v in arr.values() {
                     v.add_hash(hasher);
@@ -399,6 +404,14 @@ impl Value {
         }
     }
 
+    pub fn call_continuation(args: usize) -> Self {
+        Value { val: (args as u64) << 8 | CC_STAG }
+    }
+
+    pub fn partial_application(mut pap: Array) -> Self {
+        pap.set_as_partial_application()
+    }
+
     pub fn nil() -> Self {
         Value { val: NIL_STAG }
     }
@@ -427,6 +440,7 @@ impl Value {
                 BOOL_STAG => ValueRepr::Bool,
                 NIL_STAG => ValueRepr::Nil,
                 UDEF_STAG => ValueRepr::Undefined,
+                CC_STAG => ValueRepr::CallContinuation,
                 _ => ValueRepr::Undefined,
             },
             OBJECT_TAG => ValueRepr::Object,
@@ -476,6 +490,10 @@ impl Value {
         self.get_repr() == ValueRepr::Closure
     }
 
+    pub fn is_partial_application(&self) -> bool {
+        self.get_repr() == ValueRepr::PartialApplication
+    }
+
     pub fn is_object(&self) -> bool {
         (self.val & TAG_MASK) == OBJECT_TAG
     }
@@ -502,6 +520,10 @@ impl Value {
 
     pub fn is_undefined(&self) -> bool {
         (self.val & STAG_MASK) == UDEF_STAG
+    }
+
+    pub fn is_call_continuation(&self) -> bool {
+        (self.val & STAG_MASK) == CC_STAG
     }
 
     pub fn is_immediate(&self) -> bool {
@@ -568,6 +590,10 @@ impl Value {
         unsafe { char::from_u32_unchecked((self.val >> 8) as u32) }
     }
 
+    pub fn get_cc_args(&self) -> usize {
+        (self.val >> 8) as usize 
+    }
+
     pub fn get_bool(&self) -> bool {
         (self.val & TRUE_BTAG) > 0
     }
@@ -624,6 +650,8 @@ impl Debug for Value {
             ValueRepr::Table => write!(f, "{:?}", self.get_table()),
             ValueRepr::Closure => write!(f, "{:?}", self.get_closure()),
             ValueRepr::Object => write!(f, "{:?}", self.get_object()),
+            ValueRepr::PartialApplication => write!(f, "{:?}", self.get_array()),
+            ValueRepr::CallContinuation => write!(f, "{:?}", self.get_cc_args()),
         }
     }
 }
@@ -699,6 +727,12 @@ impl Array {
     pub fn set_type_table(&self, value: Value) {
         set_value(self.ptr, 0, value);
     }
+
+    pub fn set_as_partial_application(&mut self) -> Value {
+        let mut header = unsafe { *(self.ptr) };
+        header.repr = ValueRepr::PartialApplication;
+        Value::with_tag(self.ptr, OBJECT_TAG)
+    } 
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -950,7 +984,7 @@ impl Closure {
     pub fn make_low(
         rt: &mut Runtime,
         code: &Bytes,
-        captures: Value,
+        env: Value,
         arity: Value,
         vararg: Value,
     ) -> Self {
@@ -960,7 +994,7 @@ impl Closure {
 
         me.set_tag(TYPE_BYTECODE);
         set_value(header, 1, Value::from(code.clone()));
-        set_value(header, 2, captures);
+        set_value(header, 2, env);
         set_value(header, 3, arity);
         set_value(header, 4, vararg);
         me
