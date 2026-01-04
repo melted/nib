@@ -331,7 +331,12 @@ impl Runtime {
 
     fn op_call(&mut self, op:u8) -> Result<bool> {
         let val = self.stack.pop();
-        let args = self.stack.pop().get_integer() as usize;
+        let count = self.stack.pop();
+        let args = match count.get_immediate_repr() {
+            ValueRepr::Integer => count.get_integer() as usize,
+            ValueRepr::CallContinuation => count.get_cc_args(),
+            _ => return self.error("call arg size must be integer or call continuation")
+        };
         let mut argv = self.stack.take(args);
         match val.get_repr() {
             ValueRepr::Closure => {
@@ -416,11 +421,9 @@ impl Runtime {
         // TODO: if stack is empty return true
         let retval = self.stack.pop();
         self.stack.set_top(self.stack.base);
-        if self.stack.peek(0).is_call_continuation() {
-            let remaining = self.stack.pop().get_cc_args();
-            ensure_type(&retval, ValueRepr::Closure)?;
-            let argv = self.stack.take(remaining);
-            self.make_call(INSTR_CALL_TAIL, &argv, retval.get_closure()).map(|_| false)
+        let cc = self.stack.peek(1);
+        if cc.is_call_continuation() {
+            self.op_call(INSTR_CALL_TAIL)
         } else {
             let old_base = self.call_stack.pop().get_integer() as usize;
             let ip = self.call_stack.pop().get_integer() as usize;
