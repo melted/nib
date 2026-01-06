@@ -215,35 +215,42 @@ impl Runtime {
     fn op_arithmetic(&mut self, op:u8) -> Result<bool> {
         let left = self.stack.pop();
         let right = self.stack.pop();
-        let res = if left.is_immediate_integer() && right.is_immediate_integer() {
-            match op {
-                INSTR_ADD => Value::integer(left.get_integer() + right.get_integer()),
-                INSTR_SUB => Value::integer(left.get_integer() - right.get_integer()),
-                INSTR_MUL => Value::integer(left.get_integer() * right.get_integer()),
-                INSTR_DIV => Value::integer(left.get_integer() / right.get_integer()),
-                INSTR_MOD => Value::integer(left.get_integer() % right.get_integer()),
-                _ => unreachable!(),
+        let res = match (left.get_immediate_repr(), right.get_immediate_repr()) {
+            (ValueRepr::Integer, ValueRepr::Integer) => {
+                match op {
+                    INSTR_ADD => Value::integer(left.get_integer() + right.get_integer()),
+                    INSTR_SUB => Value::integer(left.get_integer() - right.get_integer()),
+                    INSTR_MUL => Value::integer(left.get_integer() * right.get_integer()),
+                    INSTR_DIV => Value::integer(left.get_integer() / right.get_integer()),
+                    INSTR_MOD => Value::integer(left.get_integer() % right.get_integer()),
+                    _ => unreachable!(),
+                }
             }
-        } else if left.is_float() || left.is_immediate_integer() {
-            let lf = get_float(left);
-            let rf = get_float(right);
-            let r = match op {
-                INSTR_ADD => lf + rf,
-                INSTR_SUB => lf - rf,
-                INSTR_MUL => lf * rf,
-                INSTR_DIV => lf / rf,
-                _ => unreachable!(),
-            };
-            Value::alloc_float(self, r)
-        } else if left.is_pointer()
-            && right.is_immediate_integer()
-            && (op == INSTR_ADD || op == INSTR_SUB)
-        {
-            let p = left.get_pointer::<*mut c_void>();
-            let sign = if op == INSTR_ADD { 1 } else { -1 };
-            unsafe { Value::pointer(p.byte_offset(sign * right.get_integer() as isize)) }
-        } else {
-            todo!()
+            (ValueRepr::Float | ValueRepr::Integer, ValueRepr::Float | ValueRepr::Integer) => {
+                let lf = get_float(left);
+                let rf = get_float(right);
+                let r = match op {
+                    INSTR_ADD => lf + rf,
+                    INSTR_SUB => lf - rf,
+                    INSTR_MUL => lf * rf,
+                    INSTR_DIV => lf / rf,
+                    _ => unreachable!(),
+                };
+                Value::alloc_float(self, r)
+            }
+            (ValueRepr::Pointer, ValueRepr::Integer) => {
+                let p = left.get_pointer::<*mut c_void>();
+                let sign = match op {
+                    INSTR_ADD => 1,
+                    INSTR_SUB => -1,
+                    _ => return self.error("Illegal op on pointer")
+                };
+                unsafe { Value::pointer(p.byte_offset(sign * right.get_integer() as isize)) }
+            }
+            _ => {
+                // Look at type table for ops
+                todo!()
+            }
         };
         self.stack_push(res);
         Ok(false)
