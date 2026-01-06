@@ -330,7 +330,6 @@ impl Runtime {
     }
 
     fn op_call(&mut self, op:u8) -> Result<bool> {
-        let val = self.stack.pop();
         let count = self.stack.pop();
         let args = match count.get_immediate_repr() {
             ValueRepr::Integer => count.get_integer() as usize,
@@ -338,48 +337,46 @@ impl Runtime {
             _ => return self.error("call arg size must be integer or call continuation")
         };
         let mut argv = self.stack.take(args);
-        match val.get_repr() {
+        match argv[0].get_repr() {
             ValueRepr::Closure => {
-                let closure = val.get_closure();
-                self.make_call(op, &argv, closure)?;
             }
             ValueRepr::PartialApplication => {
-                let pap = val.get_array();
+                let pap = argv[0].get_array();
                 let closure = pap.at(0).get_closure();
                 argv.extend_from_slice(&pap.values()[1..]);
-                self.make_call(op, &argv, closure)?;
+                argv[0] = Value::from(closure)
             }
             _ => {
                 // Other callables, implement later
                 todo!()
             }
-        }
-
+        };
+        self.make_call(op, &argv)?;
         Ok(false)
     }
 
-    fn make_call(&mut self, op: u8, argv: &[Value],closure: Closure) -> Result<()> {
+    fn make_call(&mut self, op: u8, argv: &[Value]) -> Result<()> {
+        let closure = argv[0].get_closure();
         let fun_code = closure.code_value();
-        let args = argv.len();
+        let args = argv.len() - 1;
         let env = closure.env().get_array();
         if args < closure.num_args() {
             // Underapplication, create a partial application
-            let mut pap = Array::make(self, args+1);
-            pap.set(0, Value::from(closure));
-            pap.fill(argv, 1, args+1);
+            let pap = Array::with(self, argv);
             self.stack.push(Value::partial_application(pap));
             return Ok(())
         }
         let mut extra_args = args - closure.num_args();
         let mut new_args = Vec::new();
-        if let Some(pos) = closure.vararg() {
+        if let Some(i) = closure.vararg() {
+            let pos = i - 1; 
             let var_arg = Array::with(self, &argv[pos..pos+extra_args]);
-            new_args.extend_from_slice(&argv[0..pos]);
+            new_args.extend_from_slice(&argv[1..pos]);
             new_args.push(Value::from(var_arg));
             new_args.extend_from_slice(&argv[pos+extra_args..args]);
             extra_args = 0;
         } else {
-            new_args.extend_from_slice(&argv[0..closure.num_args()]);
+            new_args.extend_from_slice(&argv[1..closure.num_args()+1]);
         };
         match closure.get_tag() {
             TYPE_BYTECODE => {
@@ -391,7 +388,7 @@ impl Runtime {
                     self.stack.base = self.stack.top();
                 }
                 if extra_args > 0 {
-                    for i in argv[closure.num_args()..argv.len()].iter().rev() {
+                    for i in argv[closure.num_args()+1..argv.len()].iter().rev() {
                         self.stack_push(*i);
                     }
                     self.stack_push(Value::call_continuation(extra_args));
@@ -418,9 +415,6 @@ impl Runtime {
     }
     
     fn op_return(&mut self) -> Result<bool> {
-        // TODO: if stack is empty return true
-        let retval = self.stack.pop();
-        self.stack.set_top(self.stack.base);
         let cc = self.stack.peek(1);
         if cc.is_call_continuation() {
             self.op_call(INSTR_CALL_TAIL)
