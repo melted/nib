@@ -234,6 +234,7 @@ impl Runtime {
                     INSTR_SUB => lf - rf,
                     INSTR_MUL => lf * rf,
                     INSTR_DIV => lf / rf,
+                    INSTR_MOD => lf % rf,
                     _ => unreachable!(),
                 };
                 Value::alloc_float(self, r)
