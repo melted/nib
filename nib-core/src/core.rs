@@ -207,7 +207,7 @@ impl DesugarState {
             }
             Pattern::Custom(name, fields) => {
                 let mut parts = Vec::new();
-                let loc = self.non_shadowed_var(&expr).name();
+                let loc = self.non_shadowed_var(&expr);
                 parts.push(PatternParts::Bind(
                     loc.clone(),
                     Expression::App(pattern.id, vec![name_expr(name), expr.clone()]),
@@ -390,7 +390,7 @@ impl DesugarState {
     fn desugar_funclause(
         &mut self,
         clause: &ast::FunClause,
-        args: &[Var],
+        args: &[Symbol],
         on_fail: &Expression,
     ) -> Result<(bool, Expression)> {
         let body = self.desugar_expression(&clause.body)?;
@@ -417,7 +417,7 @@ impl DesugarState {
                     if let Expression::Var(n, v) = expression {
                         // Just a = b, can rename all 'a' to 'b' instead of
                         // creating a binding.
-                        exp = rename(&exp, &Var::Named(var.clone()), v);
+                        exp = rename(&exp, var, v);
                     } else {
                         let binding =
                             Binding::binding(0, Binder::Local(Name::sym(var)), expression.clone());
@@ -492,12 +492,12 @@ impl DesugarState {
         Name::Plain(Symbol::from(id))
     }
 
-    fn next_arg(&mut self) -> Var {
+    fn next_arg(&mut self) -> Symbol {
         self.last_arg += 1;
-        Var::Arg(self.last_arg)
+        Symbol::from(format!("$arg{}", self.last_arg))
     }
 
-    fn non_shadowed_var(&mut self, exp: &Expression) -> Var {
+    fn non_shadowed_var(&mut self, exp: &Expression) -> Symbol {
         let mut vars = HashSet::new();
         let mut locals = HashMap::new();
         free_vars(exp, &mut vars, &mut locals);
@@ -505,13 +505,13 @@ impl DesugarState {
         loop {
             let next = Symbol::from(format!("x{}", counter));
             if !vars.contains(&next) {
-                return Var::Named(next);
+                return Symbol::from(next);
             }
             counter += 1;
         }
     }
 
-    fn args(&mut self, arity: &Arity) -> Vec<Var> {
+    fn args(&mut self, arity: &Arity) -> Vec<Symbol> {
         let n = match arity {
             Arity::Fixed(n) => *n as usize,
             Arity::VarArg(n, _) => (*n + 1) as usize,
@@ -529,11 +529,11 @@ impl DesugarState {
     }
 
     fn named_var(&mut self, name: &str) -> Expression {
-        Expression::Var(self.new_id(), Var::Named(Symbol::from(name)))
+        Expression::Var(self.new_id(), Symbol::from(name))
     }
 
     fn var(&mut self, name: Name) -> Expression {
-        Expression::Var(self.new_id(), Var::Named(name.top()))
+        Expression::Var(self.new_id(), Symbol::from(name.top()))
     }
 
     fn error<T>(&self, msg: &str) -> Result<T> {
@@ -664,59 +664,34 @@ impl Cond {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Let {
-    pub var: Var,
+    pub var: Symbol,
     pub expr: Expression,
     pub body: Expression,
 }
 
 impl Let {
-    pub fn new(var: Var, expr: Expression, body: Expression) -> Self {
+    pub fn new(var: Symbol, expr: Expression, body: Expression) -> Self {
         Let { var, expr, body }
     }
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Lambda {
-    pub args: Vec<Var>,
+    pub args: Vec<Symbol>,
     pub arity: Arity,
     pub body: Expression,
 }
 
 impl Lambda {
-    pub fn new(args: Vec<Var>, arity: Arity, body: Expression) -> Self {
+    pub fn new(args: Vec<Symbol>, arity: Arity, body: Expression) -> Self {
         Lambda { args, arity, body }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum Var {
-    Named(Symbol),
-    Arg(u32),
-    Env(u32),
-    Local(u32),
-}
-
-impl Var {
-    pub fn name(&self) -> Symbol {
-        match self {
-            Var::Named(s) => s.clone(),
-            Var::Arg(n) => Symbol::from(&format!("$arg{}", n)),
-            Var::Env(n) => Symbol::from(format!("$env{}", n)),
-            Var::Local(n) => Symbol::from(format!("$loc{}", n)),
-        }
-    }
-}
-
-impl Display for Var {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.name())
     }
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Expression {
     Literal(Node, Literal),
-    Var(Node, Var),
+    Var(Node, Symbol),
     Lambda(Node, Box<Lambda>),
     Cond(Node, Box<Cond>),
     App(Node, Vec<Expression>),
@@ -749,7 +724,7 @@ impl Display for Expression {
                     {
                         write!(f, "...")?;
                     }
-                    write!(f, "{} ", a.name())?;
+                    write!(f, "{} ", a)?;
                 }
                 write!(f, "-> {}", lam.body)?;
                 write!(f, " }}")?;
@@ -773,7 +748,7 @@ impl Display for Expression {
 }
 
 fn var(s: &Symbol) -> Expression {
-    Expression::Var(0, Var::Named(s.clone()))
+    Expression::Var(0, s.clone())
 }
 
 fn name_expr(n: &Name) -> Expression {
@@ -791,13 +766,6 @@ fn name_expr(n: &Name) -> Expression {
     }
 }
 
-fn arg(n: u32) -> Expression {
-    Expression::Var(0, Var::Arg(n))
-}
-
-fn env(n: u32) -> Expression {
-    Expression::Var(0, Var::Env(n))
-}
 
 fn local(n: usize) -> Symbol {
     Symbol::from(format!("$loc{}", n))
@@ -820,7 +788,7 @@ fn cond(pred: &Expression, if_true: &Expression, if_false: &Expression) -> Expre
     Expression::Cond(0, Box::new(cond))
 }
 
-fn lambda(args: Vec<Var>, arity: &Arity, body: &Expression) -> Expression {
+fn lambda(args: Vec<Symbol>, arity: &Arity, body: &Expression) -> Expression {
     Expression::Lambda(0, Box::new(Lambda::new(args, arity.clone(), body.clone())))
 }
 
@@ -853,7 +821,7 @@ impl Arity {
     }
 }
 
-pub fn rename(expr: &Expression, old_name: &Var, new_name: &Var) -> Expression {
+pub fn rename(expr: &Expression, old_name: &Symbol, new_name: &Symbol) -> Expression {
     match expr {
         Expression::Var(n, v) if v == old_name => Expression::Var(*n, new_name.clone()),
         Expression::App(n, exps) => {
@@ -891,12 +859,9 @@ pub fn rename(expr: &Expression, old_name: &Var, new_name: &Var) -> Expression {
                 let mut new_binding = b.clone();
                 new_binding.body = new_body;
                 new_defs.push(new_binding);
-                if let Var::Named(n) = old_name {
-                    if let Some(Name::Plain(x)) = &b.name
-                        && n == x
-                    {
-                        shadowed = true;
-                    }
+                if let Some(Name::Plain(x)) = &b.name && old_name == x
+                {
+                    shadowed = true;
                 }
             }
             let new_exp = if !shadowed {
@@ -922,26 +887,26 @@ where
     Ok(vars)
 }
 
-fn add_local(locals: &mut HashMap<Symbol, i32>, var: &Var) {
-    locals.insert(var.name(), locals.get(&var.name()).unwrap_or(&0) + 1);
+fn add_local(locals: &mut HashMap<Symbol, i32>, var: &Symbol) {
+    locals.insert(*var, locals.get(&var).unwrap_or(&0) + 1);
 }
 
-fn remove_local(locals: &mut HashMap<Symbol, i32>, var: &Var) {
-    if let Some(v) = locals.get_mut(&var.name()) {
+fn remove_local(locals: &mut HashMap<Symbol, i32>, var: &Symbol) {
+    if let Some(v) = locals.get_mut(&var) {
         *v -= 1;
         if *v == 0 {
-            locals.remove(&var.name());
+            locals.remove(&var);
         }
     }
 }
 
-fn add_locals(locals: &mut HashMap<Symbol, i32>, vars: &[Var]) {
+fn add_locals(locals: &mut HashMap<Symbol, i32>, vars: &[Symbol]) {
     for v in vars {
         add_local(locals, v);
     }
 }
 
-fn remove_locals(locals: &mut HashMap<Symbol, i32>, vars: &[Var]) {
+fn remove_locals(locals: &mut HashMap<Symbol, i32>, vars: &[Symbol]) {
     for v in vars {
         remove_local(locals, v);
     }
@@ -951,8 +916,8 @@ pub fn free_vars(expr: &Expression, vars: &mut HashSet<Symbol>, locals: &mut Has
     match expr {
         Expression::Literal(_, literal) => {}
         Expression::Var(_, v) => {
-            if locals.get(&v.name()).is_none() {
-                vars.insert(v.name());
+            if locals.get(&v).is_none() {
+                vars.insert(*v);
             }
         }
         Expression::Cond(_, cond) => {
@@ -976,7 +941,7 @@ pub fn free_vars(expr: &Expression, vars: &mut HashSet<Symbol>, locals: &mut Has
             for b in bindings {
                 match &b.binder {
                     Binder::Local(n) | Binder::Public(n) => {
-                        let var = Var::Named(n.top());
+                        let var = Symbol::from(n.top());
                         bound.push(var.clone());
                         add_local(locals, &var);
                     }

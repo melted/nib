@@ -231,10 +231,10 @@ impl Runtime {
                 eval_status.value_stack.push(val);
             }
             Expression::Var(_, var) => {
-                let Some(v) = self.lookup(env, &var.name()) else {
+                let Some(v) = self.lookup(env, &var) else {
                     return self.error(&format!(
                         "couldn't find variable {} in environment",
-                        &var.name()
+                        &var
                     ));
                 };
                 eval_status.value_stack.push(v);
@@ -334,7 +334,7 @@ impl Runtime {
                             args.insert(i as usize, array);
                         }
                         for (v, i) in args.iter().zip(lam.args.iter()) {
-                            env.add(&i.name(), v);
+                            env.add(&i, v);
                         }
                         mem::swap(&mut env, current_env);
                         eval_status.work_stack.push(EvalStep::ReplaceEnv(env));

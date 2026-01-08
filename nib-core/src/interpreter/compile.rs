@@ -7,8 +7,7 @@ use crate::interpreter::bytecode::{
     INSTR_JFALSE, INSTR_JFALSE_IMM8, INSTR_JNEG, INSTR_JNEG_IMM8, INSTR_JNFALSE,
     INSTR_JNFALSE_IMM8, INSTR_JNNEG, INSTR_JNNEG_IMM8, INSTR_JNPOS, INSTR_JNPOS_IMM8, INSTR_JPOS,
     INSTR_JPOS_IMM8, INSTR_JUMP, INSTR_JUMP_IMM8, INSTR_JZ, INSTR_JZ_IMM8, INSTR_LOAD_BYTES_IMM,
-    INSTR_LOAD_IMM8, INSTR_LOAD_IMM16, INSTR_LOAD_IMM32, INSTR_LOAD_IMM64, INSTR_NOP,
-    INSTR_SET_TYPE, INSTR_TABLE_GET,
+    INSTR_LOAD_IMM8, INSTR_LOAD_IMM16, INSTR_LOAD_IMM32, INSTR_LOAD_IMM64, INSTR_SET_TYPE, INSTR_TABLE_GET,
 };
 use crate::interpreter::heap::Value;
 use std::collections::{HashMap, HashSet};
@@ -163,9 +162,9 @@ impl Compilation {
             }
             Literal::String(str) => {
                 let bytes = str.as_bytes().to_vec();
-                self.compile_literal(&Literal::Bytearray(bytes))?;
+                self.compile_literal(&Literal::Bytearray(bytes), code)?;
                 code.push(INSTR_GLOBAL_ENV);
-                self.compile_literal(&Literal::Symbol(Symbol::from("string")))?;
+                self.compile_literal(&Literal::Symbol(Symbol::from("string")), code)?;
                 code.push(INSTR_TABLE_GET);
                 code.push(INSTR_SET_TYPE);
             }
