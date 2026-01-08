@@ -1,10 +1,17 @@
 use crate::ast::Literal;
 use crate::common::{Metadata, Name};
 use crate::common::{Result, Symbol};
-use crate::core::{Binder, Binding, Expression};
-use crate::interpreter::bytecode::{INSTR_ALLOC_FLOAT, INSTR_GET_LOCAL, INSTR_GLOBAL_ENV, INSTR_LOAD_BYTES_IMM, INSTR_LOAD_IMM8, INSTR_LOAD_IMM16, INSTR_LOAD_IMM32, INSTR_LOAD_IMM64, INSTR_SET_TYPE, INSTR_TABLE_GET};
+use crate::core::{Binder, Binding, Cond, Expression, Lambda, free_vars};
+use crate::interpreter::bytecode::{
+    INSTR_ALLOC_FLOAT, INSTR_CALL, INSTR_CALL_TAIL, INSTR_GET_LOCAL, INSTR_GLOBAL_ENV,
+    INSTR_JFALSE, INSTR_JFALSE_IMM8, INSTR_JNEG, INSTR_JNEG_IMM8, INSTR_JNFALSE,
+    INSTR_JNFALSE_IMM8, INSTR_JNNEG, INSTR_JNNEG_IMM8, INSTR_JNPOS, INSTR_JNPOS_IMM8, INSTR_JPOS,
+    INSTR_JPOS_IMM8, INSTR_JUMP, INSTR_JUMP_IMM8, INSTR_JZ, INSTR_JZ_IMM8, INSTR_LOAD_BYTES_IMM,
+    INSTR_LOAD_IMM8, INSTR_LOAD_IMM16, INSTR_LOAD_IMM32, INSTR_LOAD_IMM64, INSTR_NOP,
+    INSTR_SET_TYPE, INSTR_TABLE_GET,
+};
 use crate::interpreter::heap::Value;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::mem;
 
 pub fn compile(from: crate::core::Module) -> Result<Module> {
@@ -58,6 +65,7 @@ pub(super) struct Compilation {
     next_loc: usize,
     local_vars: HashMap<Symbol, usize>,
     code: Vec<u8>,
+    is_tail: bool,
 }
 
 impl Compilation {
@@ -70,6 +78,7 @@ impl Compilation {
             next_loc: 0,
             local_vars: HashMap::new(),
             code: Vec::new(),
+            is_tail: true,
         };
         compilation.module.metadata = Some(metadata);
         compilation
@@ -77,14 +86,22 @@ impl Compilation {
 
     pub(super) fn compile(&mut self) -> Result<()> {
         let bindings = mem::replace(&mut self.core_bindings, vec![]);
+        let mut code = Vec::new();
         for b in bindings {
-            self.compile_binding(&b, true)?;
+            self.is_tail = true;
+            self.compile_binding(&b, true, &mut code)?;
         }
+        self.module.bcode = code;
         Ok(())
     }
 
-    fn compile_binding(&mut self, binding: &Binding, top_level:bool) -> Result<()> {
-        self.compile_expression(&binding.body)?;
+    fn compile_binding(
+        &mut self,
+        binding: &Binding,
+        top_level: bool,
+        code: &mut Vec<u8>,
+    ) -> Result<()> {
+        self.compile_expression(&binding.body, code)?;
         match &binding.binder {
             Binder::Public(Name::Qualified(path, name)) => todo!(),
             Binder::Public(Name::Plain(name)) => {
@@ -92,74 +109,133 @@ impl Compilation {
             }
             Binder::Local(Name::Qualified(path, name)) => {
                 todo!()
-            },
+            }
             Binder::Local(Name::Plain(name)) => {
                 todo!()
             }
-            Binder::Unbound => {
-                Ok(())
-            },
+            Binder::Unbound => Ok(()),
         }
     }
 
-    fn compile_expression(&mut self, expression: &Expression) -> Result<()> {
+    fn compile_expression(&mut self, expression: &Expression, code: &mut Vec<u8>) -> Result<()> {
         match expression {
-            Expression::Literal(_, literal) => todo!(),
-            Expression::Var(_, var) => todo!(),
-            Expression::Lambda(_, lambda) => todo!(),
-            Expression::Cond(_, cond) => todo!(),
-            Expression::App(_, expressions) => todo!(),
-            Expression::Where(_, expression, bindings) => todo!(),
+            Expression::Literal(_, literal) => self.compile_literal(literal, code),
+            Expression::Var(_, var) => {
+                todo!()
+            }
+            Expression::Lambda(_, lambda) => {
+                let mut free = HashSet::new();
+                let mut locals = HashMap::new();
+                free_vars(expression, &mut free, &mut locals);
+                self.compile_lambda(lambda, free, locals, code)
+            }
+            Expression::Cond(_, cond) => self.compile_cond(cond, code),
+            Expression::App(_, expressions) => self.compile_application(&expressions, code),
+            Expression::Where(_, expression, bindings) => {
+                self.compile_where(&expression, bindings, code)
+            }
         }
     }
 
-    fn compile_literal(&mut self, literal: &Literal) -> Result<()> {
+    fn compile_literal(&mut self, literal: &Literal, code: &mut Vec<u8>) -> Result<()> {
         match literal {
             Literal::Nil => {
-                self.code.push(INSTR_LOAD_IMM8);
-                self.code.push(0x36);
-            },
+                code.push(INSTR_LOAD_IMM8);
+                code.push(0x36);
+            }
             Literal::Bool(b) => {
-                self.code.push(INSTR_LOAD_IMM8);
-                self.code.push(if *b { 0x2e} else {0x26});
-            },
+                code.push(INSTR_LOAD_IMM8);
+                code.push(if *b { 0x2e } else { 0x26 });
+            }
             Literal::Integer(n) => {
-                self.load_constant_int(*n);
-            },
+                load_constant_int(*n, code);
+            }
             Literal::Real(f) => {
-                self.code.push(INSTR_LOAD_IMM64);
+                code.push(INSTR_LOAD_IMM64);
                 let bytes = f.to_le_bytes();
-                self.code.extend_from_slice(&bytes);
-                self.code.push(INSTR_ALLOC_FLOAT);
-            },
+                code.extend_from_slice(&bytes);
+                code.push(INSTR_ALLOC_FLOAT);
+            }
             Literal::Char(c) => {
                 let val = Value::char(*c);
-                self.code.push(INSTR_LOAD_IMM32);
-                self.code.extend_from_slice(&val.val.to_le_bytes()[0..4]);
-            },
+                code.push(INSTR_LOAD_IMM32);
+                code.extend_from_slice(&val.val.to_le_bytes()[0..4]);
+            }
             Literal::String(str) => {
                 let bytes = str.as_bytes().to_vec();
                 self.compile_literal(&Literal::Bytearray(bytes))?;
-                self.code.push(INSTR_GLOBAL_ENV);
+                code.push(INSTR_GLOBAL_ENV);
                 self.compile_literal(&Literal::Symbol(Symbol::from("string")))?;
-                self.code.push(INSTR_TABLE_GET);
-                self.code.push(INSTR_SET_TYPE);
-            },
+                code.push(INSTR_TABLE_GET);
+                code.push(INSTR_SET_TYPE);
+            }
             Literal::Symbol(global_symbol) => {
                 let s = self.get_symbol_slot(global_symbol);
-                self.load_constant_int(s as i64);
-                self.code.push(INSTR_GET_LOCAL);
-            },
+                load_constant_int(s as i64, code);
+                code.push(INSTR_GET_LOCAL);
+            }
             Literal::Bytearray(items) => {
-                self.code.push(INSTR_LOAD_BYTES_IMM);
-                self.code.extend_from_slice(&(items.len() as u32).to_le_bytes());
-                self.code.extend_from_slice(&items);
-            },
+                code.push(INSTR_LOAD_BYTES_IMM);
+                code.extend_from_slice(&(items.len() as u32).to_le_bytes());
+                code.extend_from_slice(&items);
+            }
         }
         Ok(())
     }
 
-    fn get_symbol_slot(&mut self, sym:&Symbol) -> usize {
+    fn compile_lambda(
+        &mut self,
+        lambda: &Box<Lambda>,
+        vars: HashSet<Symbol>,
+        locals: HashMap<Symbol, i32>,
+        code: &mut Vec<u8>,
+    ) -> Result<()> {
+        Ok(())
+    }
+
+    fn compile_cond(&mut self, cond: &Cond, code: &mut Vec<u8>) -> Result<()> {
+        let mut if_true_code = Vec::new();
+        let mut if_false_code = Vec::new();
+        self.compile_expression(&cond.pred, code)?;
+        self.compile_expression(&cond.if_true, &mut if_true_code)?;
+        self.compile_expression(&cond.if_false, &mut if_false_code)?;
+        optimized_jump(
+            INSTR_JUMP,
+            if_false_code.len() as i64 + 1,
+            &mut if_true_code,
+        );
+        optimized_jump(INSTR_JFALSE, if_true_code.len() as i64 + 1, code);
+        code.extend_from_slice(&if_true_code);
+        code.extend_from_slice(&if_false_code);
+        Ok(())
+    }
+
+    fn compile_application(&mut self, exps: &[Expression], code: &mut Vec<u8>) -> Result<()> {
+        let is_tail = self.is_tail;
+        self.is_tail = false;
+        for e in exps {
+            self.compile_expression(e, code)?;
+        }
+        load_constant_int(exps.len() as i64, code);
+        code.push(if is_tail { INSTR_CALL_TAIL } else { INSTR_CALL });
+        Ok(())
+    }
+
+    fn compile_where(
+        &mut self,
+        exp: &Expression,
+        bindings: &[Binding],
+        code: &mut Vec<u8>,
+    ) -> Result<()> {
+        let is_tail = self.is_tail;
+        for b in bindings {
+            self.compile_binding(b, false, code)?;
+        }
+        self.is_tail = is_tail;
+        self.compile_expression(exp, code)
+    }
+
+    fn get_symbol_slot(&mut self, sym: &Symbol) -> usize {
         if let Some(loc) = self.module.want_symbols.get(sym) {
             *loc
         } else {
@@ -174,27 +250,52 @@ impl Compilation {
         self.next_loc += 1;
         n
     }
+}
 
-    fn load_constant_int(&mut self, n:i64) {
-        let v = Value::integer(n);
-        let b = v.val.leading_zeros();
-        match b {
-            56.. => {
-                self.code.push(INSTR_LOAD_IMM8);
-                self.code.push(v.val.to_le_bytes()[0]);
-            }
-            48..56 => {
-                self.code.push(INSTR_LOAD_IMM16);
-                self.code.extend_from_slice(&v.val.to_le_bytes()[0..2]);
-            }
-            32..48 => {
-                self.code.push(INSTR_LOAD_IMM32);
-                self.code.extend_from_slice(&v.val.to_le_bytes()[0..4]);
-            }
-            _ => {
-                self.code.push(INSTR_LOAD_IMM64);
-                self.code.extend_from_slice(&v.val.to_le_bytes()[0..8]);
-            }
+fn load_constant_int(n: i64, code: &mut Vec<u8>) {
+    let v = Value::integer(n);
+    let b = v.val.leading_zeros();
+    match b {
+        56.. => {
+            code.push(INSTR_LOAD_IMM8);
+            code.push(v.val.to_le_bytes()[0]);
         }
+        48..56 => {
+            code.push(INSTR_LOAD_IMM16);
+            code.extend_from_slice(&v.val.to_le_bytes()[0..2]);
+        }
+        32..48 => {
+            code.push(INSTR_LOAD_IMM32);
+            code.extend_from_slice(&v.val.to_le_bytes()[0..4]);
+        }
+        _ => {
+            code.push(INSTR_LOAD_IMM64);
+            code.extend_from_slice(&v.val.to_le_bytes()[0..8]);
+        }
+    }
+}
+
+fn optimized_jump(op: u8, n: i64, code: &mut Vec<u8>) {
+    if let Some(b) = i8::try_from(n).ok() {
+        let sop = short_jump_op(op);
+        code.push(op);
+        code.push(n as u8);
+    } else {
+        load_constant_int(n, code);
+        code.push(op);
+    }
+}
+
+fn short_jump_op(op: u8) -> u8 {
+    match op {
+        INSTR_JUMP => INSTR_JUMP_IMM8,
+        INSTR_JFALSE => INSTR_JFALSE_IMM8,
+        INSTR_JNEG => INSTR_JNEG_IMM8,
+        INSTR_JNFALSE => INSTR_JNFALSE_IMM8,
+        INSTR_JNNEG => INSTR_JNNEG_IMM8,
+        INSTR_JNPOS => INSTR_JNPOS_IMM8,
+        INSTR_JPOS => INSTR_JPOS_IMM8,
+        INSTR_JZ => INSTR_JZ_IMM8,
+        _ => op,
     }
 }

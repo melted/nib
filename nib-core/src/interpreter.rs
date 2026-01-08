@@ -446,7 +446,7 @@ impl Runtime {
         let bytes = self.code.get_bytes();
         let code = bytes.get_slice();
         let dist = if is_immediate_jump(op) {
-            let next = code[self.ip] as i64;
+            let next = (code[self.ip] as i8) as i64;
             self.ip += 1;
             next
         } else {
