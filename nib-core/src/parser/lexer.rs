@@ -1,9 +1,9 @@
 use unicode_categories::UnicodeCategories;
 
-use crate::common::{Error, SyntaxError};
 use crate::common::Location;
 use crate::common::Result;
 use crate::common::Symbol;
+use crate::common::{Error, SyntaxError};
 
 impl<'a> super::ParserState<'a> {
     pub(super) fn peek_next_token(&mut self) -> Result<Token> {
@@ -47,8 +47,10 @@ impl<'a> super::ParserState<'a> {
                             // prefix operator and (-10) as a number in parens
                             self.advance(2);
                             Some(self.token(TokenValue::Identifier(Symbol::from("(-)"))))
-                        } else if !self.check_prefix("//") &&
-                            !self.check_prefix("-") && operator_char(c) {
+                        } else if !self.check_prefix("//")
+                            && !self.check_prefix("-")
+                            && operator_char(c)
+                        {
                             let id = self.read_parenthesized_operator()?;
                             Some(self.token(TokenValue::Identifier(Symbol::from(id))))
                         } else if c == ')' {
@@ -566,6 +568,10 @@ impl PartialEq<Token> for Token {
 
 impl From<TokenValue> for Token {
     fn from(value: TokenValue) -> Self {
-        Token { value, location: Location::at(0, 0, 0), on_new_line: false }
+        Token {
+            value,
+            location: Location::at(0, 0, 0),
+            on_new_line: false,
+        }
     }
 }

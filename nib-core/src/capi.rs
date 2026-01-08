@@ -21,9 +21,7 @@ pub extern "C" fn nib_parse(source: *const c_char, mod_ptr: *mut *mut Module) ->
         *mod_ptr = Box::into_raw(mod_box);
     }
     match res {
-        Ok(()) => {
-            NIB_SUCCESS
-        }
+        Ok(()) => NIB_SUCCESS,
         Err(_) => NIB_ERROR,
     }
 }

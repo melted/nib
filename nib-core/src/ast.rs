@@ -14,14 +14,14 @@ impl Module {
     pub fn empty() -> Self {
         Module {
             metadata: Metadata::empty(),
-            declarations: Vec::new()
+            declarations: Vec::new(),
         }
     }
 
     pub fn new(file: Option<String>, code: &str) -> Self {
         Module {
             metadata: Metadata::new(file, code),
-            declarations: Vec::new()
+            declarations: Vec::new(),
         }
     }
 }

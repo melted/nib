@@ -125,7 +125,8 @@ impl Runtime {
     pub fn make_string(&mut self, s: &str) -> Value {
         let b = Bytes::with(self, s.as_bytes());
         let type_table = self
-            .get_module_path(&[Symbol::from("string")], self.global_env).unwrap_or(Value::nil());
+            .get_module_path(&[Symbol::from("string")], self.global_env)
+            .unwrap_or(Value::nil());
         // If the string type table doesn't exist yet, leave it
         // as nil. This will happen when the string type table
         // is registered. It can patch it up afterwards.

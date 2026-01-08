@@ -1,23 +1,26 @@
+use crate::common::Error;
 use crate::{
     ast::{
         Binding, Declaration, ExpressionNode, FunBinding, ModuleDirective, OpBinding, OpClause,
         Operator, Pattern, PatternNode, UseDirective, VarBinding,
     },
     common::{Location, Name, Node, Result},
-    parser::{ParserState, lexer::{Token, TokenValue}},
+    parser::{
+        ParserState,
+        lexer::{Token, TokenValue},
+    },
 };
-use crate::common::Error;
 
 impl<'a> ParserState<'a> {
     pub(super) fn parse_declarations(&mut self) -> Result<Vec<Declaration>> {
         let mut decls = Vec::new();
         loop {
-            if let Ok(true) =self.is_next(TokenValue::Eof) {
+            if let Ok(true) = self.is_next(TokenValue::Eof) {
                 break;
             }
             match self.parse_add_declaration(&mut decls) {
                 Ok(_) => {}
-                Err(Error::Syntax { err: syntax_error}) => {
+                Err(Error::Syntax { err: syntax_error }) => {
                     self.metadata.errors.push(syntax_error);
                     // Now recover
                     self.resync();
@@ -32,7 +35,7 @@ impl<'a> ParserState<'a> {
                         }
                     }
                 }
-                Err(e) => { return Err(e) }
+                Err(e) => return Err(e),
             }
         }
         Ok(decls)
@@ -146,9 +149,10 @@ impl<'a> ParserState<'a> {
             let rhs = self.parse_expression()?;
             let bind = self.op_binding(op, initial, rpat, guard, rhs);
             let pos = self.position();
-            self.metadata
-                .locations
-                .insert(bind.clauses[0].id, Location::at(self.metadata.source_id, start, pos));
+            self.metadata.locations.insert(
+                bind.clauses[0].id,
+                Location::at(self.metadata.source_id, start, pos),
+            );
             self.metadata
                 .locations
                 .insert(bind.id, Location::at(self.metadata.source_id, start, pos));
@@ -159,9 +163,10 @@ impl<'a> ParserState<'a> {
             let rhs = self.parse_expression()?;
             let bind = self.fun_binding(name, args, guard, rhs);
             let pos = self.position();
-            self.metadata
-                .locations
-                .insert(bind.clauses[0].id, Location::at(self.metadata.source_id, start, pos));
+            self.metadata.locations.insert(
+                bind.clauses[0].id,
+                Location::at(self.metadata.source_id, start, pos),
+            );
             self.metadata
                 .locations
                 .insert(bind.id, Location::at(self.metadata.source_id, start, pos));
@@ -239,7 +244,9 @@ impl<'a> ParserState<'a> {
     pub(super) fn resync(&mut self) {
         if let Some(&indent) = self.indent_stack.first() {
             while self.next_indent() >= indent {
-                let tok = self.get_next_token().unwrap_or(Token::from(TokenValue::Eof));
+                let tok = self
+                    .get_next_token()
+                    .unwrap_or(Token::from(TokenValue::Eof));
             }
             self.indent_stack.clear();
         }

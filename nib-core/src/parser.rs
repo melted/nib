@@ -63,7 +63,6 @@ pub fn dump_lex(code: &str) -> Result<()> {
 }
 
 pub fn dump_prog(code: &str) -> Result<()> {
-
     let mut module = Module::new(None, code);
     parse_declarations(&mut module)?;
     for d in module.declarations {
@@ -87,7 +86,6 @@ struct ParserState<'a> {
 
 impl<'a> ParserState<'a> {
     fn new(code: &'a str, metadata: &'a mut Metadata) -> ParserState<'a> {
-
         let mut state = ParserState {
             metadata: metadata,
             src: code,
@@ -123,7 +121,7 @@ impl<'a> ParserState<'a> {
     pub(self) fn indent(&self) -> i32 {
         for nl in self.metadata.newlines.iter().rev() {
             if self.position() > *nl {
-                return (self.position() - *nl) as i32
+                return (self.position() - *nl) as i32;
             }
         }
         self.position() as i32

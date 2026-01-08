@@ -29,7 +29,7 @@ fn main() -> io::Result<()> {
             let code = read_to_string(f)?;
             dump_lex(&code)?;
         }
-        return Ok(())
+        return Ok(());
     }
     if !opts.no_prelude {
         rt.add_code("prelude", prelude_code)?;

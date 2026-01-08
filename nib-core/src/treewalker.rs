@@ -131,7 +131,6 @@ impl Runtime {
         Ok(())
     }
 
-
     pub fn get_module_path(&self, path: &[Symbol]) -> Option<Rc<RefCell<Table>>> {
         let mut rest = path;
         let mut table = self.globals.clone();

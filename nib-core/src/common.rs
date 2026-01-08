@@ -8,10 +8,9 @@ use std::{
 };
 use thiserror::Error;
 
-
 pub fn next_source_id() -> u32 {
     unsafe {
-        static mut LOCAL_VAL:LazyLock<u32> = LazyLock::new(|| 0);
+        static mut LOCAL_VAL: LazyLock<u32> = LazyLock::new(|| 0);
         *LOCAL_VAL += 1;
         *LOCAL_VAL
     }
@@ -53,15 +52,19 @@ impl Metadata {
         }
     }
 
-    pub fn linecol(&self, loc:&Location) -> (usize, usize) {
+    pub fn linecol(&self, loc: &Location) -> (usize, usize) {
         let target = loc.start as usize;
         if self.newlines.is_empty() {
             return (0, target);
         }
         let line = match self.newlines.binary_search(&target) {
-            Ok(l) | Err(l) => l
+            Ok(l) | Err(l) => l,
         };
-        let col = if line == 0 { target } else { target - self.newlines[line-1] };
+        let col = if line == 0 {
+            target
+        } else {
+            target - self.newlines[line - 1]
+        };
         (line, col)
     }
 }
@@ -87,8 +90,12 @@ impl Location {
         Location::at(0, 0, 0)
     }
 
-    pub fn at(source:u32, start: usize, end: usize) -> Self {
-        Location { source, start: start as u32, end: end as u32 }
+    pub fn at(source: u32, start: usize, end: usize) -> Self {
+        Location {
+            source,
+            start: start as u32,
+            end: end as u32,
+        }
     }
 
     pub fn start(&self) -> usize {
@@ -110,9 +117,8 @@ impl Display for Location {
 #[derive(Debug, Clone, PartialEq)]
 pub struct SyntaxError {
     pub msg: String,
-    pub loc: Location
+    pub loc: Location,
 }
-
 
 #[derive(Error, Debug)]
 pub enum Error {

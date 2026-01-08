@@ -1,5 +1,13 @@
 use core::slice;
-use std::{collections::HashMap, ffi::c_void, fmt::Debug, hash::{DefaultHasher, Hash, Hasher}, mem, ptr::copy_nonoverlapping, slice::from_raw_parts};
+use std::{
+    collections::HashMap,
+    ffi::c_void,
+    fmt::Debug,
+    hash::{DefaultHasher, Hash, Hasher},
+    mem,
+    ptr::copy_nonoverlapping,
+    slice::from_raw_parts,
+};
 
 use region::Allocation;
 
@@ -175,7 +183,6 @@ impl Runtime {
             new_value
         }
     }
-
 }
 
 impl Space {
@@ -208,7 +215,11 @@ impl ObjectHeader {
         let space: *mut Self = rt.allocate(size as usize);
         unsafe {
             (*space).size = size;
-            (*space).flags = if size > BIG_OBJECT_THRESHOLD as u32 { BIG_OBJECT_FLAG } else { 0 };
+            (*space).flags = if size > BIG_OBJECT_THRESHOLD as u32 {
+                BIG_OBJECT_FLAG
+            } else {
+                0
+            };
             (*space).repr = repr;
             (*space).tag = 0;
         }
@@ -270,7 +281,7 @@ pub enum ValueRepr {
     Closure,
     Object,
     PartialApplication,
-    CallContinuation
+    CallContinuation,
 }
 
 const FORWARD_FLAG: u8 = 0x01;
@@ -405,7 +416,9 @@ impl Value {
     }
 
     pub fn call_continuation(args: usize) -> Self {
-        Value { val: (args as u64) << 8 | CC_STAG }
+        Value {
+            val: (args as u64) << 8 | CC_STAG,
+        }
     }
 
     pub fn partial_application(mut pap: Array) -> Self {
@@ -591,7 +604,7 @@ impl Value {
     }
 
     pub fn get_cc_args(&self) -> usize {
-        (self.val >> 8) as usize 
+        (self.val >> 8) as usize
     }
 
     pub fn get_bool(&self) -> bool {
@@ -732,7 +745,7 @@ impl Array {
         let mut header = unsafe { *(self.ptr) };
         header.repr = ValueRepr::PartialApplication;
         Value::with_tag(self.ptr, OBJECT_TAG)
-    } 
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -743,7 +756,7 @@ pub struct Table {
 const INITIAL_SIZE: usize = 16;
 
 impl Table {
-    pub fn make(rt: &mut Runtime, ) -> Self {
+    pub fn make(rt: &mut Runtime) -> Self {
         let header = ObjectHeader::make(rt, 32, ValueRepr::Table);
         let mut me = Table { ptr: header };
         me.clear(rt);
@@ -891,8 +904,7 @@ impl Bytes {
     }
 
     pub fn with(rt: &mut Runtime, bytes: &[u8]) -> Self {
-        let header =
-            ObjectHeader::make(rt, (bytes.len() + 2 * CELL_SIZE) as u32, ValueRepr::Bytes);
+        let header = ObjectHeader::make(rt, (bytes.len() + 2 * CELL_SIZE) as u32, ValueRepr::Bytes);
         let me = Bytes { ptr: header };
         let from = bytes.as_ptr();
         let to = get_object_ptr::<u8>(me.ptr, CELL_SIZE);
@@ -1072,5 +1084,5 @@ impl Closure {
 
     pub fn num_args(&self) -> usize {
         get_value(self.ptr, 3).get_integer() as usize
-    } 
+    }
 }
