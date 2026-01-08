@@ -122,36 +122,36 @@ pub const INSTR_CALL: u8 = 60;
 pub const INSTR_CALL_TAIL: u8 = 61;
 
 // Moves
-pub const INSTR_STACK_LIFT: u8 = 62;
-pub const INSTR_STACK_STORE: u8 = 63;
-pub const INSTR_STACK_LOAD: u8 = 64;
-pub const INSTR_LOAD_IMM8: u8 = 65;
-pub const INSTR_LOAD_IMM16: u8 = 66;
-pub const INSTR_LOAD_IMM32: u8 = 67;
-pub const INSTR_LOAD_IMM64: u8 = 68;
-pub const INSTR_LOAD_BYTES_IMM: u8 = 69;
-pub const INSTR_DUP: u8 = 70;
-pub const INSTR_SWAP: u8 = 71;
-pub const INSTR_DROP: u8 = 72;
-pub const INSTR_DROP_FRAME: u8 = 73;
+pub const INSTR_DUP: u8 = 62;
+pub const INSTR_SWAP: u8 = 63;
+pub const INSTR_DROP: u8 = 64;
+pub const INSTR_DROP_FRAME: u8 = 65;
+pub const INSTR_STACK_LIFT: u8 = 66;
+pub const INSTR_STACK_STORE: u8 = 67;
+pub const INSTR_STACK_LOAD: u8 = 68;
+pub const INSTR_LOAD_IMM8: u8 = 73;
+pub const INSTR_LOAD_IMM16: u8 = 74;
+pub const INSTR_LOAD_IMM32: u8 = 75;
+pub const INSTR_LOAD_IMM64: u8 = 76;
+pub const INSTR_LOAD_BYTES_IMM: u8 = 77;
 
 // Branches
-pub const INSTR_JUMP: u8 = 77;
-pub const INSTR_JUMP_IMM8: u8 = 78;
-pub const INSTR_JZ: u8 = 80;
-pub const INSTR_JZ_IMM8: u8 = 81;
-pub const INSTR_JPOS: u8 = 83;
-pub const INSTR_JPOS_IMM8: u8 = 84;
+pub const INSTR_JUMP: u8 = 80;
+pub const INSTR_JUMP_IMM8: u8 = 81;
+pub const INSTR_JZ: u8 = 82;
+pub const INSTR_JZ_IMM8: u8 = 83;
+pub const INSTR_JPOS: u8 = 84;
+pub const INSTR_JPOS_IMM8: u8 = 85;
 pub const INSTR_JNEG: u8 = 86;
 pub const INSTR_JNEG_IMM8: u8 = 87;
-pub const INSTR_JNPOS: u8 = 89;
-pub const INSTR_JNPOS_IMM8: u8 = 90;
-pub const INSTR_JNNEG: u8 = 92;
-pub const INSTR_JNNEG_IMM8: u8 = 93;
-pub const INSTR_JFALSE: u8 = 95;
-pub const INSTR_JFALSE_IMM8: u8 = 96;
-pub const INSTR_JNFALSE: u8 = 98;
-pub const INSTR_JNFALSE_IMM8: u8 = 99;
+pub const INSTR_JNPOS: u8 = 88;
+pub const INSTR_JNPOS_IMM8: u8 = 89;
+pub const INSTR_JNNEG: u8 = 90;
+pub const INSTR_JNNEG_IMM8: u8 = 91;
+pub const INSTR_JFALSE: u8 = 92;
+pub const INSTR_JFALSE_IMM8: u8 = 93;
+pub const INSTR_JNFALSE: u8 = 94;
+pub const INSTR_JNFALSE_IMM8: u8 = 95;
 
 // Type
 pub const INSTR_TYPE: u8 = 101;
@@ -167,29 +167,29 @@ pub const INSTR_ALLOC_CLOSURE: u8 = 107;
 // Arrays
 pub const INSTR_ARRAY_REF: u8 = 108;
 pub const INSTR_ARRAY_SET: u8 = 109;
-pub const INSTR_ARRAY_SIZE: u8 = 120;
+pub const INSTR_ARRAY_SIZE: u8 = 110;
 
 // Tables
-pub const INSTR_TABLE_GET: u8 = 110;
-pub const INSTR_TABLE_SET: u8 = 111;
-pub const INSTR_TABLE_DELETE: u8 = 112;
-pub const INSTR_TABLE_SIZE: u8 = 121;
+pub const INSTR_TABLE_GET: u8 = 111;
+pub const INSTR_TABLE_SET: u8 = 112;
+pub const INSTR_TABLE_DELETE: u8 = 113;
+pub const INSTR_TABLE_SIZE: u8 = 114;
 
 // Bytes
-pub const INSTR_BYTES_REF: u8 = 113;
-pub const INSTR_BYTES_SET: u8 = 114;
-pub const INSTR_BYTES_SIZE: u8 = 122;
+pub const INSTR_BYTES_REF: u8 = 115;
+pub const INSTR_BYTES_SET: u8 = 116;
+pub const INSTR_BYTES_SIZE: u8 = 117;
 
 // Misc
-pub const INSTR_GET_LOCAL: u8 = 74;
-pub const INSTR_SET_LOCAL: u8 = 75;
-pub const INSTR_GLOBAL_ENV: u8 = 76;
-pub const INSTR_INVALID: u8 = 117;
-pub const INSTR_HALT: u8 = 118;
+pub const INSTR_GET_LOCAL: u8 = 118;
+pub const INSTR_SET_LOCAL: u8 = 119;
+pub const INSTR_GLOBAL_ENV: u8 = 120;
+pub const INSTR_INVALID: u8 = 121;
+pub const INSTR_HALT: u8 = 122;
 pub const INSTR_NOP: u8 = 0;
-pub const INSTR_RETURN: u8 = 119;
-pub const INSTR_APPLY: u8 = 123; // TODO
-pub const INSTR_APPLY_TAIL: u8 = 124; // TODO
+pub const INSTR_RETURN: u8 = 123;
+pub const INSTR_APPLY: u8 = 124; // TODO
+pub const INSTR_APPLY_TAIL: u8 = 125; // TODO
 
 pub(super) fn is_immediate_jump(op: u8) -> bool {
     matches!(

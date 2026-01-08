@@ -504,7 +504,7 @@ impl Runtime {
         let code = bytes.get_slice();
         let rest = &code[self.ip..];
         let v = rest.first_chunk::<4>().unwrap();
-        let size = u32::from_ne_bytes(*v) as usize;
+        let size = u32::from_le_bytes(*v) as usize;
         let bytes = &rest[4..4 + size];
         let res = Value::from(Bytes::with(self, bytes));
         self.stack_push(res);
