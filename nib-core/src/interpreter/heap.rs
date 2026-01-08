@@ -707,10 +707,10 @@ impl Array {
         }
     }
 
-    pub fn values_mut(&self) -> &[Value] {
+    pub fn values_mut(&self) -> &mut [Value] {
         unsafe {
             let ptr = get_object_ptr(self.ptr, 1) as *mut Value;
-            slice::from_raw_parts(ptr, self.size())
+            slice::from_raw_parts_mut(ptr, self.size())
         }
     }
 

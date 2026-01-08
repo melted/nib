@@ -315,8 +315,7 @@ impl Runtime {
             (ValueRepr::Object | ValueRepr::Array, ValueRepr::Object | ValueRepr::Array)
                 if op != INSTR_CMP =>
             {
-                let order = left.val.cmp(&right.val);
-                ordering_to_int(order)
+                if left.val == right.val { 0 } else { -1 }
             }
             (_, _) if op != INSTR_CMP => {
                 // TODO: look at type table
@@ -344,48 +343,52 @@ impl Runtime {
             ValueRepr::CallContinuation => count.get_cc_args(),
             _ => return self.error("call arg size must be integer or call continuation")
         };
-        let mut argv = self.stack.take(args);
-        match argv[0].get_repr() {
+        let fun = self.stack.peek(args);
+        match fun.get_repr() {
             ValueRepr::Closure => {
             }
             ValueRepr::PartialApplication => {
-                let pap = argv[0].get_array();
-                let closure = pap.at(0).get_closure();
-                argv.extend_from_slice(&pap.values()[1..]);
-                argv[0] = Value::from(closure)
+                let pap_array = fun.get_array();
+                let pap = pap_array.values();
+                self.stack.lift(args-1, pap.len());
+                let room = self.stack.slice_mut(pap.len(), args-1);
+                room.copy_from_slice(&pap);
             }
             _ => {
                 // Other callables, implement later
                 todo!()
             }
         };
-        self.make_call(op, &argv)?;
+        self.make_call(op, args)?;
         Ok(false)
     }
 
-    fn make_call(&mut self, op: u8, argv: &[Value]) -> Result<()> {
-        let closure = argv[0].get_closure();
+    fn make_call(&mut self, op: u8, args: usize) -> Result<()> {
+        let closure = self.stack.peek(args).get_closure();
         let fun_code = closure.code_value();
-        let args = argv.len() - 1;
         let env = closure.env().get_array();
-        if args < closure.num_args() {
+        if args-1 < closure.num_args() {
             // Underapplication, create a partial application
-            let pap = Array::with(self, argv);
+            let cargs = self.stack.take(args);
+            let pap = Array::with(self, &cargs);
             self.stack.push(Value::partial_application(pap));
             return Ok(())
         }
-        let mut extra_args = args - closure.num_args();
-        let mut new_args = Vec::new();
+        let extra_args = args - closure.num_args() - 1;
         if let Some(i) = closure.vararg() {
             let pos = i - 1; 
-            let var_arg = Array::with(self, &argv[pos..pos+extra_args]);
-            new_args.extend_from_slice(&argv[1..pos]);
-            new_args.push(Value::from(var_arg));
-            new_args.extend_from_slice(&argv[pos+extra_args..args]);
-            extra_args = 0;
-        } else {
-            new_args.extend_from_slice(&argv[1..closure.num_args()+1]);
-        };
+            let mut var_arg = Array::make(self, extra_args);
+            let argv = self.stack.slice_mut(args, 0);
+            var_arg.fill(&argv[pos..pos+extra_args], 0, extra_args);
+            argv.copy_within(pos+extra_args.., pos+1);
+            argv[args-extra_args..].fill(Value::nil());
+            argv[pos] = Value::from(var_arg);
+            self.stack.top -= extra_args;
+        } else if extra_args > 0 {
+            self.stack_push(Value::call_continuation(extra_args));
+            let elems = self.stack.slice_mut(args, 0);
+            elems.rotate_right(extra_args+1);
+        }
         match closure.get_tag() {
             TYPE_BYTECODE => {
                 if op == INSTR_CALL || extra_args > 0 {
@@ -394,15 +397,6 @@ impl Runtime {
                     let frame = vec![self.closure.clone(), Value::integer(self.ip as i64), Value::integer(self.stack.base as i64)];
                     self.call_stack.pushv(&frame);
                     self.stack.base = self.stack.top();
-                }
-                if extra_args > 0 {
-                    for i in argv[closure.num_args()+1..argv.len()].iter().rev() {
-                        self.stack_push(*i);
-                    }
-                    self.stack_push(Value::call_continuation(extra_args));
-                }
-                for i in new_args.iter().rev() {
-                    self.stack_push(*i);
                 }
                 self.local_env = self.closure.get_closure().env();
                 self.code = fun_code;
@@ -425,6 +419,7 @@ impl Runtime {
     fn op_return(&mut self) -> Result<bool> {
         let cc = self.stack.peek(1);
         if cc.is_call_continuation() {
+            self.stack.dip(cc.get_cc_args());
             self.op_call(INSTR_CALL_TAIL)
         } else {
             let old_base = self.call_stack.pop().get_integer() as usize;
@@ -805,17 +800,6 @@ impl Runtime {
             self.call_stack = self.stack_expand(self.call_stack);
         }
     }
-
-    fn make_underapplied_closure(&mut self, inner:Value, args: &[Value], arity:usize) -> Value {
-        // Todo: see if we can get the instructions from the bytecode compiler
-        let instrs = Vec::new();
-        for i in 0..args.len() {
-
-        }
-        let code = heap::Code::Bytecode(instrs);
-        let closure = Closure::make(self, &code, args, arity, None);
-        Value::from(closure)
-    }
 }
 
 
@@ -857,6 +841,18 @@ impl Stack {
         v
     }
 
+    pub(super) fn slice<'a>(&'a self, n:usize, d:usize) -> &'a [Value] {
+        let from = self.top - n - d;
+        let to = self.top - d;
+        &self.array.values()[from..to]
+    }
+
+    pub(super) fn slice_mut<'a>(&'a mut self, n:usize, d:usize) -> &'a mut [Value] {
+        let from = self.top - n - d;
+        let to = self.top - d;
+        &mut self.array.values_mut()[from..to]
+    }
+
     pub(super) fn pushv(&mut self, vals:&[Value]) {
         let n = vals.len();
         if self.top + n >= self.array.size() {
@@ -872,6 +868,12 @@ impl Stack {
     }
 
     pub(super) fn put(&mut self, i:usize, val:Value) {
+        self.array.set(self.top - i, val);
+    }
+
+    pub(super) fn dip(&mut self, i:usize) {
+        let val = self.pop();
+        self.lift(i, 1);
         self.array.set(self.top - i, val);
     }
 
