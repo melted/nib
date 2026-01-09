@@ -61,8 +61,10 @@ impl Module {
 pub(super) struct Compilation {
     module: Module,
     core_bindings: Vec<crate::core::Binding>,
-    next_loc: usize,
-    local_vars: HashMap<Symbol, usize>,
+    local_vars: Vec<(Symbol, usize)>,
+    max_var: usize,
+    used_vars: HashSet<usize>,
+    free_vars: HashSet<usize>,
     code: Vec<u8>,
     is_tail: bool,
 }
@@ -74,8 +76,10 @@ impl Compilation {
         let mut compilation = Compilation {
             module: Module::new(),
             core_bindings: bindings,
-            next_loc: 0,
-            local_vars: HashMap::new(),
+            max_var:0,
+            local_vars: Vec::new(),
+            used_vars: HashSet::new(),
+            free_vars: HashSet::new(),
             code: Vec::new(),
             is_tail: true,
         };
@@ -86,6 +90,7 @@ impl Compilation {
     pub(super) fn compile(&mut self) -> Result<()> {
         let bindings = mem::replace(&mut self.core_bindings, vec![]);
         let mut code = Vec::new();
+
         for b in bindings {
             self.is_tail = true;
             self.compile_binding(&b, true, &mut code)?;
@@ -244,9 +249,40 @@ impl Compilation {
         }
     }
 
+    fn lookup_var(&mut self, var: &Symbol) -> usize {
+        for (sym, addr) in &self.local_vars {
+            if var == sym {
+                return *addr;
+            }
+        }
+        if let Some(v) = self.module.captures.get(var) {
+            *v
+        } else {
+            let v = self.fresh_env_location();
+            self.module.captures.insert(*var, v);
+            v
+        }
+    }
+
+    fn free_local_var(&mut self, n:usize) {
+        self.used_vars.remove(&n);
+        self.free_vars.insert(n);
+    }
+
+    fn env_location(&mut self) -> usize {
+        let val = self.free_vars.iter().next().map(|u| *u);
+        if let Some(loc) = val {
+            self.free_vars.remove(&loc);
+            loc
+        } else {
+            self.fresh_env_location()
+        }
+    }
+
     fn fresh_env_location(&mut self) -> usize {
-        let n = self.next_loc;
-        self.next_loc += 1;
+        let n = self.max_var;
+        self.used_vars.insert(n);
+        self.max_var += 1;
         n
     }
 }
