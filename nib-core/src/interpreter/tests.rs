@@ -105,7 +105,7 @@ fn create_compilation() -> Result<()> {
     let mut ast_mod = Module::new(None, "a = 1");
     parse_declarations(&mut ast_mod)?;
     let core_mod = desugar(ast_mod)?;
-    let comp = Compilation::new(core_mod);
+    let comp = Compilation::with(core_mod);
     Ok(())
 }
 

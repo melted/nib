@@ -3,11 +3,7 @@ use crate::common::{Metadata, Name};
 use crate::common::{Result, Symbol};
 use crate::core::{Binder, Binding, Cond, Expression, Lambda, free_vars};
 use crate::interpreter::bytecode::{
-    INSTR_ALLOC_FLOAT, INSTR_CALL, INSTR_CALL_TAIL, INSTR_GET_LOCAL, INSTR_GLOBAL_ENV,
-    INSTR_JFALSE, INSTR_JFALSE_IMM8, INSTR_JNEG, INSTR_JNEG_IMM8, INSTR_JNFALSE,
-    INSTR_JNFALSE_IMM8, INSTR_JNNEG, INSTR_JNNEG_IMM8, INSTR_JNPOS, INSTR_JNPOS_IMM8, INSTR_JPOS,
-    INSTR_JPOS_IMM8, INSTR_JUMP, INSTR_JUMP_IMM8, INSTR_JZ, INSTR_JZ_IMM8, INSTR_LOAD_BYTES_IMM,
-    INSTR_LOAD_IMM8, INSTR_LOAD_IMM16, INSTR_LOAD_IMM32, INSTR_LOAD_IMM64, INSTR_SET_TYPE, INSTR_TABLE_GET,
+    INSTR_ALLOC_FLOAT, INSTR_CALL, INSTR_CALL_TAIL, INSTR_GET_LOCAL, INSTR_GLOBAL_ENV, INSTR_JFALSE, INSTR_JFALSE_IMM8, INSTR_JNEG, INSTR_JNEG_IMM8, INSTR_JNFALSE, INSTR_JNFALSE_IMM8, INSTR_JNNEG, INSTR_JNNEG_IMM8, INSTR_JNPOS, INSTR_JNPOS_IMM8, INSTR_JPOS, INSTR_JPOS_IMM8, INSTR_JUMP, INSTR_JUMP_IMM8, INSTR_JZ, INSTR_JZ_IMM8, INSTR_LOAD_BYTES_IMM, INSTR_LOAD_IMM8, INSTR_LOAD_IMM16, INSTR_LOAD_IMM32, INSTR_LOAD_IMM64, INSTR_RETURN, INSTR_SET_TYPE, INSTR_STACK_LOAD, INSTR_TABLE_GET
 };
 use crate::interpreter::heap::Value;
 use std::collections::{HashMap, HashSet};
@@ -15,7 +11,7 @@ use std::mem;
 
 pub fn compile(from: crate::core::Module) -> Result<Module> {
     let module = Module::new();
-    let mut compilation = Compilation::new(from);
+    let mut compilation = Compilation::with(from);
     compilation.compile()?;
     Ok(compilation.module)
 }
@@ -60,8 +56,17 @@ impl Module {
 #[derive(Debug, Clone)]
 pub(super) struct Compilation {
     module: Module,
-    core_bindings: Vec<crate::core::Binding>,
+    input: CompilationInput,
     local_vars: Vec<(Symbol, usize)>,
+    stack_vars: Vec<(Symbol, usize)>,
+
+    /// Future bindings in this scope, so we can bind to them instead of trying to import a global
+    /// of the same name.
+    future_bindings: HashSet<Symbol>,
+    /// This is requested fixups for bindings not yet in scope when a lambda was defined, the first usize
+    /// is where the lambdas environment is in the local environment and the second is the offset in the
+    /// lambda's environment
+    fixups_needed: HashMap<Symbol, Vec<(usize, usize)>>,
     max_var: usize,
     used_vars: HashSet<usize>,
     free_vars: HashSet<usize>,
@@ -69,32 +74,58 @@ pub(super) struct Compilation {
     is_tail: bool,
 }
 
+#[derive(Debug, Default, Clone)]
+pub enum CompilationInput {
+    #[default]
+    Nothing,
+    Bindings(Vec<Binding>),
+    Expression(Expression)
+}
+
 impl Compilation {
-    pub(super) fn new(from: crate::core::Module) -> Self {
-        let metadata = from.metadata;
-        let bindings = from.bindings;
-        let mut compilation = Compilation {
+    pub(super) fn new() -> Self {
+        Compilation {
             module: Module::new(),
-            core_bindings: bindings,
+            input: CompilationInput::Nothing,
+            stack_vars: Vec::new(),
             max_var:0,
             local_vars: Vec::new(),
+
+            future_bindings: HashSet::new(),
+
+
+            fixups_needed: HashMap::new(),
             used_vars: HashSet::new(),
             free_vars: HashSet::new(),
             code: Vec::new(),
             is_tail: true,
-        };
-        compilation.module.metadata = Some(metadata);
+        }
+    }
+
+    pub(super) fn with(module: crate::core::Module) -> Self {
+        let mut compilation = Compilation::new();
+        compilation.input = CompilationInput::Bindings(module.bindings);
+        compilation.module.metadata = Some(module.metadata);
         compilation
     }
 
     pub(super) fn compile(&mut self) -> Result<()> {
-        let bindings = mem::replace(&mut self.core_bindings, vec![]);
+        let input = mem::take(&mut self.input);
         let mut code = Vec::new();
 
-        for b in bindings {
-            self.is_tail = true;
-            self.compile_binding(&b, true, &mut code)?;
+        match input {
+            CompilationInput::Nothing => {}
+            CompilationInput::Bindings(bindings) => {
+                self.collect_binding_names(&bindings);
+                for b in bindings {
+                    self.compile_binding(&b, true, &mut code)?;
+                }
+            },
+            CompilationInput::Expression(expression) => {
+                self.compile_expression(&expression, &mut code)?;
+            },
         }
+        code.push(INSTR_RETURN);
         self.module.bcode = code;
         Ok(())
     }
@@ -105,6 +136,7 @@ impl Compilation {
         top_level: bool,
         code: &mut Vec<u8>,
     ) -> Result<()> {
+        self.is_tail = true;
         self.compile_expression(&binding.body, code)?;
         match &binding.binder {
             Binder::Public(Name::Qualified(path, name)) => todo!(),
@@ -121,11 +153,32 @@ impl Compilation {
         }
     }
 
+    fn collect_binding_names(&mut self, bindings:&[Binding]) {
+        for b in bindings {
+            match &b.binder {
+                Binder::Public(name) |  Binder::Local(name) => {
+                    self.future_bindings.insert(name.top());
+                },
+                Binder::Unbound => {},
+            }
+        }
+    }
+
     fn compile_expression(&mut self, expression: &Expression, code: &mut Vec<u8>) -> Result<()> {
         match expression {
             Expression::Literal(_, literal) => self.compile_literal(literal, code),
             Expression::Var(_, var) => {
-                todo!()
+                match self.lookup_var(var) {
+                    VarLocation::Stack(loc) => {
+                        load_constant_int(loc as i64, code);
+                        code.push(INSTR_STACK_LOAD);
+                    },
+                    VarLocation::Env(loc) => {
+                        load_constant_int(loc as i64, code);
+                        code.push(INSTR_GET_LOCAL);
+                    },
+                }
+                Ok(())
             }
             Expression::Lambda(_, lambda) => {
                 let mut free = HashSet::new();
@@ -194,6 +247,10 @@ impl Compilation {
         locals: HashMap<Symbol, i32>,
         code: &mut Vec<u8>,
     ) -> Result<()> {
+        let mut fun_compilation = Compilation::new();
+        for (i, arg) in lambda.args.iter().enumerate() {
+            fun_compilation.stack_vars.push((*arg, i+1));
+        }
         Ok(())
     }
 
@@ -217,12 +274,19 @@ impl Compilation {
     fn compile_application(&mut self, exps: &[Expression], code: &mut Vec<u8>) -> Result<()> {
         let is_tail = self.is_tail;
         self.is_tail = false;
+        let callee = &exps[0];
+
         for e in exps {
             self.compile_expression(e, code)?;
         }
+
         load_constant_int(exps.len() as i64, code);
         code.push(if is_tail { INSTR_CALL_TAIL } else { INSTR_CALL });
         Ok(())
+    }
+
+    fn compile_bytecode_primitive(&mut self, prim: &Symbol, code: &mut Vec<u8>) -> Result<()> {
+        todo!()
     }
 
     fn compile_where(
@@ -249,18 +313,23 @@ impl Compilation {
         }
     }
 
-    fn lookup_var(&mut self, var: &Symbol) -> usize {
-        for (sym, addr) in &self.local_vars {
+    fn lookup_var(&mut self, var: &Symbol) -> VarLocation {
+        for (sym, loc) in &self.stack_vars {
             if var == sym {
-                return *addr;
+                return VarLocation::Stack(*loc);
+            }
+        }
+        for (sym, loc) in &self.local_vars {
+            if var == sym {
+                return VarLocation::Env(*loc);
             }
         }
         if let Some(v) = self.module.captures.get(var) {
-            *v
+            VarLocation::Env(*v)
         } else {
             let v = self.fresh_env_location();
             self.module.captures.insert(*var, v);
-            v
+            VarLocation::Env(v)
         }
     }
 
@@ -285,6 +354,11 @@ impl Compilation {
         self.max_var += 1;
         n
     }
+}
+
+enum VarLocation {
+    Stack(usize),
+    Env(usize)
 }
 
 fn load_constant_int(n: i64, code: &mut Vec<u8>) {
@@ -333,4 +407,15 @@ fn short_jump_op(op: u8) -> u8 {
         INSTR_JZ => INSTR_JZ_IMM8,
         _ => op,
     }
+}
+
+fn is_bytecode_primitive(prim:&Symbol) -> bool {
+    matches!(prim.as_str(),
+        "__prim_add" | "__prim_sub" | "__prim_mul" |
+        "__prim_div" | "__prim_mod" | "__prim_type" |
+        "__prim_type_set" | "__prim_negate" | "__prim_gte" |
+        "__prim_gt" | "__prim_lte" |"__prim_lt" | "__prim_eq" | "_prim_array_ref" | "_prim_array_set" | "_prim_array_create" |
+        "_prim_array_size" | "_prim_symbol_make" | "_prim_bytes_ref" | "_prim_bytes_set" | "_prim_bytes_create" | "_prim_bytes_size" |
+        "_prim_table_create" | "_prim_table_set" |
+        "_prim_table_size")
 }
