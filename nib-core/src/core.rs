@@ -1,3 +1,5 @@
+use symbol_table::static_symbol;
+
 use crate::ast::{ExpressionNode, Pattern};
 use crate::common::Symbol;
 use crate::{
@@ -213,22 +215,22 @@ impl DesugarState {
                     Expression::App(pattern.id, vec![name_expr(name), expr.clone()]),
                 ));
                 let failed = app(&vec![
-                    var(&Symbol::from("_prim_eq")),
+                    var(&static_symbol!("_prim_eq")),
                     var(&loc),
                     literal(&Literal::Bool(false)),
                 ]);
-                let success = app(&vec![var(&Symbol::from("_prim_bitnot")), failed]);
+                let success = app(&vec![var(&static_symbol!("_prim_bitnot")), failed]);
                 parts.push(PatternParts::Check(success));
-                let size = app(&vec![var(&Symbol::from("_prim_array_size")), var(&loc)]);
+                let size = app(&vec![var(&static_symbol!("_prim_array_size")), var(&loc)]);
                 let size_check = app(&vec![
-                    var(&Symbol::from("_prim_eq")),
+                    var(&static_symbol!("_prim_eq")),
                     size,
                     literal(&Literal::Integer(fields.len() as i64)),
                 ]);
                 parts.push(PatternParts::Check(size_check));
                 for (i, f) in fields.iter().enumerate() {
                     let refer = app(&vec![
-                        var(&Symbol::from("_prim_array_ref")),
+                        var(&static_symbol!("_prim_array_ref")),
                         var(&loc),
                         literal(&Literal::Integer(i as i64)),
                     ]);
@@ -257,7 +259,7 @@ impl DesugarState {
             Pattern::Literal(lit) => {
                 // TODO: Generate appropriate check for each literal type
                 let check = app(&vec![
-                    var(&Symbol::from("_prim_eq")),
+                    var(&static_symbol!("_prim_eq")),
                     expr.clone(),
                     literal(lit),
                 ]);
@@ -271,9 +273,9 @@ impl DesugarState {
                         val = var(name);
                     }
                 }
-                let get_type = app(&vec![var(&Symbol::from("_prim_type")), val]);
+                let get_type = app(&vec![var(&static_symbol!("_prim_type")), val]);
                 let check = app(&vec![
-                    var(&Symbol::from("_prim_eq")),
+                    var(&static_symbol!("_prim_eq")),
                     get_type,
                     name_expr(typ),
                 ]);
@@ -347,7 +349,7 @@ impl DesugarState {
 
     fn no_match_expression() -> Expression {
         app(&vec![
-            var(&Symbol::from("_prim_panic")),
+            var(&static_symbol!("_prim_panic")),
             literal(&Literal::String("No matching pattern".to_owned())),
         ])
     }
@@ -445,13 +447,13 @@ impl DesugarState {
         let mut p = pattern.clone();
         match &pattern.pattern {
             Pattern::Ellipsis(Some(old)) => {
-                let n = Name::Plain(Symbol::from(format!("z{}", counter)));
+                let n = Name::Plain(Symbol::from(format!("$z{}", counter)));
                 *counter += 1;
                 replacements.insert(n.clone(), old.clone());
                 p.pattern = Pattern::Ellipsis(Some(n));
             }
             Pattern::Var(old) => {
-                let n = Name::Plain(Symbol::from(format!("z{}", counter)));
+                let n = Name::Plain(Symbol::from(format!("$z{}", counter)));
                 *counter += 1;
                 replacements.insert(n.clone(), old.clone());
                 p.pattern = Pattern::Var(n)
@@ -464,7 +466,7 @@ impl DesugarState {
                 p.pattern = Pattern::Array(new_arr);
             }
             Pattern::Alias(pat, old) => {
-                let n = Name::Plain(Symbol::from(format!("z{}", counter)));
+                let n = Name::Plain(Symbol::from(format!("$z{}", counter)));
                 *counter += 1;
                 replacements.insert(n.clone(), old.clone());
                 let new_pat = self.pattern_with_plain_vars(pat, counter, replacements);

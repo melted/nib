@@ -417,6 +417,10 @@ fn is_bytecode_primitive(prim:&Symbol) -> bool {
         "__prim_div" | "__prim_mod" | "__prim_type" |
         "__prim_type_set" | "__prim_negate" | "__prim_gte" |
         "__prim_gt" | "__prim_lte" |"__prim_lt" | "__prim_eq" |
+        "__prim_sin" | "__prim_cos" | "__prim_tan" |
+        "__prim_asin" | "__prim_acos" | "__prim_atan" |
+        "__prim_ceiling" | "__prim_floor" | "__prim_round" |
+        "__prim_log" | "__prim_exp" | "__prim_to_int" |
         "_prim_array_ref" | "_prim_array_set" | "_prim_array_create" |
         "_prim_array_size" | "_prim_symbol_make" | "_prim_bytes_ref" |
          "_prim_bytes_set" | "_prim_bytes_create" | "_prim_bytes_size" |

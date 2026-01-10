@@ -1,5 +1,7 @@
 use std::ffi::c_void;
 
+use symbol_table::static_symbol;
+
 use crate::{
     common::{Name, Result, Symbol, sym},
     core::Arity,
@@ -56,9 +58,6 @@ impl Runtime {
 
         let symbol_make = self.make_primitive(prim_symbol_make, Arity::Fixed(1));
         self.set_global(&sym("_prim_symbol_make"), &symbol_make);
-
-        let ceiling = self.make_primitive(prim_ceiling, Arity::Fixed(1));
-        self.set_global(&sym("_prim_ceiling"), &ceiling);
 
         Ok(())
     }
@@ -125,7 +124,7 @@ impl Runtime {
     pub fn make_string(&mut self, s: &str) -> Value {
         let b = Bytes::with(self, s.as_bytes());
         let type_table = self
-            .get_module_path(&[Symbol::from("string")], self.global_env)
+            .get_module_path(&[static_symbol!("string")], self.global_env)
             .unwrap_or(Value::nil());
         // If the string type table doesn't exist yet, leave it
         // as nil. This will happen when the string type table
@@ -230,109 +229,6 @@ fn prim_string_substring(rt: &mut Runtime) -> Result<()> {
 }
 
 fn prim_to_char(rt: &mut Runtime) -> Result<()> {
-    Ok(())
-}
-
-fn prim_ceiling(rt: &mut Runtime) -> Result<()> {
-    let x = rt.stack.pop();
-    ensure_type(&x, ValueRepr::Float)?;
-    let res = x.get_float().ceil();
-    let alloced = Value::alloc_float(rt, res);
-    rt.stack_push(alloced);
-    Ok(())
-}
-
-fn prim_floor(rt: &mut Runtime) -> Result<()> {
-    let x = rt.stack.pop();
-    ensure_type(&x, ValueRepr::Float)?;
-    let res = x.get_float().floor();
-    let alloced = Value::alloc_float(rt, res);
-    rt.stack_push(alloced);
-    Ok(())
-}
-
-fn prim_round(rt: &mut Runtime) -> Result<()> {
-    let x = rt.stack.pop();
-    ensure_type(&x, ValueRepr::Float)?;
-    let res = x.get_float().round();
-    let alloced = Value::alloc_float(rt, res);
-    rt.stack_push(alloced);
-    Ok(())
-}
-
-fn prim_sin(rt: &mut Runtime) -> Result<()> {
-    let x = rt.stack.pop();
-    ensure_type(&x, ValueRepr::Float)?;
-    let res = x.get_float().sin();
-    let alloced = Value::alloc_float(rt, res);
-    rt.stack_push(alloced);
-    Ok(())
-}
-
-fn prim_cos(rt: &mut Runtime) -> Result<()> {
-    let x = rt.stack.pop();
-    ensure_type(&x, ValueRepr::Float)?;
-    let res = x.get_float().cos();
-    let alloced = Value::alloc_float(rt, res);
-    rt.stack_push(alloced);
-    Ok(())
-}
-
-fn prim_tan(rt: &mut Runtime) -> Result<()> {
-    let x = rt.stack.pop();
-    ensure_type(&x, ValueRepr::Float)?;
-    let res = x.get_float().tan();
-    let alloced = Value::alloc_float(rt, res);
-    rt.stack_push(alloced);
-    Ok(())
-}
-
-fn prim_asin(rt: &mut Runtime) -> Result<()> {
-    let x = rt.stack.pop();
-    ensure_type(&x, ValueRepr::Float)?;
-    let res = x.get_float().asin();
-    let alloced = Value::alloc_float(rt, res);
-    rt.stack_push(alloced);
-    Ok(())
-}
-
-fn prim_acos(rt: &mut Runtime) -> Result<()> {
-    let x = rt.stack.pop();
-    ensure_type(&x, ValueRepr::Float)?;
-    let res = x.get_float().acos();
-    let alloced = Value::alloc_float(rt, res);
-    rt.stack_push(alloced);
-    Ok(())
-}
-
-fn prim_atan(rt: &mut Runtime) -> Result<()> {
-    let x = rt.stack.pop();
-    ensure_type(&x, ValueRepr::Float)?;
-    let res = x.get_float().atan();
-    let alloced = Value::alloc_float(rt, res);
-    rt.stack_push(alloced);
-    Ok(())
-}
-
-fn prim_log(rt: &mut Runtime) -> Result<()> {
-    let x = rt.stack.pop();
-    ensure_type(&x, ValueRepr::Float)?;
-    let res = x.get_float().ln();
-    let alloced = Value::alloc_float(rt, res);
-    rt.stack_push(alloced);
-    Ok(())
-}
-
-fn prim_exp(rt: &mut Runtime) -> Result<()> {
-    let x = rt.stack.pop();
-    ensure_type(&x, ValueRepr::Float)?;
-    let res = x.get_float().exp();
-    let alloced = Value::alloc_float(rt, res);
-    rt.stack_push(alloced);
-    Ok(())
-}
-
-fn prim_to_int(rt: &mut Runtime) -> Result<()> {
     Ok(())
 }
 

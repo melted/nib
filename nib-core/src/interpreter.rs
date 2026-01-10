@@ -7,7 +7,9 @@ use std::cmp::Ordering;
 use std::ffi::c_void;
 use std::ops::BitXor;
 
-use crate::common::{Error, Name, Result, Symbol};
+use symbol_table::static_symbol;
+
+use crate::common::{Error, Name, Result, Symbol, symbol_id};
 use crate::interpreter::bytecode::*;
 use crate::interpreter::heap::{
     Array, Bytes, Closure, Heap, TYPE_BYTECODE, TYPE_EXTERN, Table, Value, ValueRepr, set_value,
@@ -175,6 +177,8 @@ impl Runtime {
             INSTR_ADD..=INSTR_MOD => self.op_arithmetic(instr),
             INSTR_NEG => self.op_negate(),
             INSTR_CMP..=INSTR_NEQ => self.op_compare(instr),
+            INSTR_SIN..=INSTR_EXP => self.op_float(instr),
+            INSTR_TOINT => self.op_toint(),
             INSTR_CALL..=INSTR_CALL_TAIL => self.op_call(instr),
             INSTR_RETURN => self.op_return(),
             INSTR_JUMP..=INSTR_JUMP_IMM8 => self.op_jump(instr),
@@ -328,6 +332,42 @@ impl Runtime {
             _ => unreachable!(),
         };
         self.stack_push(val);
+        Ok(false)
+    }
+
+    fn op_float(&mut self, op: u8) -> Result<bool> {
+        let val = self.stack.pop().get_float();
+        let res = match op {
+            INSTR_SIN => val.sin(),
+            INSTR_COS => val.cos(),
+            INSTR_TAN => val.tan(),
+            INSTR_ASIN => val.asin(),
+            INSTR_ACOS => val.acos(),
+            INSTR_ATAN => val.atan(),
+            INSTR_CEILING => val.ceil(),
+            INSTR_FLOOR => val.floor(),
+            INSTR_ROUND => val.round(),
+            INSTR_LOG => val.ln(),
+            INSTR_EXP => val.exp(),
+            _ => unreachable!()
+        };
+        let res_val = Value::alloc_float(self, res);
+        self.stack.push(res_val);
+        Ok(false)
+    }
+
+    fn op_toint(&mut self) -> Result<bool> {
+        let val = self.stack.pop();
+        let res = match val.get_immediate_repr() {
+            ValueRepr::Integer => val,
+            ValueRepr::Bool => if val.get_bool() { Value::integer(1) } else { Value::integer(0) },
+            ValueRepr::Char => Value::integer(u32::from(val.get_char()) as i64),
+            ValueRepr::Pointer => Value::integer(val.get_cpointer::<*const c_void>().addr() as i64),
+            ValueRepr::Symbol => Value::integer(symbol_id(&val.get_symbol()) as i64),
+            ValueRepr::Float => Value::integer(val.get_float() as i64),
+            _ => Value::nil()
+        };
+        self.stack.push(res);
         Ok(false)
     }
 
@@ -558,22 +598,22 @@ impl Runtime {
     fn op_type(&mut self) -> Result<bool> {
         let val = self.stack.pop();
         let typ = match val.get_repr() {
-            ValueRepr::Nil => self.get_global(&Symbol::from("nil_type")),
+            ValueRepr::Nil => self.get_global(&static_symbol!("nil_type")),
             ValueRepr::Undefined => Value::nil(),
-            ValueRepr::Bool => self.get_global(&Symbol::from("bool")),
-            ValueRepr::Integer => self.get_global(&Symbol::from("int")),
-            ValueRepr::Pointer => self.get_global(&Symbol::from("pointer")),
-            ValueRepr::Char => self.get_global(&Symbol::from("char")),
-            ValueRepr::Float => self.get_global(&Symbol::from("float")),
+            ValueRepr::Bool => self.get_global(&static_symbol!("bool")),
+            ValueRepr::Integer => self.get_global(&static_symbol!("int")),
+            ValueRepr::Pointer => self.get_global(&static_symbol!("pointer")),
+            ValueRepr::Char => self.get_global(&static_symbol!("char")),
+            ValueRepr::Float => self.get_global(&static_symbol!("float")),
             ValueRepr::BoxedInteger => todo!(),
-            ValueRepr::Symbol => self.get_global(&Symbol::from("symbol")),
-            ValueRepr::CallContinuation => self.get_global(&Symbol::from("call_continuation")),
-            ValueRepr::PartialApplication => self.get_global(&Symbol::from("partial_application")),
+            ValueRepr::Symbol => self.get_global(&static_symbol!("symbol")),
+            ValueRepr::CallContinuation => self.get_global(&static_symbol!("call_continuation")),
+            ValueRepr::PartialApplication => self.get_global(&static_symbol!("partial_application")),
             ValueRepr::Array => {
                 let arr = val.get_array();
                 let mut type_table = arr.type_table();
                 if type_table == Value::nil() {
-                    type_table = self.get_global(&Symbol::from("array"));
+                    type_table = self.get_global(&static_symbol!("array"));
                 }
                 type_table
             }
@@ -581,7 +621,7 @@ impl Runtime {
                 let bytes = val.get_bytes();
                 let mut type_table = bytes.type_table();
                 if type_table == Value::nil() {
-                    type_table = self.get_global(&Symbol::from("bytes"));
+                    type_table = self.get_global(&static_symbol!("bytes"));
                 }
                 type_table
             }
@@ -589,7 +629,7 @@ impl Runtime {
                 let table = val.get_table();
                 let mut type_table = table.type_table();
                 if type_table == Value::nil() {
-                    type_table = self.get_global(&Symbol::from("table"));
+                    type_table = self.get_global(&static_symbol!("table"));
                 }
                 type_table
             }
@@ -597,7 +637,7 @@ impl Runtime {
                 let closure = val.get_closure();
                 let mut type_table = closure.type_table();
                 if type_table == Value::nil() {
-                    type_table = self.get_global(&Symbol::from("function"));
+                    type_table = self.get_global(&static_symbol!("function"));
                 }
                 type_table
             }
