@@ -80,6 +80,11 @@ pub enum Instruction {
     Invalid = 255,
 }
 
+// Comparisons
+pub const INSTR_GT: u8 = 29;
+pub const INSTR_GTE: u8 = 30;
+pub const INSTR_LT: u8 = 31;
+pub const INSTR_LTE: u8 = 32;
 
 // Arithmetic
 pub const INSTR_ADD: u8 = 33;
@@ -135,6 +140,7 @@ pub const INSTR_LOAD_IMM16: u8 = 74;
 pub const INSTR_LOAD_IMM32: u8 = 75;
 pub const INSTR_LOAD_IMM64: u8 = 76;
 pub const INSTR_LOAD_BYTES_IMM: u8 = 77;
+pub const INSTR_ROT: u8 = 78;
 
 // Branches
 pub const INSTR_JUMP: u8 = 80;
@@ -195,4 +201,17 @@ pub const INSTR_APPLY_TAIL: u8 = 125; // TODO
 
 pub(super) fn is_immediate_jump(op: u8) -> bool {
     op >= INSTR_JUMP_IMM8 && op <= INSTR_JNFALSE_IMM8
+}
+
+pub(super) fn stack_return(op: u8) -> usize {
+    match op {
+        INSTR_SWAP | INSTR_DROP | INSTR_ROT | INSTR_DROP_FRAME | INSTR_STACK_LIFT
+        | INSTR_STACK_STORE | INSTR_JUMP | INSTR_JZ | INSTR_JPOS | INSTR_JNEG | INSTR_JNPOS
+        | INSTR_JNNEG | INSTR_JFALSE | INSTR_JNFALSE | INSTR_JUMP_IMM8 | INSTR_JZ_IMM8
+        | INSTR_JPOS_IMM8 | INSTR_JNEG_IMM8 | INSTR_JNPOS_IMM8 | INSTR_JNNEG_IMM8
+        | INSTR_JFALSE_IMM8 | INSTR_JNFALSE_IMM8 | INSTR_SET_TYPE | INSTR_ARRAY_SET
+        | INSTR_TABLE_SET | INSTR_TABLE_DELETE | INSTR_BYTES_SET | INSTR_SET_LOCAL
+        | INSTR_INVALID | INSTR_HALT | INSTR_NOP => 0,
+        _ => 1,
+    }
 }

@@ -768,7 +768,6 @@ fn name_expr(n: &Name) -> Expression {
     }
 }
 
-
 fn local(n: usize) -> Symbol {
     Symbol::from(format!("$loc{}", n))
 }
@@ -861,7 +860,8 @@ pub fn rename(expr: &Expression, old_name: &Symbol, new_name: &Symbol) -> Expres
                 let mut new_binding = b.clone();
                 new_binding.body = new_body;
                 new_defs.push(new_binding);
-                if let Some(Name::Plain(x)) = &b.name && old_name == x
+                if let Some(Name::Plain(x)) = &b.name
+                    && old_name == x
                 {
                     shadowed = true;
                 }

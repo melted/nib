@@ -232,10 +232,7 @@ impl Runtime {
             }
             Expression::Var(_, var) => {
                 let Some(v) = self.lookup(env, &var) else {
-                    return self.error(&format!(
-                        "couldn't find variable {} in environment",
-                        &var
-                    ));
+                    return self.error(&format!("couldn't find variable {} in environment", &var));
                 };
                 eval_status.value_stack.push(v);
             }

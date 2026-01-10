@@ -174,6 +174,7 @@ impl Runtime {
         self.ip += 1;
         match instr {
             INSTR_NOP => Ok(false),
+            INSTR_GT..=INSTR_LTE => self.op_compare(instr),
             INSTR_BITAND..=INSTR_BITSHIFT => self.op_bitops(instr),
             INSTR_BITNOT => self.op_bitnot(),
             INSTR_ADD..=INSTR_MOD => self.op_arithmetic(instr),
@@ -184,7 +185,9 @@ impl Runtime {
             INSTR_CALL..=INSTR_CALL_TAIL => self.op_call(instr),
             INSTR_RETURN => self.op_return(),
             INSTR_JUMP | INSTR_JUMP_IMM8 => self.op_jump(instr),
-            INSTR_JZ..=INSTR_JNFALSE | INSTR_JZ_IMM8..=INSTR_JNFALSE_IMM8 => self.op_conditional_jump(instr),
+            INSTR_JZ..=INSTR_JNFALSE | INSTR_JZ_IMM8..=INSTR_JNFALSE_IMM8 => {
+                self.op_conditional_jump(instr)
+            }
             INSTR_STACK_LOAD => self.op_pick(),
             INSTR_STACK_STORE => self.op_put(),
             INSTR_LOAD_IMM8..=INSTR_LOAD_IMM64 => self.op_load_imm(instr),
@@ -192,6 +195,7 @@ impl Runtime {
             INSTR_DUP => self.op_dup(),
             INSTR_SWAP => self.op_swap(),
             INSTR_DROP => self.op_drop(),
+            INSTR_ROT => self.op_rot(),
             INSTR_DROP_FRAME => self.op_drop_frame(),
             INSTR_STACK_LIFT => self.op_stack_lift(),
             INSTR_ALLOC_FLOAT..=INSTR_ALLOC_CLOSURE => self.op_alloc(instr),
@@ -218,8 +222,14 @@ impl Runtime {
             INSTR_BITAND => lhs & rhs,
             INSTR_BITOR => lhs | rhs,
             INSTR_BITXOR => lhs ^ rhs,
-            INSTR_BITSHIFT => if rhs < 0 { lhs.shl(rhs.abs()) } else { lhs.shr(rhs) },
-            _ => unreachable!()
+            INSTR_BITSHIFT => {
+                if rhs < 0 {
+                    lhs.shl(rhs.abs())
+                } else {
+                    lhs.shr(rhs)
+                }
+            }
+            _ => unreachable!(),
         };
         self.stack.push(Value::integer(res));
         Ok(false)
@@ -348,6 +358,10 @@ impl Runtime {
             }
         };
         let val = match op {
+            INSTR_GT => if res > 0 { right } else { Value::bool(false) },
+            INSTR_GTE => if res >= 0 { right } else { Value::bool(false) },
+            INSTR_LT => if res < 0 { right } else { Value::bool(false) },
+            INSTR_LTE => if res <= 0 { right } else { Value::bool(false) },
             INSTR_CMP => Value::integer(res),
             INSTR_EQ => Value::bool(res == 0),
             INSTR_NEQ => Value::bool(res != 0),
@@ -371,7 +385,7 @@ impl Runtime {
             INSTR_ROUND => val.round(),
             INSTR_LOG => val.ln(),
             INSTR_EXP => val.exp(),
-            _ => unreachable!()
+            _ => unreachable!(),
         };
         let res_val = Value::alloc_float(self, res);
         self.stack.push(res_val);
@@ -382,12 +396,18 @@ impl Runtime {
         let val = self.stack.pop();
         let res = match val.get_immediate_repr() {
             ValueRepr::Integer => val,
-            ValueRepr::Bool => if val.get_bool() { Value::integer(1) } else { Value::integer(0) },
+            ValueRepr::Bool => {
+                if val.get_bool() {
+                    Value::integer(1)
+                } else {
+                    Value::integer(0)
+                }
+            }
             ValueRepr::Char => Value::integer(u32::from(val.get_char()) as i64),
             ValueRepr::Pointer => Value::integer(val.get_cpointer::<*const c_void>().addr() as i64),
             ValueRepr::Symbol => Value::integer(symbol_id(&val.get_symbol()) as i64),
             ValueRepr::Float => Value::integer(val.get_float() as i64),
-            _ => Value::nil()
+            _ => Value::nil(),
         };
         self.stack.push(res);
         Ok(false)
@@ -605,6 +625,16 @@ impl Runtime {
         Ok(false)
     }
 
+    fn op_rot(&mut self) -> Result<bool> {
+        let a = self.stack.pop();
+        let b = self.stack.pop();
+        let c = self.stack.pop();
+        self.stack.push(a);
+        self.stack.push(c);
+        self.stack.push(b);
+        Ok(false)
+    }
+
     fn op_drop_frame(&mut self) -> Result<bool> {
         self.stack.set_top(self.stack.base);
         Ok(false)
@@ -630,7 +660,9 @@ impl Runtime {
             ValueRepr::BoxedInteger => todo!(),
             ValueRepr::Symbol => self.get_global(&static_symbol!("symbol")),
             ValueRepr::CallContinuation => self.get_global(&static_symbol!("call_continuation")),
-            ValueRepr::PartialApplication => self.get_global(&static_symbol!("partial_application")),
+            ValueRepr::PartialApplication => {
+                self.get_global(&static_symbol!("partial_application"))
+            }
             ValueRepr::Array => {
                 let arr = val.get_array();
                 let mut type_table = arr.type_table();

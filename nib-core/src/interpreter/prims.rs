@@ -1,4 +1,8 @@
-use std::{collections::{HashMap, HashSet}, ffi::c_void, sync::LazyLock};
+use std::{
+    collections::{HashMap, HashSet},
+    ffi::c_void,
+    sync::LazyLock,
+};
 
 use symbol_table::static_symbol;
 
@@ -6,7 +10,12 @@ use crate::{
     common::{Name, Result, Symbol, sym},
     core::Arity,
     interpreter::{
-        Runtime, bytecode::{INSTR_ACOS, INSTR_ADD, INSTR_ALLOC_ARRAY, INSTR_ALLOC_BYTES, INSTR_ALLOC_TABLE, INSTR_ARRAY_REF, INSTR_ARRAY_SET, INSTR_ARRAY_SIZE, INSTR_ASIN, INSTR_ATAN, INSTR_BITAND, INSTR_BITNOT, INSTR_BITOR, INSTR_BITSHIFT, INSTR_BITXOR, INSTR_BYTES_REF, INSTR_BYTES_SET, INSTR_BYTES_SIZE, INSTR_CEILING, INSTR_CMP, INSTR_COS, INSTR_DIV, INSTR_EQ, INSTR_EXP, INSTR_FLOOR, INSTR_LOG, INSTR_MOD, INSTR_MUL, INSTR_NEG, INSTR_ROUND, INSTR_SET_TYPE, INSTR_SIN, INSTR_SUB, INSTR_TABLE_DELETE, INSTR_TABLE_GET, INSTR_TABLE_SET, INSTR_TABLE_SIZE, INSTR_TAN, INSTR_TOINT, INSTR_TYPE}, ensure_type, heap::{Bytes, Closure, Code, Table, Value, ValueRepr}
+        Runtime,
+        bytecode::{
+            INSTR_ACOS, INSTR_ADD, INSTR_ALLOC_ARRAY, INSTR_ALLOC_BYTES, INSTR_ALLOC_TABLE, INSTR_ARRAY_REF, INSTR_ARRAY_SET, INSTR_ARRAY_SIZE, INSTR_ASIN, INSTR_ATAN, INSTR_BITAND, INSTR_BITNOT, INSTR_BITOR, INSTR_BITSHIFT, INSTR_BITXOR, INSTR_BYTES_REF, INSTR_BYTES_SET, INSTR_BYTES_SIZE, INSTR_CEILING, INSTR_CMP, INSTR_COS, INSTR_DIV, INSTR_EQ, INSTR_EXP, INSTR_FLOOR, INSTR_GT, INSTR_GTE, INSTR_LOG, INSTR_LT, INSTR_LTE, INSTR_MOD, INSTR_MUL, INSTR_NEG, INSTR_ROUND, INSTR_SET_TYPE, INSTR_SIN, INSTR_SUB, INSTR_TABLE_DELETE, INSTR_TABLE_GET, INSTR_TABLE_SET, INSTR_TABLE_SIZE, INSTR_TAN, INSTR_TOINT, INSTR_TYPE
+        },
+        ensure_type,
+        heap::{Bytes, Closure, Code, Table, Value, ValueRepr},
     },
 };
 
@@ -241,8 +250,8 @@ fn prim_foreign_call(rt: &mut Runtime) -> Result<()> {
 
 /// Primitives that are implemented as bytecode instructions
 /// rather than calling out to a function.
-fn is_bytecode_primitive(prim:&Symbol) -> Option<u8> {
-    static BYTECODE_PRIMS:LazyLock<HashMap<Symbol, u8>> = LazyLock::new(|| {
+pub fn is_bytecode_primitive(prim: &Symbol) -> Option<u8> {
+    static BYTECODE_PRIMS: LazyLock<HashMap<Symbol, u8>> = LazyLock::new(|| {
         let mut prims = HashMap::new();
         prims.insert(static_symbol!("__prim_add"), INSTR_ADD);
         prims.insert(static_symbol!("__prim_sub"), INSTR_SUB);
@@ -257,10 +266,11 @@ fn is_bytecode_primitive(prim:&Symbol) -> Option<u8> {
         prims.insert(static_symbol!("__prim_type"), INSTR_TYPE);
         prims.insert(static_symbol!("__prim_type_set"), INSTR_SET_TYPE);
         prims.insert(static_symbol!("__prim_negate"), INSTR_NEG);
-        prims.insert(static_symbol!("__prim_gte"), INSTR_CMP);
-        prims.insert(static_symbol!("__prim_gt"), INSTR_CMP);
-        prims.insert(static_symbol!("__prim_lte"), INSTR_CMP);
-        prims.insert(static_symbol!("__prim_lt"), INSTR_CMP); 
+        prims.insert(static_symbol!("__prim_gte"), INSTR_GTE);
+        prims.insert(static_symbol!("__prim_gt"), INSTR_GT);
+        prims.insert(static_symbol!("__prim_lte"), INSTR_LTE);
+        prims.insert(static_symbol!("__prim_lt"), INSTR_LT);
+        prims.insert(static_symbol!("__prim_cmp"), INSTR_CMP);
         prims.insert(static_symbol!("__prim_eq"), INSTR_EQ);
         prims.insert(static_symbol!("__prim_sin"), INSTR_SIN);
         prims.insert(static_symbol!("__prim_cos"), INSTR_COS);
@@ -280,17 +290,14 @@ fn is_bytecode_primitive(prim:&Symbol) -> Option<u8> {
         prims.insert(static_symbol!("_prim_array_size"), INSTR_ARRAY_SIZE);
         prims.insert(static_symbol!("_prim_bytes_ref"), INSTR_BYTES_REF);
         prims.insert(static_symbol!("_prim_bytes_set"), INSTR_BYTES_SET);
-        prims.insert(static_symbol!("_prim_bytes_create"), INSTR_ALLOC_BYTES); 
+        prims.insert(static_symbol!("_prim_bytes_create"), INSTR_ALLOC_BYTES);
         prims.insert(static_symbol!("_prim_bytes_size"), INSTR_BYTES_SIZE);
         prims.insert(static_symbol!("_prim_table_create"), INSTR_ALLOC_TABLE);
         prims.insert(static_symbol!("_prim_table_set"), INSTR_TABLE_SET);
         prims.insert(static_symbol!("_prim_table_size"), INSTR_TABLE_SIZE);
         prims.insert(static_symbol!("_prim_table_get"), INSTR_TABLE_GET);
         prims.insert(static_symbol!("_prim_table_delete"), INSTR_TABLE_DELETE);
-        prims 
+        prims
     });
     BYTECODE_PRIMS.get(prim).copied()
 }
-
-
-

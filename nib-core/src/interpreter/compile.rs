@@ -1,16 +1,20 @@
-use symbol_table::static_symbol;
-
 use crate::ast::Literal;
 use crate::common::{Metadata, Name};
 use crate::common::{Result, Symbol};
 use crate::core::{Binder, Binding, Cond, Expression, Lambda, free_vars};
 use crate::interpreter::bytecode::{
-    INSTR_ALLOC_FLOAT, INSTR_CALL, INSTR_CALL_TAIL, INSTR_GET_LOCAL, INSTR_GLOBAL_ENV, INSTR_JFALSE, INSTR_JFALSE_IMM8, INSTR_JNEG, INSTR_JNEG_IMM8, INSTR_JNFALSE, INSTR_JNFALSE_IMM8, INSTR_JNNEG, INSTR_JNNEG_IMM8, INSTR_JNPOS, INSTR_JNPOS_IMM8, INSTR_JPOS, INSTR_JPOS_IMM8, INSTR_JUMP, INSTR_JUMP_IMM8, INSTR_JZ, INSTR_JZ_IMM8, INSTR_LOAD_BYTES_IMM, INSTR_LOAD_IMM8, INSTR_LOAD_IMM16, INSTR_LOAD_IMM32, INSTR_LOAD_IMM64, INSTR_RETURN, INSTR_SET_TYPE, INSTR_STACK_LOAD, INSTR_TABLE_GET
+    INSTR_ALLOC_FLOAT, INSTR_CALL, INSTR_CALL_TAIL, INSTR_CMP, INSTR_DROP, INSTR_DUP,
+    INSTR_GET_LOCAL, INSTR_GLOBAL_ENV, INSTR_JFALSE, INSTR_JFALSE_IMM8, INSTR_JNEG,
+    INSTR_JNEG_IMM8, INSTR_JNFALSE, INSTR_JNFALSE_IMM8, INSTR_JNNEG, INSTR_JNNEG_IMM8, INSTR_JNPOS,
+    INSTR_JNPOS_IMM8, INSTR_JPOS, INSTR_JPOS_IMM8, INSTR_JUMP, INSTR_JUMP_IMM8, INSTR_JZ,
+    INSTR_JZ_IMM8, INSTR_LOAD_BYTES_IMM, INSTR_LOAD_IMM8, INSTR_LOAD_IMM16, INSTR_LOAD_IMM32,
+    INSTR_LOAD_IMM64, INSTR_RETURN, INSTR_ROT, INSTR_SET_TYPE, INSTR_STACK_LOAD, INSTR_TABLE_GET,
 };
 use crate::interpreter::heap::Value;
+use crate::interpreter::prims::is_bytecode_primitive;
+use crate::interpreter::stack_return;
 use std::collections::{HashMap, HashSet};
 use std::mem;
-use std::sync::LazyLock;
 
 pub fn compile(from: crate::core::Module) -> Result<Module> {
     let module = Module::new();
@@ -30,13 +34,14 @@ pub fn compile_expression(expr: crate::core::Expression) -> Result<Module> {
 
 #[derive(Debug, Clone)]
 pub struct Module {
+    /// Possible metadata acquired when parsing and compiling
+    /// this module.
     metadata: Option<Metadata>,
-    bcode: Vec<u8>,
+    /// The bytecode
+    byte_code: Vec<u8>,
+    /// Size of local environment
     local_env_size: usize,
     /// A list of symbol literals that should be put into the local environment.
-    // TODO: Remove. Not needed. Can just load the symbol as an imm64
-    // Note, this would make the output bound to the process, is this what I want?
-    // I can serialize the module if I import the symbols from the environment.
     want_symbols: HashMap<Symbol, usize>,
     /// Global variables used by the module.
     captures: HashMap<Symbol, usize>,
@@ -46,7 +51,7 @@ impl Module {
     pub fn new() -> Self {
         Module {
             metadata: None,
-            bcode: Vec::new(),
+            byte_code: Vec::new(),
             local_env_size: 0,
             want_symbols: HashMap::new(),
             captures: HashMap::new(),
@@ -82,7 +87,7 @@ pub enum CompilationInput {
     #[default]
     Nothing,
     Bindings(Vec<Binding>),
-    Expression(Expression)
+    Expression(Expression),
 }
 
 impl Compilation {
@@ -91,11 +96,10 @@ impl Compilation {
             module: Module::new(),
             input: CompilationInput::Nothing,
             stack_vars: Vec::new(),
-            max_var:0,
+            max_var: 0,
             local_vars: Vec::new(),
 
             future_bindings: HashSet::new(),
-
 
             fixups_needed: HashMap::new(),
             used_vars: HashSet::new(),
@@ -123,13 +127,13 @@ impl Compilation {
                 for b in bindings {
                     self.compile_binding(&b, true, &mut code)?;
                 }
-            },
+            }
             CompilationInput::Expression(expression) => {
                 self.compile_expression(&expression, &mut code)?;
-            },
+            }
         }
         code.push(INSTR_RETURN);
-        self.module.bcode = code;
+        self.module.byte_code = code;
         Ok(())
     }
 
@@ -156,13 +160,13 @@ impl Compilation {
         }
     }
 
-    fn collect_binding_names(&mut self, bindings:&[Binding]) {
+    fn collect_binding_names(&mut self, bindings: &[Binding]) {
         for b in bindings {
             match &b.binder {
-                Binder::Public(name) |  Binder::Local(name) => {
+                Binder::Public(name) | Binder::Local(name) => {
                     self.future_bindings.insert(name.top());
-                },
-                Binder::Unbound => {},
+                }
+                Binder::Unbound => {}
             }
         }
     }
@@ -175,11 +179,11 @@ impl Compilation {
                     VarLocation::Stack(loc) => {
                         load_constant_int(loc as i64, code);
                         code.push(INSTR_STACK_LOAD);
-                    },
+                    }
                     VarLocation::Env(loc) => {
                         load_constant_int(loc as i64, code);
                         code.push(INSTR_GET_LOCAL);
-                    },
+                    }
                 }
                 Ok(())
             }
@@ -200,12 +204,10 @@ impl Compilation {
     fn compile_literal(&mut self, literal: &Literal, code: &mut Vec<u8>) -> Result<()> {
         match literal {
             Literal::Nil => {
-                code.push(INSTR_LOAD_IMM8);
-                code.push(0x36);
+                push_nil(code);
             }
             Literal::Bool(b) => {
-                code.push(INSTR_LOAD_IMM8);
-                code.push(if *b { 0x2e } else { 0x26 });
+                push_bool(*b, code);
             }
             Literal::Integer(n) => {
                 load_constant_int(*n, code);
@@ -252,7 +254,7 @@ impl Compilation {
     ) -> Result<()> {
         let mut fun_compilation = Compilation::new();
         for (i, arg) in lambda.args.iter().enumerate() {
-            fun_compilation.stack_vars.push((*arg, i+1));
+            fun_compilation.stack_vars.push((*arg, i + 1));
         }
         Ok(())
     }
@@ -278,13 +280,27 @@ impl Compilation {
         let is_tail = self.is_tail;
         self.is_tail = false;
         let callee = &exps[0];
-
-        for e in exps {
+        let bytecode_prim = if let Expression::Var(_, sym) = callee {
+            is_bytecode_primitive(sym)
+        } else {
+            self.compile_expression(callee, code)?;
+            None
+        };
+        for e in &exps[1..] {
             self.compile_expression(e, code)?;
         }
-
-        load_constant_int(exps.len() as i64, code);
-        code.push(if is_tail { INSTR_CALL_TAIL } else { INSTR_CALL });
+        match bytecode_prim {
+            Some(op) => {
+                code.push(op);
+                if stack_return(op) == 0 {
+                    push_nil(code);
+                }
+            }
+            None => {
+                load_constant_int(exps.len() as i64, code);
+                code.push(if is_tail { INSTR_CALL_TAIL } else { INSTR_CALL });
+            }
+        }
         Ok(())
     }
 
@@ -336,7 +352,7 @@ impl Compilation {
         }
     }
 
-    fn free_local_var(&mut self, n:usize) {
+    fn free_local_var(&mut self, n: usize) {
         self.used_vars.remove(&n);
         self.free_vars.insert(n);
     }
@@ -361,7 +377,7 @@ impl Compilation {
 
 enum VarLocation {
     Stack(usize),
-    Env(usize)
+    Env(usize),
 }
 
 fn load_constant_int(n: i64, code: &mut Vec<u8>) {
@@ -385,6 +401,16 @@ fn load_constant_int(n: i64, code: &mut Vec<u8>) {
             code.extend_from_slice(&v.val.to_le_bytes()[0..8]);
         }
     }
+}
+
+fn push_nil(code: &mut Vec<u8>) {
+    code.push(INSTR_LOAD_IMM8);
+    code.push(0x36);
+}
+
+fn push_bool(b: bool, code: &mut Vec<u8>) {
+    code.push(INSTR_LOAD_IMM8);
+    code.push(if b { 0x2e } else { 0x26 });
 }
 
 fn optimized_jump(op: u8, n: i64, code: &mut Vec<u8>) {
