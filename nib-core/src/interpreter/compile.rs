@@ -409,13 +409,17 @@ fn short_jump_op(op: u8) -> u8 {
     }
 }
 
+/// Primitives that are implemented as bytecode instructions
+/// rather than calling out to a function.
 fn is_bytecode_primitive(prim:&Symbol) -> bool {
     matches!(prim.as_str(),
         "__prim_add" | "__prim_sub" | "__prim_mul" |
         "__prim_div" | "__prim_mod" | "__prim_type" |
         "__prim_type_set" | "__prim_negate" | "__prim_gte" |
-        "__prim_gt" | "__prim_lte" |"__prim_lt" | "__prim_eq" | "_prim_array_ref" | "_prim_array_set" | "_prim_array_create" |
-        "_prim_array_size" | "_prim_symbol_make" | "_prim_bytes_ref" | "_prim_bytes_set" | "_prim_bytes_create" | "_prim_bytes_size" |
+        "__prim_gt" | "__prim_lte" |"__prim_lt" | "__prim_eq" |
+        "_prim_array_ref" | "_prim_array_set" | "_prim_array_create" |
+        "_prim_array_size" | "_prim_symbol_make" | "_prim_bytes_ref" |
+         "_prim_bytes_set" | "_prim_bytes_create" | "_prim_bytes_size" |
         "_prim_table_create" | "_prim_table_set" |
         "_prim_table_size")
 }
