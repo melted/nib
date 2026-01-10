@@ -223,6 +223,18 @@ impl Name {
         }
     }
 
+    pub fn tail(&self) -> Vec<Symbol> {
+        match self {
+            Name::Qualified(path, n) => {
+                let mut tail = Vec::new();
+                tail.extend_from_slice(&path[1..]);
+                tail.push(*n);
+                tail
+            }
+            Name::Plain(n) => vec![*n]
+        }
+    }
+
     pub fn append(path: &Name, base: &Name) -> Result<Name> {
         match (path, base) {
             (Name::Qualified(path, last), Name::Plain(b)) => {

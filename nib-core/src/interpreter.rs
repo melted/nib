@@ -211,6 +211,7 @@ impl Runtime {
             INSTR_GET_LOCAL => self.op_get_local(),
             INSTR_SET_LOCAL => self.op_set_local(),
             INSTR_GLOBAL_ENV => self.op_global_env(),
+            INSTR_IS_INTEGER..=INSTR_IS_IMMEDIATE => self.op_type_pred(instr),
             _ => self.error(&format!("unimplemented opcode: {}", instr)),
         }
     }
@@ -757,6 +758,30 @@ impl Runtime {
             _ => unreachable!(),
         };
         self.stack_push(val);
+        Ok(false)
+    }
+
+    fn op_type_pred(&mut self, op: u8) -> Result<bool> {
+        let val = self.stack.pop();
+        let res = match val.get_repr() {
+            ValueRepr::Nil => op == INSTR_IS_NIL,
+            ValueRepr::Undefined => false,
+            ValueRepr::Bool => op == INSTR_IS_BOOL,
+            ValueRepr::Integer => op == INSTR_IS_INTEGER,
+            ValueRepr::Pointer => op == INSTR_IS_POINTER,
+            ValueRepr::Char => op == INSTR_IS_CHAR,
+            ValueRepr::Float => op == INSTR_IS_FLOAT,
+            ValueRepr::BoxedInteger => false,
+            ValueRepr::Symbol => op == INSTR_IS_SYMBOL,
+            ValueRepr::Array => op == INSTR_IS_ARRAY,
+            ValueRepr::Bytes => op == INSTR_IS_BYTES,
+            ValueRepr::Table => op == INSTR_IS_TABLE,
+            ValueRepr::Closure => op == INSTR_IS_CLOSURE,
+            ValueRepr::Object => op == INSTR_IS_OBJECT,
+            ValueRepr::PartialApplication => op == INSTR_IS_PAP,
+            ValueRepr::CallContinuation => op == INSTR_IS_TABLE,
+        };
+        self.stack.push(Value::bool(res));
         Ok(false)
     }
 

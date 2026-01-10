@@ -199,6 +199,23 @@ pub const INSTR_RETURN: u8 = 123;
 pub const INSTR_APPLY: u8 = 124; // TODO
 pub const INSTR_APPLY_TAIL: u8 = 125; // TODO
 
+// Fast repr checks
+pub const INSTR_IS_INTEGER: u8 = 126;
+pub const INSTR_IS_CHAR: u8 = 127;
+pub const INSTR_IS_NIL: u8 = 128;
+pub const INSTR_IS_FLOAT: u8 = 129;
+pub const INSTR_IS_POINTER: u8 = 130;
+pub const INSTR_IS_BOOL: u8 = 131;
+pub const INSTR_IS_SYMBOL: u8 = 132;
+pub const INSTR_IS_ARRAY: u8 = 133;
+pub const INSTR_IS_BYTES: u8 = 134;
+pub const INSTR_IS_TABLE: u8 = 135;
+pub const INSTR_IS_CLOSURE: u8 = 136;
+pub const INSTR_IS_PAP: u8 = 137;
+pub const INSTR_IS_CALL_CONT: u8 = 138;
+pub const INSTR_IS_OBJECT: u8 = 139;
+pub const INSTR_IS_IMMEDIATE: u8 = 140;
+
 pub(super) fn is_immediate_jump(op: u8) -> bool {
     op >= INSTR_JUMP_IMM8 && op <= INSTR_JNFALSE_IMM8
 }

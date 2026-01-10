@@ -1,14 +1,11 @@
+use symbol_table::static_symbol;
+
 use crate::ast::Literal;
 use crate::common::{Metadata, Name};
 use crate::common::{Result, Symbol};
 use crate::core::{Binder, Binding, Cond, Expression, Lambda, free_vars};
 use crate::interpreter::bytecode::{
-    INSTR_ALLOC_FLOAT, INSTR_CALL, INSTR_CALL_TAIL, INSTR_CMP, INSTR_DROP, INSTR_DUP,
-    INSTR_GET_LOCAL, INSTR_GLOBAL_ENV, INSTR_JFALSE, INSTR_JFALSE_IMM8, INSTR_JNEG,
-    INSTR_JNEG_IMM8, INSTR_JNFALSE, INSTR_JNFALSE_IMM8, INSTR_JNNEG, INSTR_JNNEG_IMM8, INSTR_JNPOS,
-    INSTR_JNPOS_IMM8, INSTR_JPOS, INSTR_JPOS_IMM8, INSTR_JUMP, INSTR_JUMP_IMM8, INSTR_JZ,
-    INSTR_JZ_IMM8, INSTR_LOAD_BYTES_IMM, INSTR_LOAD_IMM8, INSTR_LOAD_IMM16, INSTR_LOAD_IMM32,
-    INSTR_LOAD_IMM64, INSTR_RETURN, INSTR_ROT, INSTR_SET_TYPE, INSTR_STACK_LOAD, INSTR_TABLE_GET,
+    INSTR_ALLOC_FLOAT, INSTR_ALLOC_TABLE, INSTR_CALL, INSTR_CALL_TAIL, INSTR_DUP, INSTR_GET_LOCAL, INSTR_GLOBAL_ENV, INSTR_IS_TABLE, INSTR_JFALSE, INSTR_JFALSE_IMM8, INSTR_JNEG, INSTR_JNEG_IMM8, INSTR_JNFALSE, INSTR_JNFALSE_IMM8, INSTR_JNNEG, INSTR_JNNEG_IMM8, INSTR_JNPOS, INSTR_JNPOS_IMM8, INSTR_JPOS, INSTR_JPOS_IMM8, INSTR_JUMP, INSTR_JUMP_IMM8, INSTR_JZ, INSTR_JZ_IMM8, INSTR_LOAD_BYTES_IMM, INSTR_LOAD_IMM8, INSTR_LOAD_IMM16, INSTR_LOAD_IMM32, INSTR_LOAD_IMM64, INSTR_RETURN, INSTR_SET_LOCAL, INSTR_SET_TYPE, INSTR_STACK_LOAD, INSTR_TABLE_GET, INSTR_TABLE_SET
 };
 use crate::interpreter::heap::Value;
 use crate::interpreter::prims::is_bytecode_primitive;
@@ -98,9 +95,7 @@ impl Compilation {
             stack_vars: Vec::new(),
             max_var: 0,
             local_vars: Vec::new(),
-
             future_bindings: HashSet::new(),
-
             fixups_needed: HashMap::new(),
             used_vars: HashSet::new(),
             free_vars: HashSet::new(),
@@ -127,6 +122,8 @@ impl Compilation {
                 for b in bindings {
                     self.compile_binding(&b, true, &mut code)?;
                 }
+                // Return nothing
+                push_nil(&mut code);
             }
             CompilationInput::Expression(expression) => {
                 self.compile_expression(&expression, &mut code)?;
@@ -146,18 +143,43 @@ impl Compilation {
         self.is_tail = true;
         self.compile_expression(&binding.body, code)?;
         match &binding.binder {
-            Binder::Public(Name::Qualified(path, name)) => todo!(),
+            Binder::Public(Name::Qualified(path, name)) => {
+                self.push_symbol(name, code);
+                let get_path = static_symbol!("__prim_get_path");
+                self.get_global_name(&get_path, code);
+                for s in path {
+                    self.push_symbol(s, code);
+                }
+                load_constant_int((path.len() + 1) as i64, code);
+                code.push(INSTR_CALL);
+                code.push(INSTR_TABLE_SET);
+            },
             Binder::Public(Name::Plain(name)) => {
-                todo!()
+                self.push_symbol(name, code);
+                code.push(INSTR_GLOBAL_ENV);
+                code.push(INSTR_TABLE_SET);
             }
             Binder::Local(Name::Qualified(path, name)) => {
-                todo!()
+                self.push_symbol(name, code);
+                let get_path = static_symbol!("__prim_get_path");
+                self.get_global_name(&get_path, code);
+                let (first, tail) = path.split_at(1);
+                self.get_local_table(&first[0], code);
+                for s in path {
+                    self.push_symbol(s, code);
+                }
+                load_constant_int((path.len() + 1) as i64, code);
+                code.push(INSTR_CALL);
+                code.push(INSTR_TABLE_SET);
             }
             Binder::Local(Name::Plain(name)) => {
-                todo!()
+                let h = self.local_top_var(&name);
+                load_constant_int(h as i64, code);
+                code.push(INSTR_SET_LOCAL);
             }
-            Binder::Unbound => Ok(()),
+            Binder::Unbound => {},
         }
+        Ok(())
     }
 
     fn collect_binding_names(&mut self, bindings: &[Binding]) {
@@ -332,13 +354,39 @@ impl Compilation {
         }
     }
 
+    fn push_symbol(&mut self, sym:&Symbol, code:&mut Vec<u8>) {
+        let sym_addr = self.get_symbol_slot(sym);
+        load_constant_int(sym_addr as i64, code);
+        code.push(INSTR_GET_LOCAL);
+    }
+
+    fn get_global_name(&mut self, sym:&Symbol, code:&mut Vec<u8>) {
+        self.push_symbol(&sym, code);
+        code.push(INSTR_GLOBAL_ENV);
+        code.push(INSTR_TABLE_GET);
+    }
+
+    fn get_local_table(&mut self, sym:&Symbol, code:&mut Vec<u8>) {
+        let h = self.local_top_var(&sym);
+        load_constant_int(h as i64, code);
+        code.push(INSTR_GET_LOCAL);
+        code.push(INSTR_DUP);
+        code.push(INSTR_IS_TABLE);
+        let mut create_table_code = Vec::new();
+        create_table_code.push(INSTR_ALLOC_TABLE);
+        load_constant_int(h as i64, &mut create_table_code);
+        create_table_code.push(INSTR_SET_LOCAL);
+        optimized_jump(INSTR_JFALSE, (create_table_code.len()+1) as i64, code);
+        code.extend_from_slice(&create_table_code);
+    }
+
     fn lookup_var(&mut self, var: &Symbol) -> VarLocation {
         for (sym, loc) in &self.stack_vars {
             if var == sym {
                 return VarLocation::Stack(*loc);
             }
         }
-        for (sym, loc) in &self.local_vars {
+        for (sym, loc) in self.local_vars.iter().rev() {
             if var == sym {
                 return VarLocation::Env(*loc);
             }
@@ -350,6 +398,17 @@ impl Compilation {
             self.module.captures.insert(*var, v);
             VarLocation::Env(v)
         }
+    }
+
+    fn local_top_var(&mut self, sym: &Symbol) -> usize {
+        for (var, loc) in self.local_vars.iter().rev() {
+            if  var == sym {
+                return *loc;
+            }
+        }
+        let nvar = self.fresh_env_location();
+        self.local_vars.push((*sym, nvar));
+        nvar
     }
 
     fn free_local_var(&mut self, n: usize) {
@@ -423,6 +482,7 @@ fn optimized_jump(op: u8, n: i64, code: &mut Vec<u8>) {
         code.push(op);
     }
 }
+
 
 fn short_jump_op(op: u8) -> u8 {
     match op {
