@@ -5,7 +5,7 @@
 
 use std::cmp::Ordering;
 use std::ffi::c_void;
-use std::ops::BitXor;
+use std::ops::{BitXor, Shl, Shr};
 
 use symbol_table::static_symbol;
 
@@ -174,6 +174,8 @@ impl Runtime {
         self.ip += 1;
         match instr {
             INSTR_NOP => Ok(false),
+            INSTR_BITAND..=INSTR_BITSHIFT => self.op_bitops(instr),
+            INSTR_BITNOT => self.op_bitnot(),
             INSTR_ADD..=INSTR_MOD => self.op_arithmetic(instr),
             INSTR_NEG => self.op_negate(),
             INSTR_CMP..=INSTR_NEQ => self.op_compare(instr),
@@ -181,8 +183,8 @@ impl Runtime {
             INSTR_TOINT => self.op_toint(),
             INSTR_CALL..=INSTR_CALL_TAIL => self.op_call(instr),
             INSTR_RETURN => self.op_return(),
-            INSTR_JUMP..=INSTR_JUMP_IMM8 => self.op_jump(instr),
-            INSTR_JZ..=INSTR_JNFALSE_IMM8 => self.op_conditional_jump(instr),
+            INSTR_JUMP | INSTR_JUMP_IMM8 => self.op_jump(instr),
+            INSTR_JZ..=INSTR_JNFALSE | INSTR_JZ_IMM8..=INSTR_JNFALSE_IMM8 => self.op_conditional_jump(instr),
             INSTR_STACK_LOAD => self.op_pick(),
             INSTR_STACK_STORE => self.op_put(),
             INSTR_LOAD_IMM8..=INSTR_LOAD_IMM64 => self.op_load_imm(instr),
@@ -207,6 +209,26 @@ impl Runtime {
             INSTR_GLOBAL_ENV => self.op_global_env(),
             _ => self.error(&format!("unimplemented opcode: {}", instr)),
         }
+    }
+
+    fn op_bitops(&mut self, op: u8) -> Result<bool> {
+        let lhs = self.stack.pop().get_integer();
+        let rhs = self.stack.pop().get_integer();
+        let res = match op {
+            INSTR_BITAND => lhs & rhs,
+            INSTR_BITOR => lhs | rhs,
+            INSTR_BITXOR => lhs ^ rhs,
+            INSTR_BITSHIFT => if rhs < 0 { lhs.shl(rhs.abs()) } else { lhs.shr(rhs) },
+            _ => unreachable!()
+        };
+        self.stack.push(Value::integer(res));
+        Ok(false)
+    }
+
+    fn op_bitnot(&mut self) -> Result<bool> {
+        let val = self.stack.pop().get_integer();
+        self.stack.push(Value::integer(!val));
+        Ok(false)
     }
 
     fn op_arithmetic(&mut self, op: u8) -> Result<bool> {

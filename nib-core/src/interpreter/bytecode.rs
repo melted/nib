@@ -80,6 +80,7 @@ pub enum Instruction {
     Invalid = 255,
 }
 
+
 // Arithmetic
 pub const INSTR_ADD: u8 = 33;
 pub const INSTR_SUB: u8 = 34;
@@ -94,11 +95,11 @@ pub const INSTR_EQ: u8 = 40;
 pub const INSTR_NEQ: u8 = 41;
 
 // Bit Logic
-pub const INSTR_BAND: u8 = 42;
-pub const INSTR_BOR: u8 = 43;
-pub const INSTR_BXOR: u8 = 44;
-pub const INSTR_BNOT: u8 = 45;
-pub const INSTR_BSHIFT: u8 = 46;
+pub const INSTR_BITAND: u8 = 42;
+pub const INSTR_BITOR: u8 = 43;
+pub const INSTR_BITXOR: u8 = 44;
+pub const INSTR_BITSHIFT: u8 = 45;
+pub const INSTR_BITNOT: u8 = 46;
 
 // Float Ops Unimplemented (has prims, so maybe delete)
 pub const INSTR_SIN: u8 = 47;
@@ -137,20 +138,21 @@ pub const INSTR_LOAD_BYTES_IMM: u8 = 77;
 
 // Branches
 pub const INSTR_JUMP: u8 = 80;
-pub const INSTR_JUMP_IMM8: u8 = 81;
-pub const INSTR_JZ: u8 = 82;
-pub const INSTR_JZ_IMM8: u8 = 83;
-pub const INSTR_JPOS: u8 = 84;
-pub const INSTR_JPOS_IMM8: u8 = 85;
-pub const INSTR_JNEG: u8 = 86;
-pub const INSTR_JNEG_IMM8: u8 = 87;
-pub const INSTR_JNPOS: u8 = 88;
-pub const INSTR_JNPOS_IMM8: u8 = 89;
-pub const INSTR_JNNEG: u8 = 90;
-pub const INSTR_JNNEG_IMM8: u8 = 91;
-pub const INSTR_JFALSE: u8 = 92;
-pub const INSTR_JFALSE_IMM8: u8 = 93;
-pub const INSTR_JNFALSE: u8 = 94;
+pub const INSTR_JZ: u8 = 81;
+pub const INSTR_JPOS: u8 = 82;
+pub const INSTR_JNEG: u8 = 83;
+pub const INSTR_JNPOS: u8 = 84;
+pub const INSTR_JNNEG: u8 = 85;
+pub const INSTR_JFALSE: u8 = 86;
+pub const INSTR_JNFALSE: u8 = 87;
+
+pub const INSTR_JUMP_IMM8: u8 = 88;
+pub const INSTR_JZ_IMM8: u8 = 89;
+pub const INSTR_JPOS_IMM8: u8 = 90;
+pub const INSTR_JNEG_IMM8: u8 = 91;
+pub const INSTR_JNPOS_IMM8: u8 = 92;
+pub const INSTR_JNNEG_IMM8: u8 = 93;
+pub const INSTR_JFALSE_IMM8: u8 = 94;
 pub const INSTR_JNFALSE_IMM8: u8 = 95;
 
 // Type
@@ -192,15 +194,5 @@ pub const INSTR_APPLY: u8 = 124; // TODO
 pub const INSTR_APPLY_TAIL: u8 = 125; // TODO
 
 pub(super) fn is_immediate_jump(op: u8) -> bool {
-    matches!(
-        op,
-        INSTR_JUMP_IMM8
-            | INSTR_JFALSE_IMM8
-            | INSTR_JNEG_IMM8
-            | INSTR_JNFALSE_IMM8
-            | INSTR_JNNEG_IMM8
-            | INSTR_JNPOS_IMM8
-            | INSTR_JPOS_IMM8
-            | INSTR_JZ_IMM8
-    )
+    op >= INSTR_JUMP_IMM8 && op <= INSTR_JNFALSE_IMM8
 }

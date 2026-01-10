@@ -1,4 +1,4 @@
-use std::ffi::c_void;
+use std::{collections::{HashMap, HashSet}, ffi::c_void, sync::LazyLock};
 
 use symbol_table::static_symbol;
 
@@ -6,8 +6,7 @@ use crate::{
     common::{Name, Result, Symbol, sym},
     core::Arity,
     interpreter::{
-        Runtime, ensure_type,
-        heap::{Bytes, Closure, Code, Table, Value, ValueRepr},
+        Runtime, bytecode::{INSTR_ACOS, INSTR_ADD, INSTR_ALLOC_ARRAY, INSTR_ALLOC_BYTES, INSTR_ALLOC_TABLE, INSTR_ARRAY_REF, INSTR_ARRAY_SET, INSTR_ARRAY_SIZE, INSTR_ASIN, INSTR_ATAN, INSTR_BITAND, INSTR_BITNOT, INSTR_BITOR, INSTR_BITSHIFT, INSTR_BITXOR, INSTR_BYTES_REF, INSTR_BYTES_SET, INSTR_BYTES_SIZE, INSTR_CEILING, INSTR_CMP, INSTR_COS, INSTR_DIV, INSTR_EQ, INSTR_EXP, INSTR_FLOOR, INSTR_LOG, INSTR_MOD, INSTR_MUL, INSTR_NEG, INSTR_ROUND, INSTR_SET_TYPE, INSTR_SIN, INSTR_SUB, INSTR_TABLE_DELETE, INSTR_TABLE_GET, INSTR_TABLE_SET, INSTR_TABLE_SIZE, INSTR_TAN, INSTR_TOINT, INSTR_TYPE}, ensure_type, heap::{Bytes, Closure, Code, Table, Value, ValueRepr}
     },
 };
 
@@ -239,3 +238,59 @@ fn prim_to_pointer(rt: &mut Runtime) -> Result<()> {
 fn prim_foreign_call(rt: &mut Runtime) -> Result<()> {
     Ok(())
 }
+
+/// Primitives that are implemented as bytecode instructions
+/// rather than calling out to a function.
+fn is_bytecode_primitive(prim:&Symbol) -> Option<u8> {
+    static BYTECODE_PRIMS:LazyLock<HashMap<Symbol, u8>> = LazyLock::new(|| {
+        let mut prims = HashMap::new();
+        prims.insert(static_symbol!("__prim_add"), INSTR_ADD);
+        prims.insert(static_symbol!("__prim_sub"), INSTR_SUB);
+        prims.insert(static_symbol!("__prim_mul"), INSTR_MUL);
+        prims.insert(static_symbol!("__prim_div"), INSTR_DIV);
+        prims.insert(static_symbol!("__prim_mod"), INSTR_MOD);
+        prims.insert(static_symbol!("__prim_bitand"), INSTR_BITAND);
+        prims.insert(static_symbol!("__prim_bitor"), INSTR_BITOR);
+        prims.insert(static_symbol!("__prim_bitxor"), INSTR_BITXOR);
+        prims.insert(static_symbol!("__prim_bitshift"), INSTR_BITSHIFT);
+        prims.insert(static_symbol!("__prim_bitnot"), INSTR_BITNOT);
+        prims.insert(static_symbol!("__prim_type"), INSTR_TYPE);
+        prims.insert(static_symbol!("__prim_type_set"), INSTR_SET_TYPE);
+        prims.insert(static_symbol!("__prim_negate"), INSTR_NEG);
+        prims.insert(static_symbol!("__prim_gte"), INSTR_CMP);
+        prims.insert(static_symbol!("__prim_gt"), INSTR_CMP);
+        prims.insert(static_symbol!("__prim_lte"), INSTR_CMP);
+        prims.insert(static_symbol!("__prim_lt"), INSTR_CMP); 
+        prims.insert(static_symbol!("__prim_eq"), INSTR_EQ);
+        prims.insert(static_symbol!("__prim_sin"), INSTR_SIN);
+        prims.insert(static_symbol!("__prim_cos"), INSTR_COS);
+        prims.insert(static_symbol!("__prim_tan"), INSTR_TAN);
+        prims.insert(static_symbol!("__prim_asin"), INSTR_ASIN);
+        prims.insert(static_symbol!("__prim_acos"), INSTR_ACOS);
+        prims.insert(static_symbol!("__prim_atan"), INSTR_ATAN);
+        prims.insert(static_symbol!("__prim_ceiling"), INSTR_CEILING);
+        prims.insert(static_symbol!("__prim_floor"), INSTR_FLOOR);
+        prims.insert(static_symbol!("__prim_round"), INSTR_ROUND);
+        prims.insert(static_symbol!("__prim_log"), INSTR_LOG);
+        prims.insert(static_symbol!("__prim_exp"), INSTR_EXP);
+        prims.insert(static_symbol!("__prim_to_int"), INSTR_TOINT);
+        prims.insert(static_symbol!("_prim_array_ref"), INSTR_ARRAY_REF);
+        prims.insert(static_symbol!("_prim_array_set"), INSTR_ARRAY_SET);
+        prims.insert(static_symbol!("_prim_array_create"), INSTR_ALLOC_ARRAY);
+        prims.insert(static_symbol!("_prim_array_size"), INSTR_ARRAY_SIZE);
+        prims.insert(static_symbol!("_prim_bytes_ref"), INSTR_BYTES_REF);
+        prims.insert(static_symbol!("_prim_bytes_set"), INSTR_BYTES_SET);
+        prims.insert(static_symbol!("_prim_bytes_create"), INSTR_ALLOC_BYTES); 
+        prims.insert(static_symbol!("_prim_bytes_size"), INSTR_BYTES_SIZE);
+        prims.insert(static_symbol!("_prim_table_create"), INSTR_ALLOC_TABLE);
+        prims.insert(static_symbol!("_prim_table_set"), INSTR_TABLE_SET);
+        prims.insert(static_symbol!("_prim_table_size"), INSTR_TABLE_SIZE);
+        prims.insert(static_symbol!("_prim_table_get"), INSTR_TABLE_GET);
+        prims.insert(static_symbol!("_prim_table_delete"), INSTR_TABLE_DELETE);
+        prims 
+    });
+    BYTECODE_PRIMS.get(prim).copied()
+}
+
+
+

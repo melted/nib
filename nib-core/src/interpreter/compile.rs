@@ -1,3 +1,5 @@
+use symbol_table::static_symbol;
+
 use crate::ast::Literal;
 use crate::common::{Metadata, Name};
 use crate::common::{Result, Symbol};
@@ -8,6 +10,7 @@ use crate::interpreter::bytecode::{
 use crate::interpreter::heap::Value;
 use std::collections::{HashMap, HashSet};
 use std::mem;
+use std::sync::LazyLock;
 
 pub fn compile(from: crate::core::Module) -> Result<Module> {
     let module = Module::new();
@@ -407,23 +410,4 @@ fn short_jump_op(op: u8) -> u8 {
         INSTR_JZ => INSTR_JZ_IMM8,
         _ => op,
     }
-}
-
-/// Primitives that are implemented as bytecode instructions
-/// rather than calling out to a function.
-fn is_bytecode_primitive(prim:&Symbol) -> bool {
-    matches!(prim.as_str(),
-        "__prim_add" | "__prim_sub" | "__prim_mul" |
-        "__prim_div" | "__prim_mod" | "__prim_type" |
-        "__prim_type_set" | "__prim_negate" | "__prim_gte" |
-        "__prim_gt" | "__prim_lte" |"__prim_lt" | "__prim_eq" |
-        "__prim_sin" | "__prim_cos" | "__prim_tan" |
-        "__prim_asin" | "__prim_acos" | "__prim_atan" |
-        "__prim_ceiling" | "__prim_floor" | "__prim_round" |
-        "__prim_log" | "__prim_exp" | "__prim_to_int" |
-        "_prim_array_ref" | "_prim_array_set" | "_prim_array_create" |
-        "_prim_array_size" | "_prim_symbol_make" | "_prim_bytes_ref" |
-         "_prim_bytes_set" | "_prim_bytes_create" | "_prim_bytes_size" |
-        "_prim_table_create" | "_prim_table_set" |
-        "_prim_table_size")
 }
