@@ -136,12 +136,12 @@ impl Runtime {
         }
     }
 
-    pub fn call_function(&mut self, fun:&Value, args:&[Value]) {
+    pub fn call_function(&mut self, fun:&Value, args:&[Value]) -> Result<bool> {
         self.stack_push(*fun);
         self.ensure_stack(args.len());
         self.stack.pushv(args);
         self.stack.push(Value::integer((args.len() + 1) as i64));
-        self.op_call(INSTR_CALL);
+        self.op_call(INSTR_CALL)
     }
 }
 
@@ -189,7 +189,7 @@ fn prim_project(rt: &mut Runtime) -> Result<()> {
     if let Some(method) = rt.find_overload(&start, &static_symbol!("project")) {
         let mut args = vec![start];
         args.extend_from_slice(projection.values());
-        rt.call_function(&method,&args);
+        rt.call_function(&method, &args).map(|_|())?;
     } else {
         let mut current = start;
         for s in projection.values() {
@@ -203,6 +203,7 @@ fn prim_project(rt: &mut Runtime) -> Result<()> {
 }
 
 fn prim_array_make(rt: &mut Runtime) -> Result<()> {
+    // Vararg processing does all the work in making an array so just return.
     Ok(())
 }
 
@@ -231,6 +232,12 @@ fn prim_symbol_name(rt: &mut Runtime) -> Result<()> {
 }
 
 fn prim_symbol_make(rt: &mut Runtime) -> Result<()> {
+    let arg = rt.stack.pop();
+    ensure_type(&arg, ValueRepr::Bytes)?;
+    let bytes = arg.get_bytes();
+    let str = str::from_utf8(bytes.get_slice()).unwrap_or_default();
+    let sym = rt.make_symbol(str);
+    rt.stack_push(sym);
     Ok(())
 }
 
@@ -239,10 +246,15 @@ fn prim_bytes_make(rt: &mut Runtime) -> Result<()> {
 }
 
 fn prim_table_keys(rt: &mut Runtime) -> Result<()> {
+    let arg = rt.stack.pop();
+    ensure_type(&arg, ValueRepr::Table)?;
+    let table = arg.get_table();
+    let keys = table.keys(rt);
+    rt.stack_push(keys);
     Ok(())
 }
 
-fn prim_table_delete(rt: &mut Runtime) -> Result<()> {
+fn prim_table_clear(rt: &mut Runtime) -> Result<()> {
     Ok(())
 }
 
@@ -277,6 +289,12 @@ fn prim_to_pointer(rt: &mut Runtime) -> Result<()> {
 fn prim_foreign_call(rt: &mut Runtime) -> Result<()> {
     Ok(())
 }
+
+fn prim_apply(rt: &mut Runtime) -> Result<()> {
+    Ok(())
+}
+
+
 
 /// Primitives that are implemented as bytecode instructions
 /// rather than calling out to a function.
