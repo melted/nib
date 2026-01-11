@@ -6,7 +6,7 @@ use std::{
     hash::{DefaultHasher, Hash, Hasher},
     mem,
     ptr::copy_nonoverlapping,
-    slice::from_raw_parts,
+    slice::{from_raw_parts, from_raw_parts_mut},
 };
 
 use region::Allocation;
@@ -940,6 +940,13 @@ impl Bytes {
         }
     }
 
+    pub(super) fn get_slice_mut(&self) -> &mut [u8] {
+        unsafe {
+            let ptr = self.ptr.byte_add(2 * CELL_SIZE) as *mut u8;
+            from_raw_parts_mut(ptr, self.size())
+        }
+    }
+    
     pub fn type_table(&self) -> Value {
         get_value(self.ptr, 0)
     }
