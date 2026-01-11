@@ -9,7 +9,7 @@ use std::ops::{BitXor, Shl, Shr};
 
 use symbol_table::static_symbol;
 
-use crate::common::{Error, Name, Result, Symbol, symbol_id};
+use crate::common::{Error, Name, Result, Symbol, sym, symbol_id};
 use crate::interpreter::bytecode::*;
 use crate::interpreter::heap::{
     Array, Bytes, Closure, Heap, TYPE_BYTECODE, TYPE_EXTERN, Table, Value, ValueRepr, set_value,
@@ -210,6 +210,15 @@ impl Runtime {
         Ok(typ)
     }
 
+    pub fn get_type_id(&self, val:&Value) -> Result<Symbol> {
+        let tt = self.get_type_table(val)?.get_table();
+        let tid = tt.get(Value::symbol(&sym("type_id")));
+        if !val.is_symbol() {
+            return self.error("Type table has no type_id");
+        }
+        Ok(tid.get_symbol())
+    }
+
     fn run(&mut self) -> Result<()> {
         let code_size = self.code.get_bytes().size();
         let bytes = self.code.get_bytes();
@@ -335,8 +344,24 @@ impl Runtime {
                 unsafe { Value::pointer(p.byte_offset(sign * right.get_integer() as isize)) }
             }
             _ => {
-                // Look at type table for ops
-                todo!()
+                let symbol = match op {
+                    INSTR_ADD => static_symbol!("__add"),
+                    INSTR_SUB => static_symbol!("__sub"),
+                    INSTR_MUL => static_symbol!("__mul"),
+                    INSTR_DIV => static_symbol!("__div"),
+                    INSTR_MOD => static_symbol!("__mod"),
+                    _ => unreachable!()
+                };
+                let overload = self.find_overload(&left, &symbol);
+                if let Some(method) = overload {
+                    self.stack_push(method);
+                    self.stack_push(left);
+                    self.stack_push(right);
+                    self.stack_push(Value::integer(3));
+                    return self.op_call(INSTR_CALL);
+                } else {
+                    return self.error(&format!("op_arithmetic: Type {} doesn't have an overload for op: {}", self.get_type_id(&left)?, op));
+                }
             }
         };
         self.stack_push(res);
@@ -568,6 +593,7 @@ impl Runtime {
             self.code = closure.get_closure().code_value();
             self.local_env = closure.get_closure().env();
             self.ip = ip;
+            self.stack.base = old_base;
             Ok(false)
         }
     }

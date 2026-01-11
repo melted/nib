@@ -59,14 +59,7 @@ impl Runtime {
     }
 
     pub(super) fn register_type_tables(&mut self) -> Result<()> {
-        // Since strings created without the string table present will
-        // not have the string type, create that first, and
-        // fix up the typeid type.
         self.register_type("string", "string");
-        let string_table_id = self.get_name(&Name::str("string.typeid")).unwrap();
-        let byte_str = string_table_id.get_bytes();
-        let string_table = self.get_global(&sym("string"));
-        byte_str.set_type_table(string_table);
         self.register_type("nil_type", "nil");
         self.register_type("bool", "bool");
         self.register_type("int", "int");
@@ -86,7 +79,7 @@ impl Runtime {
     fn register_type(&mut self, table_name: &str, type_name: &str) {
         let new_table = Value::from(Table::make(self));
         self.set_global(&sym(table_name), &new_table);
-        let tname = self.make_string(type_name);
+        let tname = self.make_symbol(type_name);
         self.add_name(&Name::str(&format!("{}.type_id", table_name)), &tname)
             .unwrap();
     }
@@ -123,10 +116,13 @@ impl Runtime {
             .get_module_path(&[static_symbol!("string")], self.global_env)
             .unwrap_or(Value::nil());
         // If the string type table doesn't exist yet, leave it
-        // as nil. This will happen when the string type table
-        // is registered. It can patch it up afterwards.
+        // as nil.
         b.set_type_table(type_table);
         Value::from(b)
+    }
+
+    pub fn make_symbol(&mut self, s: &str) -> Value {
+        Value::symbol(&sym(s))
     }
 
     pub fn find_overload(&mut self, val:&Value, method:&Symbol) -> Option<Value> {
