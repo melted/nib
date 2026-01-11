@@ -5,7 +5,7 @@ use crate::common::{Metadata, Name};
 use crate::common::{Result, Symbol};
 use crate::core::{Binder, Binding, Cond, Expression, Lambda, free_vars};
 use crate::interpreter::bytecode::{
-    INSTR_ALLOC_FLOAT, INSTR_ALLOC_TABLE, INSTR_CALL, INSTR_CALL_TAIL, INSTR_DUP, INSTR_GET_LOCAL, INSTR_GLOBAL_ENV, INSTR_IS_TABLE, INSTR_JFALSE, INSTR_JFALSE_IMM8, INSTR_JNEG, INSTR_JNEG_IMM8, INSTR_JNFALSE, INSTR_JNFALSE_IMM8, INSTR_JNNEG, INSTR_JNNEG_IMM8, INSTR_JNPOS, INSTR_JNPOS_IMM8, INSTR_JPOS, INSTR_JPOS_IMM8, INSTR_JUMP, INSTR_JUMP_IMM8, INSTR_JZ, INSTR_JZ_IMM8, INSTR_LOAD_BYTES_IMM, INSTR_LOAD_IMM8, INSTR_LOAD_IMM16, INSTR_LOAD_IMM32, INSTR_LOAD_IMM64, INSTR_RETURN, INSTR_SET_LOCAL, INSTR_SET_TYPE, INSTR_STACK_LOAD, INSTR_TABLE_GET, INSTR_TABLE_SET
+    INSTR_ALLOC_ARRAY, INSTR_ALLOC_CLOSURE, INSTR_ALLOC_FLOAT, INSTR_ALLOC_TABLE, INSTR_ARRAY_SET, INSTR_CALL, INSTR_CALL_TAIL, INSTR_DUP, INSTR_GET_LOCAL, INSTR_GLOBAL_ENV, INSTR_IS_TABLE, INSTR_JFALSE, INSTR_JFALSE_IMM8, INSTR_JNEG, INSTR_JNEG_IMM8, INSTR_JNFALSE, INSTR_JNFALSE_IMM8, INSTR_JNNEG, INSTR_JNNEG_IMM8, INSTR_JNPOS, INSTR_JNPOS_IMM8, INSTR_JPOS, INSTR_JPOS_IMM8, INSTR_JUMP, INSTR_JUMP_IMM8, INSTR_JZ, INSTR_JZ_IMM8, INSTR_LOAD_BYTES_IMM, INSTR_LOAD_IMM8, INSTR_LOAD_IMM16, INSTR_LOAD_IMM32, INSTR_LOAD_IMM64, INSTR_RETURN, INSTR_SET_LOCAL, INSTR_SET_TYPE, INSTR_STACK_LOAD, INSTR_TABLE_GET, INSTR_TABLE_SET
 };
 use crate::interpreter::heap::Value;
 use crate::interpreter::prims::is_bytecode_primitive;
@@ -259,9 +259,7 @@ impl Compilation {
                 code.push(INSTR_GET_LOCAL);
             }
             Literal::Bytearray(items) => {
-                code.push(INSTR_LOAD_BYTES_IMM);
-                code.extend_from_slice(&(items.len() as u32).to_le_bytes());
-                code.extend_from_slice(&items);
+                push_bytes(&items, code);;
             }
         }
         Ok(())
@@ -278,8 +276,46 @@ impl Compilation {
         for (i, arg) in lambda.args.iter().enumerate() {
             fun_compilation.stack_vars.push((*arg, i + 1));
         }
+        fun_compilation.input = CompilationInput::Expression(lambda.body.clone());
+        fun_compilation.compile()?;
+        let (arity, vararg) = match lambda.arity {
+            crate::core::Arity::Fixed(n) => (Value::integer(n as i64), Value::bool(false)),
+            crate::core::Arity::VarArg(n, i) => (Value::integer(n as i64), Value::integer(i as i64)),
+        };
+        load_constant_value(&vararg, code);
+        load_constant_value(&arity, code);
+        load_constant_int(fun_compilation.module.local_env_size as i64, code);
+        code.push(INSTR_ALLOC_ARRAY);
 
-        todo!(); 
+        for (sym, index) in fun_compilation.module.want_symbols {
+            code.push(INSTR_DUP);
+            let slot = self.get_symbol_slot(&sym);
+            load_constant_int(index as i64, code);
+            load_constant_int(slot as i64, code);
+            code.push(INSTR_GET_LOCAL);
+            code.push(INSTR_ARRAY_SET);
+            
+        }
+        for (var, index) in fun_compilation.module.captures {
+            code.push(INSTR_DUP);
+            
+            load_constant_int(index as i64, code);
+            let loc = self.lookup_var(&var);
+            match loc {
+                VarLocation::Stack(s) => {
+                    load_constant_int(s as i64, code);
+                    code.push(INSTR_STACK_LOAD);
+                },
+                VarLocation::Env(i) => {
+                    load_constant_int(i as i64, code);
+                    code.push(INSTR_GET_LOCAL);
+                },
+            }
+            code.push(INSTR_ARRAY_SET);
+        }
+        push_bytes(&fun_compilation.module.byte_code, code);
+        code.push(INSTR_ALLOC_CLOSURE);
+        Ok(())
     }
 
     fn compile_cond(&mut self, cond: &Cond, code: &mut Vec<u8>) -> Result<()> {
@@ -437,8 +473,7 @@ enum VarLocation {
     Env(usize),
 }
 
-fn load_constant_int(n: i64, code: &mut Vec<u8>) {
-    let v = Value::integer(n);
+fn load_constant_value(v: &Value, code: &mut Vec<u8>) {
     let b = v.val.leading_zeros();
     match b {
         56.. => {
@@ -460,6 +495,11 @@ fn load_constant_int(n: i64, code: &mut Vec<u8>) {
     }
 }
 
+fn load_constant_int(n: i64, code: &mut Vec<u8>) {
+    let v = Value::integer(n);
+    load_constant_value(&v, code);
+}
+
 fn push_nil(code: &mut Vec<u8>) {
     code.push(INSTR_LOAD_IMM8);
     code.push(0x36);
@@ -468,6 +508,12 @@ fn push_nil(code: &mut Vec<u8>) {
 fn push_bool(b: bool, code: &mut Vec<u8>) {
     code.push(INSTR_LOAD_IMM8);
     code.push(if b { 0x2e } else { 0x26 });
+}
+
+fn push_bytes(items: &[u8], code: &mut Vec<u8>) {
+    code.push(INSTR_LOAD_BYTES_IMM);
+    code.extend_from_slice(&(items.len() as u32).to_le_bytes());
+    code.extend_from_slice(&items);
 }
 
 fn optimized_jump(op: u8, n: i64, code: &mut Vec<u8>) {

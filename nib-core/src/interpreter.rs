@@ -279,8 +279,8 @@ impl Runtime {
     }
 
     fn op_bitops(&mut self, op: u8) -> Result<bool> {
-        let lhs = self.stack.pop().get_integer();
         let rhs = self.stack.pop().get_integer();
+        let lhs = self.stack.pop().get_integer();
         let res = match op {
             INSTR_BITAND => lhs & rhs,
             INSTR_BITOR => lhs | rhs,
@@ -305,8 +305,8 @@ impl Runtime {
     }
 
     fn op_arithmetic(&mut self, op: u8) -> Result<bool> {
-        let left = self.stack.pop();
         let right = self.stack.pop();
+        let left = self.stack.pop();
         let res = match (left.get_immediate_repr(), right.get_immediate_repr()) {
             (ValueRepr::Integer, ValueRepr::Integer) => {
                 let l = left.val as i64;
@@ -387,8 +387,8 @@ impl Runtime {
     }
 
     fn op_compare(&mut self, op: u8) -> Result<bool> {
-        let left = self.stack.pop();
         let right = self.stack.pop();
+        let left = self.stack.pop();
         let equalcheck = op == INSTR_EQ || op == INSTR_NEQ;
         let res = match (left.get_immediate_repr(), right.get_immediate_repr()) {
             (ValueRepr::Integer, ValueRepr::Integer) => {
@@ -823,17 +823,17 @@ impl Runtime {
     }
 
     fn op_array_get(&mut self) -> Result<bool> {
-        let obj = self.stack.pop();
         let pos = self.stack.pop();
+        let obj = self.stack.pop();
         let val = obj.get_array().at(pos.get_integer() as usize);
         self.stack_push(val);
         Ok(false)
     }
 
     fn op_array_set(&mut self) -> Result<bool> {
-        let obj = self.stack.pop();
-        let pos = self.stack.pop();
         let val = self.stack.pop();
+        let pos = self.stack.pop();
+        let obj = self.stack.pop();
         obj.get_array().set(pos.get_integer() as usize, val);
         Ok(false)
     }
@@ -846,17 +846,17 @@ impl Runtime {
     }
 
     fn op_bytes_get(&mut self) -> Result<bool> {
-        let obj = self.stack.pop();
         let pos = self.stack.pop();
+        let obj = self.stack.pop();
         let val = obj.get_bytes().at(pos.get_integer() as usize);
         self.stack_push(Value::integer(val as i64));
         Ok(false)
     }
 
     fn op_bytes_set(&mut self) -> Result<bool> {
-        let obj = self.stack.pop();
-        let pos = self.stack.pop();
         let byte = self.stack.pop();
+        let pos = self.stack.pop();
+        let obj = self.stack.pop();
         let val = byte.get_integer() as u8;
         obj.get_bytes().set(pos.get_integer() as usize, val);
         Ok(false)
@@ -870,17 +870,17 @@ impl Runtime {
     }
 
     fn op_table_get(&mut self) -> Result<bool> {
-        let obj = self.stack.pop();
         let sym = self.stack.pop();
+        let obj = self.stack.pop();
         let val = obj.get_table().get(sym);
         self.stack_push(val);
         Ok(false)
     }
 
     fn op_table_set(&mut self) -> Result<bool> {
-        let obj = self.stack.pop();
-        let sym = self.stack.pop();
         let val = self.stack.pop();
+        let sym = self.stack.pop();
+        let obj = self.stack.pop();
         obj.get_table().insert(self, sym, val);
         Ok(false)
     }
@@ -904,8 +904,8 @@ impl Runtime {
     }
 
     fn op_set_local(&mut self) -> Result<bool> {
-        let index = self.stack.pop().get_integer() as usize;
         let val = self.stack.pop();
+        let index = self.stack.pop().get_integer() as usize;
         self.local_env.get_array().set(index, val);
         Ok(false)
     }
