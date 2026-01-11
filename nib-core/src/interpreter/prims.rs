@@ -12,7 +12,7 @@ use crate::{
     interpreter::{
         Runtime,
         bytecode::{
-            INSTR_ACOS, INSTR_ADD, INSTR_ALLOC_ARRAY, INSTR_ALLOC_BYTES, INSTR_ALLOC_TABLE, INSTR_ARRAY_REF, INSTR_ARRAY_SET, INSTR_ARRAY_SIZE, INSTR_ASIN, INSTR_ATAN, INSTR_BITAND, INSTR_BITNOT, INSTR_BITOR, INSTR_BITSHIFT, INSTR_BITXOR, INSTR_BYTES_REF, INSTR_BYTES_SET, INSTR_BYTES_SIZE, INSTR_CALL, INSTR_CEILING, INSTR_CMP, INSTR_COS, INSTR_DIV, INSTR_EQ, INSTR_EXP, INSTR_FLOOR, INSTR_GT, INSTR_GTE, INSTR_LOG, INSTR_LT, INSTR_LTE, INSTR_MOD, INSTR_MUL, INSTR_NEG, INSTR_ROUND, INSTR_SET_TYPE, INSTR_SIN, INSTR_SUB, INSTR_TABLE_DELETE, INSTR_TABLE_GET, INSTR_TABLE_SET, INSTR_TABLE_SIZE, INSTR_TAN, INSTR_TOINT, INSTR_TYPE
+            INSTR_ACOS, INSTR_ADD, INSTR_ALLOC_ARRAY, INSTR_ALLOC_BYTES, INSTR_ALLOC_TABLE, INSTR_ARRAY_REF, INSTR_ARRAY_SET, INSTR_ARRAY_SIZE, INSTR_ASIN, INSTR_ATAN, INSTR_BITAND, INSTR_BITNOT, INSTR_BITOR, INSTR_BITSHIFT, INSTR_BITXOR, INSTR_BYTES_REF, INSTR_BYTES_SET, INSTR_BYTES_SIZE, INSTR_CALL, INSTR_CEILING, INSTR_CMP, INSTR_COS, INSTR_DIV, INSTR_EQ, INSTR_EXP, INSTR_FLOOR, INSTR_GT, INSTR_GTE, INSTR_IS_ARRAY, INSTR_IS_BOOL, INSTR_IS_BYTES, INSTR_IS_CHAR, INSTR_IS_CLOSURE, INSTR_IS_FLOAT, INSTR_IS_INTEGER, INSTR_IS_NIL, INSTR_IS_PAP, INSTR_IS_POINTER, INSTR_IS_SYMBOL, INSTR_IS_TABLE, INSTR_LOG, INSTR_LT, INSTR_LTE, INSTR_MOD, INSTR_MUL, INSTR_NEG, INSTR_ROUND, INSTR_SET_TYPE, INSTR_SIN, INSTR_SUB, INSTR_TABLE_DELETE, INSTR_TABLE_GET, INSTR_TABLE_SET, INSTR_TABLE_SIZE, INSTR_TAN, INSTR_TOINT, INSTR_TYPE
         },
         ensure_type,
         heap::{Bytes, Closure, Code, Table, Value, ValueRepr},
@@ -345,6 +345,18 @@ pub fn is_bytecode_primitive(prim: &Symbol) -> Option<u8> {
         prims.insert(static_symbol!("_prim_table_size"), INSTR_TABLE_SIZE);
         prims.insert(static_symbol!("_prim_table_get"), INSTR_TABLE_GET);
         prims.insert(static_symbol!("_prim_table_delete"), INSTR_TABLE_DELETE);
+        prims.insert(static_symbol!("_prim_is_integer"), INSTR_IS_INTEGER);
+        prims.insert(static_symbol!("_prim_is_nil"), INSTR_IS_NIL);
+        prims.insert(static_symbol!("_prim_is_bool"), INSTR_IS_BOOL);
+        prims.insert(static_symbol!("_prim_is_char"), INSTR_IS_CHAR);
+        prims.insert(static_symbol!("_prim_is_float"), INSTR_IS_FLOAT);
+        prims.insert(static_symbol!("_prim_is_symbol"), INSTR_IS_SYMBOL);
+        prims.insert(static_symbol!("_prim_is_array"), INSTR_IS_ARRAY);
+        prims.insert(static_symbol!("_prim_is_closure"), INSTR_IS_CLOSURE);
+        prims.insert(static_symbol!("_prim_is_bytes"), INSTR_IS_BYTES);
+        prims.insert(static_symbol!("_prim_is_table"), INSTR_IS_TABLE);
+        prims.insert(static_symbol!("_prim_is_pointer"), INSTR_IS_POINTER);
+        prims.insert(static_symbol!("_prim_is_pap"), INSTR_IS_PAP);
         prims
     });
     BYTECODE_PRIMS.get(prim).copied()
