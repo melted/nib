@@ -299,13 +299,18 @@ impl Runtime {
         let left = self.stack.pop();
         let right = self.stack.pop();
         let res = match (left.get_immediate_repr(), right.get_immediate_repr()) {
-            (ValueRepr::Integer, ValueRepr::Integer) => match op {
-                INSTR_ADD => Value::integer(left.get_integer() + right.get_integer()),
-                INSTR_SUB => Value::integer(left.get_integer() - right.get_integer()),
-                INSTR_MUL => Value::integer(left.get_integer() * right.get_integer()),
-                INSTR_DIV => Value::integer(left.get_integer() / right.get_integer()),
-                INSTR_MOD => Value::integer(left.get_integer() % right.get_integer()),
-                _ => unreachable!(),
+            (ValueRepr::Integer, ValueRepr::Integer) => {
+                let l = left.val as i64;
+                let r = right.val as i64;
+                let res = match op {
+                    INSTR_ADD => l + r,
+                    INSTR_SUB => l - r,
+                    INSTR_MUL => (l >> 3) * r,
+                    INSTR_DIV => (l / r) << 3,
+                    INSTR_MOD => l % r,
+                    _ => unreachable!(),
+                };
+                Value { val: res as u64 }
             },
             (ValueRepr::Float | ValueRepr::Integer, ValueRepr::Float | ValueRepr::Integer) => {
                 let lf = get_float(left);
@@ -359,16 +364,16 @@ impl Runtime {
     fn op_compare(&mut self, op: u8) -> Result<bool> {
         let left = self.stack.pop();
         let right = self.stack.pop();
+        let equalcheck = op == INSTR_EQ || op == INSTR_NEQ;
         let res = match (left.get_immediate_repr(), right.get_immediate_repr()) {
             (ValueRepr::Integer, ValueRepr::Integer) => {
-                let order = left.get_integer().cmp(&right.get_integer());
+                let l = left.val as i64;
+                let r = right.val as i64;
+                let order = l.cmp(&r);
                 ordering_to_int(order)
             }
             (ValueRepr::Pointer, ValueRepr::Pointer) => {
-                let order = left
-                    .get_cpointer::<*mut c_void>()
-                    .addr()
-                    .cmp(&right.get_cpointer::<*mut c_void>().addr());
+                let order = left.val.cmp(&right.val);
                 ordering_to_int(order)
             }
             (ValueRepr::Float | ValueRepr::Integer, ValueRepr::Float | ValueRepr::Integer) => {
@@ -386,7 +391,7 @@ impl Runtime {
                 ordering_to_int(order)
             }
             (ValueRepr::Nil, ValueRepr::Nil) => 0,
-            (ValueRepr::Symbol, ValueRepr::Symbol) if op != INSTR_CMP => {
+            (ValueRepr::Symbol, ValueRepr::Symbol) if equalcheck => {
                 if left.get_symbol() == right.get_symbol() {
                     0
                 } else {
@@ -394,7 +399,7 @@ impl Runtime {
                 }
             }
             (ValueRepr::Object | ValueRepr::Array, ValueRepr::Object | ValueRepr::Array)
-                if op != INSTR_CMP =>
+                if equalcheck =>
             {
                 if left.val == right.val {
                     0
@@ -402,7 +407,7 @@ impl Runtime {
                     -1
                 }
             }
-            (_, _) if op != INSTR_CMP => {
+            (_, _) if equalcheck => {
                 // TODO: look at type table
                 -1
             }
