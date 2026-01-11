@@ -157,7 +157,7 @@ impl Runtime {
         Ok(table)
     }
 
-    pub fn get_type_table(&self, val:&Value) -> Result<Value> {
+    pub fn get_type_table(&self, val: &Value) -> Result<Value> {
         let typ = match val.get_repr() {
             ValueRepr::Nil => self.get_global(&static_symbol!("nil_type")),
             ValueRepr::Undefined => Value::nil(),
@@ -210,7 +210,7 @@ impl Runtime {
         Ok(typ)
     }
 
-    pub fn get_type_id(&self, val:&Value) -> Result<Symbol> {
+    pub fn get_type_id(&self, val: &Value) -> Result<Symbol> {
         let tt = self.get_type_table(val)?.get_table();
         let tid = tt.get(Value::symbol(&sym("type_id")));
         if !val.is_symbol() {
@@ -320,7 +320,7 @@ impl Runtime {
                     _ => unreachable!(),
                 };
                 Value { val: res as u64 }
-            },
+            }
             (ValueRepr::Float | ValueRepr::Integer, ValueRepr::Float | ValueRepr::Integer) => {
                 let lf = get_float(left);
                 let rf = get_float(right);
@@ -350,7 +350,7 @@ impl Runtime {
                     INSTR_MUL => static_symbol!("__mul"),
                     INSTR_DIV => static_symbol!("__div"),
                     INSTR_MOD => static_symbol!("__mod"),
-                    _ => unreachable!()
+                    _ => unreachable!(),
                 };
                 let overload = self.find_overload(&left, &symbol);
                 if let Some(method) = overload {
@@ -360,7 +360,11 @@ impl Runtime {
                     self.stack_push(Value::integer(3));
                     return self.op_call(INSTR_CALL);
                 } else {
-                    return self.error(&format!("op_arithmetic: Type {} doesn't have an overload for op: {}", self.get_type_id(&left)?, op));
+                    return self.error(&format!(
+                        "op_arithmetic: Type {} doesn't have an overload for op: {}",
+                        self.get_type_id(&left)?,
+                        op
+                    ));
                 }
             }
         };
@@ -442,10 +446,34 @@ impl Runtime {
             }
         };
         let val = match op {
-            INSTR_GT => if res > 0 { right } else { Value::bool(false) },
-            INSTR_GTE => if res >= 0 { right } else { Value::bool(false) },
-            INSTR_LT => if res < 0 { right } else { Value::bool(false) },
-            INSTR_LTE => if res <= 0 { right } else { Value::bool(false) },
+            INSTR_GT => {
+                if res > 0 {
+                    right
+                } else {
+                    Value::bool(false)
+                }
+            }
+            INSTR_GTE => {
+                if res >= 0 {
+                    right
+                } else {
+                    Value::bool(false)
+                }
+            }
+            INSTR_LT => {
+                if res < 0 {
+                    right
+                } else {
+                    Value::bool(false)
+                }
+            }
+            INSTR_LTE => {
+                if res <= 0 {
+                    right
+                } else {
+                    Value::bool(false)
+                }
+            }
             INSTR_CMP => Value::integer(res),
             INSTR_EQ => Value::bool(res == 0),
             INSTR_NEQ => Value::bool(res != 0),

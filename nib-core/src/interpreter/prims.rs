@@ -12,7 +12,16 @@ use crate::{
     interpreter::{
         Runtime,
         bytecode::{
-            INSTR_ACOS, INSTR_ADD, INSTR_ALLOC_ARRAY, INSTR_ALLOC_BYTES, INSTR_ALLOC_TABLE, INSTR_ARRAY_REF, INSTR_ARRAY_SET, INSTR_ARRAY_SIZE, INSTR_ASIN, INSTR_ATAN, INSTR_BITAND, INSTR_BITNOT, INSTR_BITOR, INSTR_BITSHIFT, INSTR_BITXOR, INSTR_BYTES_REF, INSTR_BYTES_SET, INSTR_BYTES_SIZE, INSTR_CALL, INSTR_CEILING, INSTR_CMP, INSTR_COS, INSTR_DIV, INSTR_EQ, INSTR_EXP, INSTR_FLOOR, INSTR_GT, INSTR_GTE, INSTR_IS_ARRAY, INSTR_IS_BOOL, INSTR_IS_BYTES, INSTR_IS_CHAR, INSTR_IS_CLOSURE, INSTR_IS_FLOAT, INSTR_IS_INTEGER, INSTR_IS_NIL, INSTR_IS_PAP, INSTR_IS_POINTER, INSTR_IS_SYMBOL, INSTR_IS_TABLE, INSTR_LOG, INSTR_LT, INSTR_LTE, INSTR_MOD, INSTR_MUL, INSTR_NEG, INSTR_ROUND, INSTR_SET_TYPE, INSTR_SIN, INSTR_SUB, INSTR_TABLE_DELETE, INSTR_TABLE_GET, INSTR_TABLE_SET, INSTR_TABLE_SIZE, INSTR_TAN, INSTR_TOINT, INSTR_TYPE
+            INSTR_ACOS, INSTR_ADD, INSTR_ALLOC_ARRAY, INSTR_ALLOC_BYTES, INSTR_ALLOC_TABLE,
+            INSTR_ARRAY_REF, INSTR_ARRAY_SET, INSTR_ARRAY_SIZE, INSTR_ASIN, INSTR_ATAN,
+            INSTR_BITAND, INSTR_BITNOT, INSTR_BITOR, INSTR_BITSHIFT, INSTR_BITXOR, INSTR_BYTES_REF,
+            INSTR_BYTES_SET, INSTR_BYTES_SIZE, INSTR_CALL, INSTR_CEILING, INSTR_CMP, INSTR_COS,
+            INSTR_DIV, INSTR_EQ, INSTR_EXP, INSTR_FLOOR, INSTR_GT, INSTR_GTE, INSTR_IS_ARRAY,
+            INSTR_IS_BOOL, INSTR_IS_BYTES, INSTR_IS_CHAR, INSTR_IS_CLOSURE, INSTR_IS_FLOAT,
+            INSTR_IS_INTEGER, INSTR_IS_NIL, INSTR_IS_PAP, INSTR_IS_POINTER, INSTR_IS_SYMBOL,
+            INSTR_IS_TABLE, INSTR_LOG, INSTR_LT, INSTR_LTE, INSTR_MOD, INSTR_MUL, INSTR_NEG,
+            INSTR_ROUND, INSTR_SET_TYPE, INSTR_SIN, INSTR_SUB, INSTR_TABLE_DELETE, INSTR_TABLE_GET,
+            INSTR_TABLE_SET, INSTR_TABLE_SIZE, INSTR_TAN, INSTR_TOINT, INSTR_TYPE,
         },
         ensure_type,
         heap::{Bytes, Closure, Code, Table, Value, ValueRepr},
@@ -52,7 +61,7 @@ impl Runtime {
         let symbol_make = self.make_primitive(prim_symbol_make, Arity::Fixed(1));
         self.set_global(&sym("_prim_symbol_make"), &symbol_make);
 
-        let get_path = self.make_primitive(prim_get_path, Arity::VarArg(2,1));
+        let get_path = self.make_primitive(prim_get_path, Arity::VarArg(2, 1));
         self.set_global(&sym("_prim_get_path"), &symbol_make);
 
         Ok(())
@@ -125,18 +134,14 @@ impl Runtime {
         Value::symbol(&sym(s))
     }
 
-    pub fn find_overload(&mut self, val:&Value, method:&Symbol) -> Option<Value> {
+    pub fn find_overload(&mut self, val: &Value, method: &Symbol) -> Option<Value> {
         let tt_val = self.get_type_table(val).ok()?;
         let tt = tt_val.get_table();
         let m = tt.get(Value::symbol(method));
-        if m.is_nil() {
-            None
-        } else {
-            Some(m)
-        }
+        if m.is_nil() { None } else { Some(m) }
     }
 
-    pub fn call_function(&mut self, fun:&Value, args:&[Value]) -> Result<bool> {
+    pub fn call_function(&mut self, fun: &Value, args: &[Value]) -> Result<bool> {
         self.stack_push(*fun);
         self.ensure_stack(args.len());
         self.stack.pushv(args);
@@ -154,7 +159,7 @@ fn prim_get_path(rt: &mut Runtime) -> Result<()> {
     if syms.iter().any(|v| !v.is_symbol()) {
         return rt.error("prim_get_path: All trailing arguments must be symbols");
     }
-    let symbols:Vec<_> = syms.iter().map(|v| v.get_symbol()).collect();
+    let symbols: Vec<_> = syms.iter().map(|v| v.get_symbol()).collect();
     let initial = match first.get_repr() {
         ValueRepr::Symbol => {
             let symbol = first.get_symbol();
@@ -189,7 +194,7 @@ fn prim_project(rt: &mut Runtime) -> Result<()> {
     if let Some(method) = rt.find_overload(&start, &static_symbol!("project")) {
         let mut args = vec![start];
         args.extend_from_slice(projection.values());
-        rt.call_function(&method, &args).map(|_|())?;
+        rt.call_function(&method, &args).map(|_| ())?;
     } else {
         let mut current = start;
         for s in projection.values() {
@@ -293,8 +298,6 @@ fn prim_foreign_call(rt: &mut Runtime) -> Result<()> {
 fn prim_apply(rt: &mut Runtime) -> Result<()> {
     Ok(())
 }
-
-
 
 /// Primitives that are implemented as bytecode instructions
 /// rather than calling out to a function.

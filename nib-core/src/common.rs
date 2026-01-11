@@ -231,7 +231,7 @@ impl Name {
                 tail.push(*n);
                 tail
             }
-            Name::Plain(n) => vec![*n]
+            Name::Plain(n) => vec![*n],
         }
     }
 

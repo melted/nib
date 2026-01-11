@@ -5,7 +5,13 @@ use crate::common::{Metadata, Name};
 use crate::common::{Result, Symbol};
 use crate::core::{Binder, Binding, Cond, Expression, Lambda, free_vars};
 use crate::interpreter::bytecode::{
-    INSTR_ALLOC_ARRAY, INSTR_ALLOC_CLOSURE, INSTR_ALLOC_FLOAT, INSTR_ALLOC_TABLE, INSTR_ARRAY_SET, INSTR_CALL, INSTR_CALL_TAIL, INSTR_DUP, INSTR_GET_LOCAL, INSTR_GLOBAL_ENV, INSTR_IS_TABLE, INSTR_JFALSE, INSTR_JFALSE_IMM8, INSTR_JNEG, INSTR_JNEG_IMM8, INSTR_JNFALSE, INSTR_JNFALSE_IMM8, INSTR_JNNEG, INSTR_JNNEG_IMM8, INSTR_JNPOS, INSTR_JNPOS_IMM8, INSTR_JPOS, INSTR_JPOS_IMM8, INSTR_JUMP, INSTR_JUMP_IMM8, INSTR_JZ, INSTR_JZ_IMM8, INSTR_LOAD_BYTES_IMM, INSTR_LOAD_IMM8, INSTR_LOAD_IMM16, INSTR_LOAD_IMM32, INSTR_LOAD_IMM64, INSTR_RETURN, INSTR_SET_LOCAL, INSTR_SET_TYPE, INSTR_STACK_LOAD, INSTR_TABLE_GET, INSTR_TABLE_SET
+    INSTR_ALLOC_ARRAY, INSTR_ALLOC_CLOSURE, INSTR_ALLOC_FLOAT, INSTR_ALLOC_TABLE, INSTR_ARRAY_SET,
+    INSTR_CALL, INSTR_CALL_TAIL, INSTR_DROP, INSTR_DUP, INSTR_GET_LOCAL, INSTR_GLOBAL_ENV,
+    INSTR_IS_TABLE, INSTR_JFALSE, INSTR_JFALSE_IMM8, INSTR_JNEG, INSTR_JNEG_IMM8, INSTR_JNFALSE,
+    INSTR_JNFALSE_IMM8, INSTR_JNNEG, INSTR_JNNEG_IMM8, INSTR_JNPOS, INSTR_JNPOS_IMM8, INSTR_JPOS,
+    INSTR_JPOS_IMM8, INSTR_JUMP, INSTR_JUMP_IMM8, INSTR_JZ, INSTR_JZ_IMM8, INSTR_LOAD_BYTES_IMM,
+    INSTR_LOAD_IMM8, INSTR_LOAD_IMM16, INSTR_LOAD_IMM32, INSTR_LOAD_IMM64, INSTR_RETURN,
+    INSTR_SET_LOCAL, INSTR_SET_TYPE, INSTR_STACK_LOAD, INSTR_TABLE_GET, INSTR_TABLE_SET,
 };
 use crate::interpreter::heap::Value;
 use crate::interpreter::prims::is_bytecode_primitive;
@@ -153,11 +159,13 @@ impl Compilation {
                 load_constant_int((path.len() + 1) as i64, code);
                 code.push(INSTR_CALL);
                 code.push(INSTR_TABLE_SET);
-            },
+                self.check_fixups(&path[0], code);
+            }
             Binder::Public(Name::Plain(name)) => {
                 self.push_symbol(name, code);
                 code.push(INSTR_GLOBAL_ENV);
                 code.push(INSTR_TABLE_SET);
+                self.check_fixups(name, code);
             }
             Binder::Local(Name::Qualified(path, name)) => {
                 self.push_symbol(name, code);
@@ -171,15 +179,34 @@ impl Compilation {
                 load_constant_int((path.len() + 1) as i64, code);
                 code.push(INSTR_CALL);
                 code.push(INSTR_TABLE_SET);
+                self.check_fixups(&path[0], code);
             }
             Binder::Local(Name::Plain(name)) => {
-                let h = self.local_top_var(&name);
+                let h = if top_level {
+                    self.local_top_var(&name)
+                } else {
+                    self.env_location()
+                };
                 load_constant_int(h as i64, code);
                 code.push(INSTR_SET_LOCAL);
+                self.check_fixups(name, code);
             }
-            Binder::Unbound => {},
+            Binder::Unbound => {}
         }
         Ok(())
+    }
+
+    fn check_fixups(&mut self, name: &Symbol, code: &mut Vec<u8>) {
+        if let Some(fixups) = self.fixups_needed.remove(name) {
+            self.get_variable(name, code);
+            for fix in fixups {
+                code.push(INSTR_DUP);
+                load_constant_int(fix.0 as i64, code);
+                code.push(INSTR_GET_LOCAL);
+                code.push(INSTR_ARRAY_SET);
+            }
+            code.push(INSTR_DROP);
+        }
     }
 
     fn collect_binding_names(&mut self, bindings: &[Binding]) {
@@ -218,7 +245,14 @@ impl Compilation {
             Expression::Cond(_, cond) => self.compile_cond(cond, code),
             Expression::App(_, expressions) => self.compile_application(&expressions, code),
             Expression::Where(_, expression, bindings) => {
-                self.compile_where(&expression, bindings, code)
+                let mut old_fixups = HashMap::new();
+                let mut old_future_bindings = HashSet::new();
+                mem::swap(&mut old_fixups, &mut self.fixups_needed);
+                mem::swap(&mut old_future_bindings, &mut self.future_bindings);
+                self.compile_where(&expression, bindings, code)?;
+                mem::swap(&mut old_fixups, &mut self.fixups_needed);
+                mem::swap(&mut old_future_bindings, &mut self.future_bindings);
+                Ok(())
             }
         }
     }
@@ -259,7 +293,7 @@ impl Compilation {
                 code.push(INSTR_GET_LOCAL);
             }
             Literal::Bytearray(items) => {
-                push_bytes(&items, code);;
+                push_bytes(&items, code);
             }
         }
         Ok(())
@@ -280,7 +314,9 @@ impl Compilation {
         fun_compilation.compile()?;
         let (arity, vararg) = match lambda.arity {
             crate::core::Arity::Fixed(n) => (Value::integer(n as i64), Value::bool(false)),
-            crate::core::Arity::VarArg(n, i) => (Value::integer(n as i64), Value::integer(i as i64)),
+            crate::core::Arity::VarArg(n, i) => {
+                (Value::integer(n as i64), Value::integer(i as i64))
+            }
         };
         load_constant_value(&vararg, code);
         load_constant_value(&arity, code);
@@ -294,24 +330,27 @@ impl Compilation {
             load_constant_int(slot as i64, code);
             code.push(INSTR_GET_LOCAL);
             code.push(INSTR_ARRAY_SET);
-            
         }
+        let mut captures_var = None;
         for (var, index) in fun_compilation.module.captures {
             code.push(INSTR_DUP);
-            
             load_constant_int(index as i64, code);
-            let loc = self.lookup_var(&var);
-            match loc {
-                VarLocation::Stack(s) => {
-                    load_constant_int(s as i64, code);
-                    code.push(INSTR_STACK_LOAD);
-                },
-                VarLocation::Env(i) => {
-                    load_constant_int(i as i64, code);
-                    code.push(INSTR_GET_LOCAL);
-                },
+            if self.future_bindings.contains(&var) {
+                let v = if let Some(v) = captures_var {
+                    v
+                } else {
+                    let n = self.env_location();
+                    captures_var = Some(n);
+                    n
+                };
+                self.fixups_needed
+                    .entry(var)
+                    .and_modify(|vec| vec.push((v, index)))
+                    .or_insert_with(|| vec![(v, index)]);
+            } else {
+                self.get_variable(&var, code);
+                code.push(INSTR_ARRAY_SET);
             }
-            code.push(INSTR_ARRAY_SET);
         }
         push_bytes(&fun_compilation.module.byte_code, code);
         code.push(INSTR_ALLOC_CLOSURE);
@@ -363,7 +402,6 @@ impl Compilation {
         Ok(())
     }
 
-
     fn compile_where(
         &mut self,
         exp: &Expression,
@@ -371,6 +409,7 @@ impl Compilation {
         code: &mut Vec<u8>,
     ) -> Result<()> {
         let is_tail = self.is_tail;
+        self.collect_binding_names(&bindings);
         for b in bindings {
             self.compile_binding(b, false, code)?;
         }
@@ -388,19 +427,19 @@ impl Compilation {
         }
     }
 
-    fn push_symbol(&mut self, sym:&Symbol, code:&mut Vec<u8>) {
+    fn push_symbol(&mut self, sym: &Symbol, code: &mut Vec<u8>) {
         let sym_addr = self.get_symbol_slot(sym);
         load_constant_int(sym_addr as i64, code);
         code.push(INSTR_GET_LOCAL);
     }
 
-    fn get_global_name(&mut self, sym:&Symbol, code:&mut Vec<u8>) {
+    fn get_global_name(&mut self, sym: &Symbol, code: &mut Vec<u8>) {
         self.push_symbol(&sym, code);
         code.push(INSTR_GLOBAL_ENV);
         code.push(INSTR_TABLE_GET);
     }
 
-    fn get_local_table(&mut self, sym:&Symbol, code:&mut Vec<u8>) {
+    fn get_local_table(&mut self, sym: &Symbol, code: &mut Vec<u8>) {
         let h = self.local_top_var(&sym);
         load_constant_int(h as i64, code);
         code.push(INSTR_GET_LOCAL);
@@ -410,8 +449,22 @@ impl Compilation {
         create_table_code.push(INSTR_ALLOC_TABLE);
         load_constant_int(h as i64, &mut create_table_code);
         create_table_code.push(INSTR_SET_LOCAL);
-        optimized_jump(INSTR_JFALSE, (create_table_code.len()+1) as i64, code);
+        optimized_jump(INSTR_JFALSE, (create_table_code.len() + 1) as i64, code);
         code.extend_from_slice(&create_table_code);
+    }
+
+    fn get_variable(&mut self, var: &Symbol, code: &mut Vec<u8>) {
+        let loc = self.lookup_var(&var);
+        match loc {
+            VarLocation::Stack(s) => {
+                load_constant_int(s as i64, code);
+                code.push(INSTR_STACK_LOAD);
+            }
+            VarLocation::Env(i) => {
+                load_constant_int(i as i64, code);
+                code.push(INSTR_GET_LOCAL);
+            }
+        }
     }
 
     fn lookup_var(&mut self, var: &Symbol) -> VarLocation {
@@ -436,7 +489,7 @@ impl Compilation {
 
     fn local_top_var(&mut self, sym: &Symbol) -> usize {
         for (var, loc) in self.local_vars.iter().rev() {
-            if  var == sym {
+            if var == sym {
                 return *loc;
             }
         }
@@ -526,7 +579,6 @@ fn optimized_jump(op: u8, n: i64, code: &mut Vec<u8>) {
         code.push(op);
     }
 }
-
 
 fn short_jump_op(op: u8) -> u8 {
     match op {

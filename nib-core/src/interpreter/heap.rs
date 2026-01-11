@@ -946,7 +946,7 @@ impl Bytes {
             from_raw_parts_mut(ptr, self.size())
         }
     }
-    
+
     pub fn type_table(&self) -> Value {
         get_value(self.ptr, 0)
     }
