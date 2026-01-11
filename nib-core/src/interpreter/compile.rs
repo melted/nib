@@ -145,7 +145,7 @@ impl Compilation {
         match &binding.binder {
             Binder::Public(Name::Qualified(path, name)) => {
                 self.push_symbol(name, code);
-                let get_path = static_symbol!("__prim_get_path");
+                let get_path = static_symbol!("_prim_get_path");
                 self.get_global_name(&get_path, code);
                 for s in path {
                     self.push_symbol(s, code);
@@ -161,7 +161,7 @@ impl Compilation {
             }
             Binder::Local(Name::Qualified(path, name)) => {
                 self.push_symbol(name, code);
-                let get_path = static_symbol!("__prim_get_path");
+                let get_path = static_symbol!("_prim_get_path");
                 self.get_global_name(&get_path, code);
                 let (first, tail) = path.split_at(1);
                 self.get_local_table(&first[0], code);
@@ -278,7 +278,8 @@ impl Compilation {
         for (i, arg) in lambda.args.iter().enumerate() {
             fun_compilation.stack_vars.push((*arg, i + 1));
         }
-        Ok(())
+
+        todo!(); 
     }
 
     fn compile_cond(&mut self, cond: &Cond, code: &mut Vec<u8>) -> Result<()> {
@@ -326,9 +327,6 @@ impl Compilation {
         Ok(())
     }
 
-    fn compile_bytecode_primitive(&mut self, prim: &Symbol, code: &mut Vec<u8>) -> Result<()> {
-        todo!()
-    }
 
     fn compile_where(
         &mut self,

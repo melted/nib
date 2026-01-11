@@ -157,6 +157,59 @@ impl Runtime {
         Ok(table)
     }
 
+    pub fn get_type_table(&self, val:&Value) -> Result<Value> {
+        let typ = match val.get_repr() {
+            ValueRepr::Nil => self.get_global(&static_symbol!("nil_type")),
+            ValueRepr::Undefined => Value::nil(),
+            ValueRepr::Bool => self.get_global(&static_symbol!("bool")),
+            ValueRepr::Integer => self.get_global(&static_symbol!("int")),
+            ValueRepr::Pointer => self.get_global(&static_symbol!("pointer")),
+            ValueRepr::Char => self.get_global(&static_symbol!("char")),
+            ValueRepr::Float => self.get_global(&static_symbol!("float")),
+            ValueRepr::BoxedInteger => todo!(),
+            ValueRepr::Symbol => self.get_global(&static_symbol!("symbol")),
+            ValueRepr::CallContinuation => self.get_global(&static_symbol!("call_continuation")),
+            ValueRepr::PartialApplication => {
+                self.get_global(&static_symbol!("partial_application"))
+            }
+            ValueRepr::Array => {
+                let arr = val.get_array();
+                let mut type_table = arr.type_table();
+                if type_table == Value::nil() {
+                    type_table = self.get_global(&static_symbol!("array"));
+                }
+                type_table
+            }
+            ValueRepr::Bytes => {
+                let bytes = val.get_bytes();
+                let mut type_table = bytes.type_table();
+                if type_table == Value::nil() {
+                    type_table = self.get_global(&static_symbol!("bytes"));
+                }
+                type_table
+            }
+            ValueRepr::Table => {
+                let table = val.get_table();
+                let mut type_table = table.type_table();
+                if type_table == Value::nil() {
+                    type_table = self.get_global(&static_symbol!("table"));
+                }
+                type_table
+            }
+            ValueRepr::Closure => {
+                let closure = val.get_closure();
+                let mut type_table = closure.type_table();
+                if type_table == Value::nil() {
+                    type_table = self.get_global(&static_symbol!("function"));
+                }
+                type_table
+            }
+            ValueRepr::Object => todo!(),
+        };
+        ensure_type(&typ, ValueRepr::Table)?;
+        Ok(typ)
+    }
+
     fn run(&mut self) -> Result<()> {
         let code_size = self.code.get_bytes().size();
         let bytes = self.code.get_bytes();
@@ -650,54 +703,7 @@ impl Runtime {
 
     fn op_type(&mut self) -> Result<bool> {
         let val = self.stack.pop();
-        let typ = match val.get_repr() {
-            ValueRepr::Nil => self.get_global(&static_symbol!("nil_type")),
-            ValueRepr::Undefined => Value::nil(),
-            ValueRepr::Bool => self.get_global(&static_symbol!("bool")),
-            ValueRepr::Integer => self.get_global(&static_symbol!("int")),
-            ValueRepr::Pointer => self.get_global(&static_symbol!("pointer")),
-            ValueRepr::Char => self.get_global(&static_symbol!("char")),
-            ValueRepr::Float => self.get_global(&static_symbol!("float")),
-            ValueRepr::BoxedInteger => todo!(),
-            ValueRepr::Symbol => self.get_global(&static_symbol!("symbol")),
-            ValueRepr::CallContinuation => self.get_global(&static_symbol!("call_continuation")),
-            ValueRepr::PartialApplication => {
-                self.get_global(&static_symbol!("partial_application"))
-            }
-            ValueRepr::Array => {
-                let arr = val.get_array();
-                let mut type_table = arr.type_table();
-                if type_table == Value::nil() {
-                    type_table = self.get_global(&static_symbol!("array"));
-                }
-                type_table
-            }
-            ValueRepr::Bytes => {
-                let bytes = val.get_bytes();
-                let mut type_table = bytes.type_table();
-                if type_table == Value::nil() {
-                    type_table = self.get_global(&static_symbol!("bytes"));
-                }
-                type_table
-            }
-            ValueRepr::Table => {
-                let table = val.get_table();
-                let mut type_table = table.type_table();
-                if type_table == Value::nil() {
-                    type_table = self.get_global(&static_symbol!("table"));
-                }
-                type_table
-            }
-            ValueRepr::Closure => {
-                let closure = val.get_closure();
-                let mut type_table = closure.type_table();
-                if type_table == Value::nil() {
-                    type_table = self.get_global(&static_symbol!("function"));
-                }
-                type_table
-            }
-            ValueRepr::Object => todo!(),
-        };
+        let typ = self.get_type_table(&val)?;
         self.stack_push(typ);
         Ok(false)
     }
