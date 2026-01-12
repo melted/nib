@@ -383,8 +383,15 @@ impl Runtime {
             let f = -val.get_float();
             Value::alloc_float(self, f)
         } else {
-            // crash and burn
-            todo!()
+            let overload = self.find_overload(&val, &static_symbol!("__neg"));
+            if let Some(method) = overload {
+                self.stack_push(method);
+                self.stack_push(val);
+                self.stack_push(Value::integer(2));
+                return self.op_call(INSTR_CALL);
+            } else {
+                return self.error(&format!("op_negate: No implementations of negate for {}", self.get_type_id(&val)?));
+            }
         };
         self.stack_push(res);
         Ok(false)
@@ -427,22 +434,34 @@ impl Runtime {
                     1
                 }
             }
-            (ValueRepr::Object | ValueRepr::Array, ValueRepr::Object | ValueRepr::Array)
-                if equalcheck =>
-            {
-                if left.val == right.val {
-                    0
-                } else {
-                    -1
-                }
-            }
-            (_, _) if equalcheck => {
-                // TODO: look at type table
-                -1
-            }
             (x, y) => {
-                // TODO: look at type table
-                return self.error(&format!("Can't compare types {:?} and {:?}", x, y));
+                let symbol = match op {
+                    INSTR_GTE => static_symbol!("__gte"),
+                    INSTR_GT => static_symbol!("__gt"),
+                    INSTR_LTE => static_symbol!("__lte"),
+                    INSTR_LT => static_symbol!("__lt"),
+                    INSTR_EQ => static_symbol!("__eq"),
+                    INSTR_NEQ => static_symbol!("__neq"),
+                    _ => unreachable!(),
+                };
+                let overload = self.find_overload(&left, &symbol);
+                if let Some(method) = overload {
+                    self.stack_push(method);
+                    self.stack_push(left);
+                    self.stack_push(right);
+                    self.stack_push(Value::integer(3));
+                    return self.op_call(INSTR_CALL);
+                }
+                if equalcheck {
+                    // Object identity
+                    if left.val == right.val {
+                        0
+                    } else {
+                        -1
+                    }
+                } else {
+                    return self.error(&format!("Can't compare types {:?} and {:?}", x, y));
+                }
             }
         };
         let val = match op {
@@ -519,7 +538,16 @@ impl Runtime {
             ValueRepr::Pointer => Value::integer(val.get_cpointer::<*const c_void>().addr() as i64),
             ValueRepr::Symbol => Value::integer(symbol_id(&val.get_symbol()) as i64),
             ValueRepr::Float => Value::integer(val.get_float() as i64),
-            _ => Value::nil(),
+            _ => {
+                if let Some(method) = self.find_overload(&val, &static_symbol!("__toint")) {
+                    self.stack_push(method);
+                    self.stack_push(val);
+                    self.stack_push(Value::integer(2));
+                    return self.op_call(INSTR_CALL);
+                } else {
+                    return self.error("op_toint: type not convertible to int");
+                }
+            },
         };
         self.stack.push(res);
         Ok(false)
@@ -543,8 +571,11 @@ impl Runtime {
                 room.copy_from_slice(&pap);
             }
             _ => {
-                // Other callables, implement later
-                todo!()
+                if let Some(method) = self.find_overload(&fun, &static_symbol!("__call")) {
+                    self.stack.put(args, method);
+                } else {
+                    return self.error("op_toint: type not convertible to int");
+                }
             }
         };
         self.make_call(op, args)?;
@@ -553,8 +584,6 @@ impl Runtime {
 
     fn make_call(&mut self, op: u8, args: usize) -> Result<()> {
         let closure = self.stack.peek(args).get_closure();
-        let fun_code = closure.code_value();
-        let env = closure.env().get_array();
         if args - 1 < closure.num_args() {
             // Underapplication, create a partial application
             let cargs = self.stack.take(args);
@@ -590,12 +619,13 @@ impl Runtime {
                     self.call_stack.pushv(&frame);
                     self.stack.base = self.stack.top();
                 }
-                self.local_env = self.closure.get_closure().env();
-                self.code = fun_code;
+                self.closure = Value::from(closure);
+                self.local_env = closure.env();
+                self.code = closure.code_value();
                 self.ip = 0;
             }
             TYPE_EXTERN => {
-                let fun_ptr = fun_code.get_pointer() as *mut PrimFn;
+                let fun_ptr = closure.code_value().get_pointer() as *mut PrimFn;
                 unsafe {
                     let fun = *fun_ptr;
                     fun(self)?;
@@ -619,7 +649,7 @@ impl Runtime {
             let closure = self.call_stack.pop();
             self.closure = closure;
             self.code = closure.get_closure().code_value();
-            self.local_env = closure.get_closure().env();
+            self.local_env = closure.get_closure().env(); 
             self.ip = ip;
             self.stack.base = old_base;
             Ok(false)

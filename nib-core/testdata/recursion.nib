@@ -1,5 +1,4 @@
 // Overflows
-// Todo: make it not overflow
 
 a = array.create 2000
 b = array.create 2000
