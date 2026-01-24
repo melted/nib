@@ -1,7 +1,7 @@
 use std::ops::{Shl, Shr};
 use std::os::raw::c_void;
 
-use crate::common::{Error, Name, Result, Symbol};
+use crate::common::{Error, Name, Result, Symbol, sym};
 use crate::core::Arity;
 use crate::treewalker::{Runtime, Value};
 
@@ -306,9 +306,24 @@ impl Runtime {
 
     fn register_type(&mut self, table_name: &str, type_name: &str) {
         self.add_global(table_name, Value::new_table());
-        let tname = self.make_string(type_name).unwrap();
+        let tname = Value::Symbol(sym(type_name));
         self.add_name(&Name::str(&format!("{}.type_id", table_name)), &tname)
             .unwrap();
+    }
+
+    fn find_overload(&mut self, val:&Value, method:&Symbol) -> Result<Value> {
+        let tt = self.type_query(val)?;
+        if let Value::Table(table_rc) = tt {
+            let table = &table_rc.borrow().table;
+            let overload = if let Some(overload) = table.get(method) {
+                overload
+            } else {
+                &Value::Nil
+            };
+            Ok(overload.clone())
+        } else {
+            self.error("Non-table type value")
+        }
     }
 
     pub(super) fn prim_to_int(&self, args: &[Value]) -> Result<Value> {

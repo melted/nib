@@ -18,6 +18,7 @@ use crate::interpreter::prims::PrimFn;
 
 pub mod bytecode;
 pub mod compile;
+pub mod foreign;
 pub mod heap;
 pub mod prims;
 mod tests;

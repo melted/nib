@@ -9,6 +9,7 @@ use std::{
     slice::{from_raw_parts, from_raw_parts_mut},
 };
 
+use libffi::middle::Cif;
 use region::Allocation;
 
 use crate::{
@@ -957,10 +958,18 @@ impl Bytes {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Foreign {
+    code: *const c_void,
+    signature: *const Cif
+}
+
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Code {
     Bytecode(Vec<u8>),
     Core(*const Vec<Expression>),
     Extern(*const c_void),
+    Foreign(Foreign)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -972,6 +981,7 @@ pub const TYPE_INCOMPLETE: u16 = 0xffff;
 pub const TYPE_BYTECODE: u16 = 0;
 pub const TYPE_CORE: u16 = 1;
 pub const TYPE_EXTERN: u16 = 2;
+pub const TYPE_FOREIGN: u16 = 3;
 
 impl Closure {
     pub fn make(
@@ -1043,6 +1053,13 @@ impl Closure {
             Code::Extern(ptr) => {
                 self.set_tag(TYPE_EXTERN);
                 set_value(self.ptr, 1, Value::cpointer(ptr));
+            }
+            Code::Foreign(foreign) => {
+                self.set_tag(TYPE_FOREIGN);
+                let array = Array::make(rt, 2);
+                array.set(0, Value::cpointer(foreign.code));
+                array.set(1, Value::cpointer(foreign.signature));
+                set_value(self.ptr, 1, Value::from(array));
             }
         }
     }

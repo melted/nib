@@ -257,7 +257,6 @@ impl DesugarState {
                 }
             }
             Pattern::Literal(lit) => {
-                // TODO: Generate appropriate check for each literal type
                 let check = app(&vec![
                     var(&static_symbol!("_prim_eq")),
                     expr.clone(),

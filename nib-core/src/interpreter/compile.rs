@@ -81,7 +81,6 @@ pub(super) struct Compilation {
     max_var: usize,
     used_vars: HashSet<usize>,
     free_vars: HashSet<usize>,
-    code: Vec<u8>,
     is_tail: bool,
 }
 
@@ -105,7 +104,6 @@ impl Compilation {
             fixups_needed: HashMap::new(),
             used_vars: HashSet::new(),
             free_vars: HashSet::new(),
-            code: Vec::new(),
             is_tail: true,
         }
     }
@@ -137,6 +135,7 @@ impl Compilation {
         }
         code.push(INSTR_RETURN);
         self.module.byte_code = code;
+        self.module.local_env_size = self.max_var+1;
         Ok(())
     }
 
@@ -245,14 +244,7 @@ impl Compilation {
             Expression::Cond(_, cond) => self.compile_cond(cond, code),
             Expression::App(_, expressions) => self.compile_application(&expressions, code),
             Expression::Where(_, expression, bindings) => {
-                let mut old_fixups = HashMap::new();
-                let mut old_future_bindings = HashSet::new();
-                mem::swap(&mut old_fixups, &mut self.fixups_needed);
-                mem::swap(&mut old_future_bindings, &mut self.future_bindings);
-                self.compile_where(&expression, bindings, code)?;
-                mem::swap(&mut old_fixups, &mut self.fixups_needed);
-                mem::swap(&mut old_future_bindings, &mut self.future_bindings);
-                Ok(())
+                self.compile_where(&expression, bindings, code)
             }
         }
     }
@@ -408,13 +400,24 @@ impl Compilation {
         bindings: &[Binding],
         code: &mut Vec<u8>,
     ) -> Result<()> {
+        let mut old_fixups = HashMap::new();
+        let mut old_future_bindings = HashSet::new();
+        let mut old_used_vars = self.used_vars.clone();
+        let mut old_free_vars = self.free_vars.clone();
+        mem::swap(&mut old_fixups, &mut self.fixups_needed);
+        mem::swap(&mut old_future_bindings, &mut self.future_bindings);
         let is_tail = self.is_tail;
         self.collect_binding_names(&bindings);
         for b in bindings {
             self.compile_binding(b, false, code)?;
         }
         self.is_tail = is_tail;
-        self.compile_expression(exp, code)
+        self.compile_expression(exp, code)?;
+        mem::swap(&mut old_fixups, &mut self.fixups_needed);
+        mem::swap(&mut old_future_bindings, &mut self.future_bindings);
+        mem::swap(&mut old_used_vars, &mut self.used_vars);
+        mem::swap(&mut old_free_vars, &mut self.free_vars);
+        Ok(())
     }
 
     fn get_symbol_slot(&mut self, sym: &Symbol) -> usize {
@@ -507,6 +510,7 @@ impl Compilation {
         let val = self.free_vars.iter().next().map(|u| *u);
         if let Some(loc) = val {
             self.free_vars.remove(&loc);
+            self.used_vars.insert(loc);
             loc
         } else {
             self.fresh_env_location()

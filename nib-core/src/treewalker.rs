@@ -810,6 +810,7 @@ impl Bytes {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+#[repr(u8)]
 pub enum CType {
     Int8,
     Int16,
