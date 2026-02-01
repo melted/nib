@@ -391,7 +391,10 @@ impl Runtime {
                 self.stack_push(Value::integer(2));
                 return self.op_call(INSTR_CALL);
             } else {
-                return self.error(&format!("op_negate: No implementations of negate for {}", self.get_type_id(&val)?));
+                return self.error(&format!(
+                    "op_negate: No implementations of negate for {}",
+                    self.get_type_id(&val)?
+                ));
             }
         };
         self.stack_push(res);
@@ -455,11 +458,7 @@ impl Runtime {
                 }
                 if equalcheck {
                     // Object identity
-                    if left.val == right.val {
-                        0
-                    } else {
-                        -1
-                    }
+                    if left.val == right.val { 0 } else { -1 }
                 } else {
                     return self.error(&format!("Can't compare types {:?} and {:?}", x, y));
                 }
@@ -548,7 +547,7 @@ impl Runtime {
                 } else {
                     return self.error("op_toint: type not convertible to int");
                 }
-            },
+            }
         };
         self.stack.push(res);
         Ok(false)
@@ -650,7 +649,7 @@ impl Runtime {
             let closure = self.call_stack.pop();
             self.closure = closure;
             self.code = closure.get_closure().code_value();
-            self.local_env = closure.get_closure().env(); 
+            self.local_env = closure.get_closure().env();
             self.ip = ip;
             self.stack.base = old_base;
             Ok(false)

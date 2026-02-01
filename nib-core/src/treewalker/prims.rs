@@ -311,7 +311,7 @@ impl Runtime {
             .unwrap();
     }
 
-    fn find_overload(&mut self, val:&Value, method:&Symbol) -> Result<Value> {
+    fn find_overload(&mut self, val: &Value, method: &Symbol) -> Result<Value> {
         let tt = self.type_query(val)?;
         if let Value::Table(table_rc) = tt {
             let table = &table_rc.borrow().table;

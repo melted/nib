@@ -960,16 +960,15 @@ impl Bytes {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Foreign {
     code: *const c_void,
-    signature: *const Cif
+    signature: *const Cif,
 }
-
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Code {
     Bytecode(Vec<u8>),
     Core(*const Vec<Expression>),
     Extern(*const c_void),
-    Foreign(Foreign)
+    Foreign(Foreign),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

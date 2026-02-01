@@ -135,7 +135,7 @@ impl Compilation {
         }
         code.push(INSTR_RETURN);
         self.module.byte_code = code;
-        self.module.local_env_size = self.max_var+1;
+        self.module.local_env_size = self.max_var + 1;
         Ok(())
     }
 
