@@ -9,12 +9,16 @@ use std::ops::{BitXor, Shl, Shr};
 
 use symbol_table::static_symbol;
 
+use crate::ast;
 use crate::common::{Error, Name, Result, Symbol, sym, symbol_id};
+use crate::core::desugar;
 use crate::interpreter::bytecode::*;
+use crate::interpreter::compile::{Module, compile};
 use crate::interpreter::heap::{
     Array, Bytes, Closure, Heap, TYPE_BYTECODE, TYPE_EXTERN, Table, Value, ValueRepr, set_value,
 };
 use crate::interpreter::prims::PrimFn;
+use crate::parser::parse_declarations;
 
 pub mod bytecode;
 pub mod compile;
@@ -65,11 +69,45 @@ impl Runtime {
     }
 
     pub fn add_code(&mut self, name: &str, code: &str) -> Result<()> {
+        let file = if name.is_empty() {
+                None 
+            } else { 
+                Some(name.to_owned())
+            };
+        let mut module = ast::Module::new(file, code);
+        parse_declarations(&mut module)?;
+        let core = desugar(module)?;
+        let bytecode = compile(core)?;
+        self.run_module(bytecode)
+    }
+
+    pub fn run_module(&mut self, bytecode: Module) -> Result<()> {
+        self.local_env = self.make_local_env(&bytecode);
+        let bc = Bytes::with(self, &bytecode.byte_code);
+        self.code = Value::from(bc);
+        let closure = Closure::make_low(self, 
+       &bc, 
+            self.local_env.clone(), 
+      Value::integer(0), 
+     Value::integer(0));
+        self.closure = Value::from(closure);
+        self.run()
+    }
+    
+    pub fn run_expression(&mut self, code: &str) -> Result<Value> {
         todo!()
     }
 
-    pub fn run_expression(&mut self, code: &str) -> Result<Value> {
-        todo!()
+    pub fn make_local_env(&mut self, module : &compile::Module) -> Value {
+        let array = Array::make(self, module.local_env_size);
+        for (sym, &idx) in &module.want_symbols {
+            array.set(idx, Value::symbol(sym));
+        }
+        for (sym, &idx) in &module.captures {
+            let val = self.get_global(sym);
+            array.set(idx, val);
+        }
+        Value::from(array)
     }
 
     pub fn set_global(&mut self, sym: &Symbol, value: &Value) {

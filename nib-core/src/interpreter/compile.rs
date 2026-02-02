@@ -39,15 +39,15 @@ pub fn compile_expression(expr: crate::core::Expression) -> Result<Module> {
 pub struct Module {
     /// Possible metadata acquired when parsing and compiling
     /// this module.
-    metadata: Option<Metadata>,
+    pub metadata: Option<Metadata>,
     /// The bytecode
-    byte_code: Vec<u8>,
+    pub byte_code: Vec<u8>,
     /// Size of local environment
-    local_env_size: usize,
+    pub local_env_size: usize,
     /// A list of symbol literals that should be put into the local environment.
-    want_symbols: HashMap<Symbol, usize>,
+    pub want_symbols: HashMap<Symbol, usize>,
     /// Global variables used by the module.
-    captures: HashMap<Symbol, usize>,
+    pub captures: HashMap<Symbol, usize>,
 }
 
 impl Module {
