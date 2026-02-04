@@ -670,9 +670,33 @@ impl Debug for Value {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub struct Array {
     ptr: *mut ObjectHeader,
+}
+
+impl Debug for Array {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Array[")?;
+        let vals = self.values();
+        let mut nil_count = 0;
+        for v in vals {
+            if v.is_nil() {
+                nil_count += 1;
+            } else {
+                if nil_count > 0 {
+                    write!(f, "... {} nil, ", nil_count)?;
+                    nil_count = 0;
+                }
+                write!(f, "{:?}, ", v)?;
+            }
+        }
+        if nil_count > 0 {
+            write!(f, "... {} nil, ", nil_count)?;
+            nil_count = 0;
+        }
+        write!(f, "]")
+    }
 }
 
 impl Array {
@@ -749,10 +773,17 @@ impl Array {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub struct Table {
     ptr: *mut ObjectHeader,
 }
+
+impl Debug for Table {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Table[ptr: {:?} keys: {}]", self.ptr, self.size())
+    }
+}
+
 
 const INITIAL_SIZE: usize = 16;
 
@@ -870,6 +901,19 @@ impl Table {
         Value::from(keys)
     }
 
+    pub fn pairs(&self) -> Vec<(Value, Value)> {
+        let mut kv = Vec::new();
+        let storage = self.storage();
+        for i in 0..self.capacity() {
+            let key = storage.at(i * 2);
+            if Self::valid_key(key) {
+                let value = storage.at(i*2+1);
+                kv.push((key, value));
+            }
+        }
+        kv
+    }
+
     pub fn size(&self) -> usize {
         get_value(self.ptr, 1).get_integer() as usize
     }
@@ -888,9 +932,20 @@ impl Table {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub struct Bytes {
     ptr: *mut ObjectHeader,
+}
+
+impl Debug for Bytes {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Bytes[")?;
+        let vals = self.get_slice();
+        for v in vals {
+            write!(f, "{}, ", *v)?;
+        }
+        write!(f, "]")
+    }
 }
 
 impl Bytes {
@@ -971,9 +1026,16 @@ pub enum Code {
     Foreign(Foreign),
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub struct Closure {
     ptr: *mut ObjectHeader,
+}
+
+impl Debug for Closure {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Closure[ptr: {:?}, code: {:?}, env: {:?}, arg: {:?}, vararg: {:?}]",
+                 self.ptr, self.get_code(), self.env(), self.num_args(), self.vararg())
+    }
 }
 
 pub const TYPE_INCOMPLETE: u16 = 0xffff;

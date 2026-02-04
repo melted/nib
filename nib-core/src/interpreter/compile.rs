@@ -5,13 +5,7 @@ use crate::common::{Metadata, Name};
 use crate::common::{Result, Symbol};
 use crate::core::{Binder, Binding, Cond, Expression, Lambda, free_vars};
 use crate::interpreter::bytecode::{
-    INSTR_ALLOC_ARRAY, INSTR_ALLOC_CLOSURE, INSTR_ALLOC_FLOAT, INSTR_ALLOC_TABLE, INSTR_ARRAY_SET,
-    INSTR_CALL, INSTR_CALL_TAIL, INSTR_DROP, INSTR_DUP, INSTR_GET_LOCAL, INSTR_GLOBAL_ENV,
-    INSTR_IS_TABLE, INSTR_JFALSE, INSTR_JFALSE_IMM8, INSTR_JNEG, INSTR_JNEG_IMM8, INSTR_JNFALSE,
-    INSTR_JNFALSE_IMM8, INSTR_JNNEG, INSTR_JNNEG_IMM8, INSTR_JNPOS, INSTR_JNPOS_IMM8, INSTR_JPOS,
-    INSTR_JPOS_IMM8, INSTR_JUMP, INSTR_JUMP_IMM8, INSTR_JZ, INSTR_JZ_IMM8, INSTR_LOAD_BYTES_IMM,
-    INSTR_LOAD_IMM8, INSTR_LOAD_IMM16, INSTR_LOAD_IMM32, INSTR_LOAD_IMM64, INSTR_RETURN,
-    INSTR_SET_LOCAL, INSTR_SET_TYPE, INSTR_STACK_LOAD, INSTR_TABLE_GET, INSTR_TABLE_SET,
+    INSTR_ALLOC_ARRAY, INSTR_ALLOC_CLOSURE, INSTR_ALLOC_FLOAT, INSTR_ALLOC_TABLE, INSTR_ARRAY_SET, INSTR_CALL, INSTR_CALL_TAIL, INSTR_DROP, INSTR_DUP, INSTR_GET_LOCAL, INSTR_GLOBAL_ENV, INSTR_IS_TABLE, INSTR_JFALSE, INSTR_JFALSE_IMM8, INSTR_JNEG, INSTR_JNEG_IMM8, INSTR_JNFALSE, INSTR_JNFALSE_IMM8, INSTR_JNNEG, INSTR_JNNEG_IMM8, INSTR_JNPOS, INSTR_JNPOS_IMM8, INSTR_JPOS, INSTR_JPOS_IMM8, INSTR_JUMP, INSTR_JUMP_IMM8, INSTR_JZ, INSTR_JZ_IMM8, INSTR_LOAD_BYTES_IMM, INSTR_LOAD_IMM8, INSTR_LOAD_IMM16, INSTR_LOAD_IMM32, INSTR_LOAD_IMM64, INSTR_PUSH_FALSE, INSTR_PUSH_LAST_SMALL, INSTR_PUSH_MINUS_ONE, INSTR_PUSH_NIL, INSTR_PUSH_TRUE, INSTR_RETURN, INSTR_SET_LOCAL, INSTR_SET_TYPE, INSTR_STACK_LOAD, INSTR_TABLE_GET, INSTR_TABLE_SET
 };
 use crate::interpreter::heap::Value;
 use crate::interpreter::prims::is_bytecode_primitive;
@@ -27,12 +21,9 @@ pub fn compile(from: crate::core::Module) -> Result<Module> {
 }
 
 pub fn compile_expression(expr: crate::core::Expression) -> Result<Module> {
-    let binding = crate::core::Binding::binding(0, Binder::Local(Name::str("it")), expr);
-    let module = crate::core::Module {
-        metadata: Metadata::empty(),
-        bindings: vec![binding],
-    };
-    compile(module)
+    let mut compilation = Compilation::with_expression(expr);
+    compilation.compile()?;
+    Ok(compilation.module)
 }
 
 #[derive(Debug, Clone)]
@@ -112,6 +103,12 @@ impl Compilation {
         let mut compilation = Compilation::new();
         compilation.input = CompilationInput::Bindings(module.bindings);
         compilation.module.metadata = Some(module.metadata);
+        compilation
+    }
+
+    pub(super) fn with_expression(expr: crate::core::Expression) -> Self {
+        let mut compilation = Compilation::new();
+        compilation.input = CompilationInput::Expression(expr);
         compilation
     }
 
@@ -274,6 +271,7 @@ impl Compilation {
             Literal::String(str) => {
                 let bytes = str.as_bytes().to_vec();
                 self.compile_literal(&Literal::Bytearray(bytes), code)?;
+                code.push(INSTR_DUP);
                 code.push(INSTR_GLOBAL_ENV);
                 self.compile_literal(&Literal::Symbol(Symbol::from("string")), code)?;
                 code.push(INSTR_TABLE_GET);
@@ -370,12 +368,15 @@ impl Compilation {
         let is_tail = self.is_tail;
         self.is_tail = false;
         let callee = &exps[0];
+        dbg!(&exps);
         let bytecode_prim = if let Expression::Var(_, sym) = callee {
             is_bytecode_primitive(sym)
         } else {
-            self.compile_expression(callee, code)?;
             None
         };
+        if bytecode_prim.is_none() {
+            self.compile_expression(callee, code)?;
+        }
         for e in &exps[1..] {
             self.compile_expression(e, code)?;
         }
@@ -553,18 +554,28 @@ fn load_constant_value(v: &Value, code: &mut Vec<u8>) {
 }
 
 fn load_constant_int(n: i64, code: &mut Vec<u8>) {
-    let v = Value::integer(n);
-    load_constant_value(&v, code);
+    const LAST_SMALL:i64 = INSTR_PUSH_LAST_SMALL as i64;
+    match n {
+        -1 => code.push(INSTR_PUSH_MINUS_ONE),
+        0..=LAST_SMALL => code.push(n as u8),
+        _ => {
+                    
+            let v = Value::integer(n);
+            load_constant_value(&v, code);
+        }
+    }
 }
 
 fn push_nil(code: &mut Vec<u8>) {
-    code.push(INSTR_LOAD_IMM8);
-    code.push(0x36);
+    code.push(INSTR_PUSH_NIL);
 }
 
 fn push_bool(b: bool, code: &mut Vec<u8>) {
-    code.push(INSTR_LOAD_IMM8);
-    code.push(if b { 0x2e } else { 0x26 });
+    if b {
+        code.push(INSTR_PUSH_TRUE);
+    } else {
+        code.push(INSTR_PUSH_FALSE);
+    }
 }
 
 fn push_bytes(items: &[u8], code: &mut Vec<u8>) {

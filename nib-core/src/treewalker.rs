@@ -2,6 +2,7 @@
 #![allow(clippy::mutable_key_type)]
 
 use crate::common::Symbol;
+use crate::runtime::Interpreter;
 use crate::{
     common::{Error, Metadata, Name, Result},
     core::{Arity, Lambda, desugar, desugar_expression},
@@ -9,6 +10,7 @@ use crate::{
     treewalker::evaluate::Environment,
 };
 use libffi::middle::{Cif, CodePtr};
+use std::path::Path;
 use std::{
     cell::RefCell,
     collections::{BTreeSet, HashMap, HashSet},
@@ -37,6 +39,36 @@ impl Default for Runtime {
     }
 }
 
+impl Interpreter for Runtime {
+    fn load(&mut self, path: &Path, reload: bool) -> Result<()> {
+        let path_str = path.as_os_str().to_str().unwrap();
+        log::info!("Loading {path_str}");
+        let code = read_to_string(path)?;
+        self.add_code(path_str, &code)
+    }
+
+    fn add_code(&mut self, name: &str, code: &str) -> Result<()> {
+        let mut ast_module = crate::ast::Module::new(Some(name.to_owned()), code);
+        parse_declarations(&mut ast_module)?;
+        let mut module = desugar(ast_module)?;
+        if self.output_core {
+            for b in &module.bindings {
+                println!("{}", b);
+            }
+        }
+        let v = self
+            .metadata
+            .insert(name.to_owned(), module.metadata.clone());
+        let mut env = Environment::new();
+        self.evaluate(&mut module, &mut env)?;
+        Ok(())
+    }
+
+    fn set_output_core(&mut self, output: bool) {
+        self.output_core = output;
+    }
+}
+
 impl Runtime {
     pub fn new() -> Self {
         let mut rt = Runtime {
@@ -54,29 +86,6 @@ impl Runtime {
         rt
     }
 
-    pub fn load(&mut self, path: &str) -> Result<()> {
-        log::info!("Loading {path}");
-        let code = read_to_string(path)?;
-        self.add_code(path, &code)
-    }
-
-    pub fn add_code(&mut self, name: &str, code: &str) -> Result<()> {
-        let mut ast_module = crate::ast::Module::new(Some(name.to_owned()), code);
-        parse_declarations(&mut ast_module)?;
-        let mut module = desugar(ast_module)?;
-        if self.output_core {
-            for b in &module.bindings {
-                println!("{}", b);
-            }
-        }
-        let v = self
-            .metadata
-            .insert(name.to_owned(), module.metadata.clone());
-        let mut env = Environment::new();
-        self.evaluate(&mut module, &mut env)?;
-        Ok(())
-    }
-
     pub fn run_expression(&mut self, code: &str) -> Result<Value> {
         let ast_expr = parse_expression(code)?;
         let expr = desugar_expression(ast_expr)?;
@@ -88,10 +97,6 @@ impl Runtime {
             msg: msg.to_owned(),
             loc: None,
         })
-    }
-
-    pub fn set_output_core(&mut self, output: bool) {
-        self.output_core = output;
     }
 
     pub fn add_global(&mut self, name: &str, value: Value) {

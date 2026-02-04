@@ -1,12 +1,14 @@
 #![cfg(test)]
 
 use crate::ast::Module;
+use crate::common::sym;
 use crate::core::desugar;
 use crate::interpreter::Runtime;
 use crate::interpreter::bytecode::INSTR_ADD;
 use crate::interpreter::compile::Compilation;
 use crate::interpreter::heap::{Bytes, Space};
 use crate::parser::parse_declarations;
+use crate::runtime::Interpreter;
 use crate::{
     common::{Result, Symbol},
     interpreter::heap::{Array, Table, Value, ValueRepr},
@@ -120,5 +122,57 @@ fn add_numbers() -> Result<()> {
     assert!(err.is_ok());
     let res = Value::get_integer(&rt.stack.pop());
     assert_eq!(res, 15);
+    Ok(())
+}
+
+#[test]
+fn run_literal_expression_integer() -> Result<()> {
+    let mut rt = Runtime::new();
+    let val = rt.run_expression("1")?;
+    assert_eq!(val, Value::integer(1));
+    Ok(())
+}
+
+#[test]
+fn run_literal_expression_bytes() -> Result<()> {
+    let mut rt = Runtime::new();
+    let val = rt.run_expression("#[1,2,3]")?;
+    assert_eq!(val.get_bytes().get_slice(), [1,2,3]);
+    Ok(())
+}
+
+#[test]
+fn run_literal_expression_string() -> Result<()> {
+    let mut rt = Runtime::new();
+    let val = rt.run_expression("\"hej\"")?;
+    assert_eq!(val.get_bytes().get_slice(), [104,101,106]);
+    Ok(())
+}
+
+#[test]
+fn run_literal_expression_symbol() -> Result<()> {
+    let mut rt = Runtime::new();
+    let val = rt.run_expression("#hej")?;
+    assert_eq!(val.get_symbol(), sym("hej"));
+    Ok(())
+}
+
+
+#[test]
+fn run_expression() -> Result<()> {
+    let mut rt = Runtime::new();
+    let val = rt.run_expression("[1,2]")?;
+    dbg!(val);
+    Ok(())
+}
+
+
+#[test]
+fn run_simple_binding() -> Result<()> {
+    let mut rt = Runtime::new();
+    rt.add_code("test","a=1")?;
+    let val = rt.get_global(&sym("a"));
+    dbg!(val);
+    assert_eq!(val.get_integer(), 1);
     Ok(())
 }

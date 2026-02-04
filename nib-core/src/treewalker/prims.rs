@@ -1,8 +1,10 @@
 use std::ops::{Shl, Shr};
 use std::os::raw::c_void;
+use std::path::Path;
 
 use crate::common::{Error, Name, Result, Symbol, sym};
 use crate::core::Arity;
+use crate::runtime::Interpreter;
 use crate::treewalker::{Runtime, Value};
 
 impl Runtime {
@@ -859,10 +861,12 @@ impl Runtime {
             Ok(Value::Table(type_table)) => {
                 let table = &type_table.borrow().table;
                 let tid = Symbol::from("type_id");
-                if let Some(Value::Bytes(b)) = table.get(&tid) {
-                    str::from_utf8(&b.borrow().bytes).unwrap_or_default() == t
-                } else {
-                    false
+                match table.get(&tid) {
+                    Some(Value::Symbol(sym)) => sym.as_str() == t,
+                    Some(Value::Bytes(b)) => {
+                        str::from_utf8(&b.borrow().bytes).unwrap_or_default() == t
+                    }
+                    _ => false,
                 }
             }
             _ => false,
@@ -986,7 +990,7 @@ impl Runtime {
                 let name = &b.borrow().bytes;
                 let file = str::from_utf8(name)
                     .map_err(|_| Error::runtime_error("Invalid utf8 string"))?;
-                match self.load(file) {
+                match self.load(Path::new(file), true) {
                     Ok(_) => Ok(Value::Bool(true)),
                     Err(_) => Ok(Value::Bool(false)),
                 }

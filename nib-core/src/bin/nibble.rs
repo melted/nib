@@ -1,18 +1,22 @@
 use std::env::args;
 use std::fs::read_to_string;
 use std::io::{self, Read, Write, stderr, stdin};
+use std::path::Path;
 use std::process::exit;
 
 use nib_core::common::Error;
 use nib_core::parser::dump_lex;
-use nib_core::treewalker::Runtime;
+use nib_core::runtime::Interpreter;
 
 /// Simple runner of Nib code. Anything more elaborate goes into
 /// another crate, where it can pull in dependencies and go wild
 /// in general.
 fn main() -> io::Result<()> {
     let opts = parse_options();
-    let mut rt = Runtime::new();
+    let mut rt: Box<dyn Interpreter> = match opts.interpreter {
+        Backend::Bytecode => Box::new(nib_core::interpreter::Runtime::new()),
+        Backend::Treewalker => Box::new(nib_core::treewalker::Runtime::new()),
+    };
     let prelude_code = include_str!("../../lib/prelude.nib");
     let level = if opts.verbose {
         log::Level::Info
@@ -41,7 +45,7 @@ fn main() -> io::Result<()> {
     } else {
         let mut res = Ok(());
         for f in opts.files {
-            res = rt.load(&f);
+            res = rt.load(&Path::new(&f), false);
             if res.is_err() {
                 break;
             }
@@ -62,12 +66,18 @@ fn main() -> io::Result<()> {
     Ok(())
 }
 
+pub enum Backend {
+    Treewalker,
+    Bytecode,
+}
+
 pub struct Options {
     pub no_prelude: bool,
     pub verbose: bool,
     pub use_treewalker: bool,
     pub output_core: bool,
     pub dump_tokens: bool,
+    pub interpreter: Backend,
     pub files: Vec<String>,
 }
 
@@ -79,6 +89,7 @@ impl Options {
             use_treewalker: true,
             output_core: false,
             dump_tokens: false,
+            interpreter: Backend::Treewalker,
             files: Vec::new(),
         }
     }
@@ -99,6 +110,12 @@ fn parse_options() -> Options {
             }
             _ if arg == "--dump-tokens" => {
                 opts.dump_tokens = true;
+            }
+            _ if arg == "--treewalker" => {
+                opts.interpreter = Backend::Treewalker;
+            }
+            _ if arg == "--bytecode" => {
+                opts.interpreter = Backend::Bytecode;
             }
             file => {
                 opts.files.push(file);

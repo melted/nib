@@ -119,9 +119,9 @@ pub const INSTR_ROUND: u8 = 55;
 pub const INSTR_LOG: u8 = 56;
 pub const INSTR_EXP: u8 = 57;
 
-// Conversions TODO implement
+// Conversions
 pub const INSTR_TOINT: u8 = 58;
-pub const INSTR_TOPTR: u8 = 59;
+pub const INSTR_TOPTR: u8 = 59; // TODO
 
 // Calls
 pub const INSTR_CALL: u8 = 60;
@@ -194,7 +194,7 @@ pub const INSTR_SET_LOCAL: u8 = 119;
 pub const INSTR_GLOBAL_ENV: u8 = 120;
 pub const INSTR_INVALID: u8 = 121;
 pub const INSTR_HALT: u8 = 122;
-pub const INSTR_NOP: u8 = 0;
+pub const INSTR_NOP: u8 = 22;
 pub const INSTR_RETURN: u8 = 123;
 pub const INSTR_APPLY: u8 = 124; // TODO
 pub const INSTR_APPLY_TAIL: u8 = 125; // TODO
@@ -215,6 +215,14 @@ pub const INSTR_IS_PAP: u8 = 137;
 pub const INSTR_IS_CALL_CONT: u8 = 138;
 pub const INSTR_IS_OBJECT: u8 = 139;
 pub const INSTR_IS_IMMEDIATE: u8 = 140;
+pub const INSTR_PUSH_MINUS_ONE:u8 = 152; //TODO
+pub const INSTR_PUSH_NIL:u8 = 153; //TODO
+pub const INSTR_PUSH_FALSE:u8 = 154; //TODO
+pub const INSTR_PUSH_TRUE:u8 = 155; //TODO
+pub const INSTR_PUSH_ZERO:u8 = 0; // TODO
+pub const INSTR_PUSH_LAST_SMALL:u8 = 20; // TODO
+
+
 
 pub(super) fn is_immediate_jump(op: u8) -> bool {
     op >= INSTR_JUMP_IMM8 && op <= INSTR_JNFALSE_IMM8

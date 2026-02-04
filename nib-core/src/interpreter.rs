@@ -5,20 +5,23 @@
 
 use std::cmp::Ordering;
 use std::ffi::c_void;
+use std::fs::read_to_string;
 use std::ops::{BitXor, Shl, Shr};
+use std::path::Path;
 
 use symbol_table::static_symbol;
 
 use crate::ast;
 use crate::common::{Error, Name, Result, Symbol, sym, symbol_id};
-use crate::core::desugar;
+use crate::core::{desugar, desugar_expression};
 use crate::interpreter::bytecode::*;
-use crate::interpreter::compile::{Module, compile};
+use crate::interpreter::compile::{Module, compile, compile_expression};
 use crate::interpreter::heap::{
     Array, Bytes, Closure, Heap, TYPE_BYTECODE, TYPE_EXTERN, Table, Value, ValueRepr, set_value,
 };
 use crate::interpreter::prims::PrimFn;
-use crate::parser::parse_declarations;
+use crate::parser::{parse_declarations, parse_expression};
+use crate::runtime::Interpreter;
 
 pub mod bytecode;
 pub mod compile;
@@ -42,6 +45,38 @@ const DEFAULT_HEAP_SIZE: usize = 1000000;
 const DEFAULT_STACK_SIZE: usize = 10000;
 const DEFAULT_CALL_STACK_SIZE: usize = 10000;
 
+impl Interpreter for Runtime {
+    fn load(&mut self, path: &Path, reload: bool) -> Result<()> {
+        if self.has_package(path)? && !reload {
+            return Ok(());
+        }
+        let id = self.package_name(path)?;
+        self.package_table()
+            .insert(self, Value::symbol(&id), Value::bool(true));
+        let code = read_to_string(path)?;
+        let file = path
+            .as_os_str()
+            .to_str()
+            .ok_or(self.err("Filenames must be utf-8"))?;
+        self.add_code(file, &code)
+    }
+
+    fn add_code(&mut self, name: &str, code: &str) -> Result<()> {
+        let file = if name.is_empty() {
+            None
+        } else {
+            Some(name.to_owned())
+        };
+        let mut module = ast::Module::new(file, code);
+        parse_declarations(&mut module)?;
+        let core = desugar(module)?;
+        let bytecode = compile(core)?;
+        self.run_module(bytecode)
+    }
+
+    fn set_output_core(&mut self, output: bool) {}
+}
+
 impl Runtime {
     pub fn new() -> Self {
         let heap = Heap::new(DEFAULT_HEAP_SIZE);
@@ -61,44 +96,56 @@ impl Runtime {
         runtime.global_env = global_env;
         runtime.stack = Stack::new(stack);
         runtime.call_stack = Stack::new(call_stack);
+        runtime.register_intrinsics();
         runtime
     }
 
-    pub fn load(&mut self, reload: bool) -> Result<()> {
-        todo!()
+    pub fn package_table(&mut self) -> Table {
+        self.get_name(&Name::str("nib.packages"))
+            .unwrap()
+            .get_table()
     }
 
-    pub fn add_code(&mut self, name: &str, code: &str) -> Result<()> {
-        let file = if name.is_empty() {
-                None 
-            } else { 
-                Some(name.to_owned())
-            };
-        let mut module = ast::Module::new(file, code);
-        parse_declarations(&mut module)?;
-        let core = desugar(module)?;
-        let bytecode = compile(core)?;
-        self.run_module(bytecode)
+    pub fn has_package(&mut self, path: &Path) -> Result<bool> {
+        let id = self.package_name(path)?;
+        Ok(!self.package_table().get(Value::symbol(&id)).is_nil())
+    }
+
+    pub fn package_name(&mut self, path: &Path) -> Result<Symbol> {
+        let basename = path
+            .file_stem()
+            .ok_or(self.err("No filename in package check"))?;
+        let validname = basename.to_str().ok_or(self.err(&format!(
+            "Weird package name {}, keep to unicode",
+            basename.to_string_lossy()
+        )))?;
+        Ok(sym(validname))
     }
 
     pub fn run_module(&mut self, bytecode: Module) -> Result<()> {
         self.local_env = self.make_local_env(&bytecode);
         let bc = Bytes::with(self, &bytecode.byte_code);
         self.code = Value::from(bc);
-        let closure = Closure::make_low(self, 
-       &bc, 
-            self.local_env.clone(), 
-      Value::integer(0), 
-     Value::integer(0));
+        let closure = Closure::make_low(
+            self,
+            &bc,
+            self.local_env.clone(),
+            Value::integer(0),
+            Value::integer(0),
+        );
         self.closure = Value::from(closure);
         self.run()
     }
-    
+
     pub fn run_expression(&mut self, code: &str) -> Result<Value> {
-        todo!()
+        let expression = parse_expression(code)?;
+        let core = desugar_expression(expression)?;
+        let compiled = compile_expression(core)?;
+        self.run_module(compiled)?;
+        Ok(self.stack.pop())
     }
 
-    pub fn make_local_env(&mut self, module : &compile::Module) -> Value {
+    pub fn make_local_env(&mut self, module: &compile::Module) -> Value {
         let array = Array::make(self, module.local_env_size);
         for (sym, &idx) in &module.want_symbols {
             array.set(idx, Value::symbol(sym));
@@ -274,6 +321,7 @@ impl Runtime {
         let instr = code[self.ip];
         self.ip += 1;
         match instr {
+            INSTR_PUSH_ZERO..=INSTR_PUSH_LAST_SMALL => self.op_push_small(instr),
             INSTR_NOP => Ok(false),
             INSTR_GT..=INSTR_LTE => self.op_compare(instr),
             INSTR_BITAND..=INSTR_BITSHIFT => self.op_bitops(instr),
@@ -299,6 +347,8 @@ impl Runtime {
             INSTR_ROT => self.op_rot(),
             INSTR_DROP_FRAME => self.op_drop_frame(),
             INSTR_STACK_LIFT => self.op_stack_lift(),
+            INSTR_TYPE => self.op_type(),
+            INSTR_SET_TYPE => self.op_set_type(),
             INSTR_ALLOC_FLOAT..=INSTR_ALLOC_CLOSURE => self.op_alloc(instr),
             INSTR_ARRAY_REF => self.op_array_get(),
             INSTR_ARRAY_SET => self.op_array_set(),
@@ -313,6 +363,7 @@ impl Runtime {
             INSTR_SET_LOCAL => self.op_set_local(),
             INSTR_GLOBAL_ENV => self.op_global_env(),
             INSTR_IS_INTEGER..=INSTR_IS_IMMEDIATE => self.op_type_pred(instr),
+            INSTR_PUSH_MINUS_ONE..=INSTR_PUSH_TRUE => self.op_push_const(instr),
             _ => self.error(&format!("unimplemented opcode: {}", instr)),
         }
     }
@@ -677,10 +728,16 @@ impl Runtime {
     }
 
     fn op_return(&mut self) -> Result<bool> {
-        let cc = self.stack.peek(1);
+        let cc = if self.stack.top() > 0 {
+            self.stack.peek(1)
+        } else {
+            Value::nil()
+        };
         if cc.is_call_continuation() {
             self.stack.dip(cc.get_cc_args());
             self.op_call(INSTR_CALL_TAIL)
+        } else if self.call_stack.is_empty() {
+            Ok(true)
         } else {
             let old_base = self.call_stack.pop().get_integer() as usize;
             let ip = self.call_stack.pop().get_integer() as usize;
@@ -737,6 +794,24 @@ impl Runtime {
         Ok(false)
     }
 
+    fn op_push_small(&mut self, op: u8) -> Result<bool> {
+        let val = op as i64;
+        self.stack.push(Value::integer(val));
+        Ok(false)
+    }
+
+    fn op_push_const(&mut self, op: u8) -> Result<bool> {
+        let val = match op {
+            INSTR_PUSH_MINUS_ONE => Value::integer(-1),
+            INSTR_PUSH_NIL => Value::nil(),
+            INSTR_PUSH_TRUE => Value::bool(true),
+            INSTR_PUSH_FALSE => Value::bool(false),
+            _ => Value::nil()
+        };
+        self.stack.push(val);
+        Ok(false)
+    }
+
     fn op_load_imm(&mut self, op: u8) -> Result<bool> {
         let bytes = self.code.get_bytes();
         let code = bytes.get_slice();
@@ -789,7 +864,7 @@ impl Runtime {
     }
 
     fn op_dup(&mut self) -> Result<bool> {
-        self.stack.pick(0);
+        self.stack.pick(1);
         Ok(false)
     }
 
@@ -836,9 +911,10 @@ impl Runtime {
     }
 
     fn op_set_type(&mut self) -> Result<bool> {
-        let val = self.stack.pop();
         let typ = self.stack.pop();
+        let val = self.stack.pop();
         ensure_type(&typ, ValueRepr::Table)?;
+        dbg!(val);
         match val.get_repr() {
             ValueRepr::Array | ValueRepr::Bytes | ValueRepr::Table | ValueRepr::Closure => {
                 let obj = val.get_object();
@@ -1012,10 +1088,14 @@ impl Runtime {
     }
 
     pub fn error<T>(&self, msg: &str) -> Result<T> {
-        Err(Error::Runtime {
+        Err(self.err(msg))
+    }
+
+    pub fn err(&self, msg: &str) -> Error {
+        Error::Runtime {
             msg: msg.to_owned(),
             loc: None,
-        })
+        }
     }
 
     // Because we want to allocate a new stack instead of overflowing,
@@ -1064,6 +1144,10 @@ impl Stack {
             top: 0,
             base: 0,
         }
+    }
+
+    pub(super) fn is_empty(&self) -> bool {
+        self.top == 0
     }
 
     pub(super) fn push(&mut self, val: Value) {
@@ -1129,7 +1213,11 @@ impl Stack {
     }
 
     pub(super) fn peek(&self, i: usize) -> Value {
-        self.array.at(self.top - i)
+        if self.top < i {
+            Value::nil()
+        } else {
+            self.array.at(self.top - i)
+        }
     }
 
     pub(super) fn top(&self) -> usize {

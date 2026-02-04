@@ -31,7 +31,14 @@ use crate::{
 pub type PrimFn = fn(&mut Runtime) -> Result<()>;
 
 impl Runtime {
-    pub(super) fn register_primitives(&mut self) -> Result<()> {
+    pub(super) fn register_intrinsics(&mut self) {
+        self.register_type_tables();
+        self.register_primitives();
+        self.register_nib_namespace().unwrap();
+        self.register_system_constants().unwrap();
+    }
+
+    pub(super) fn register_primitives(&mut self) {
         self.set_global(&sym("global"), &self.global_env.clone());
 
         let print_representation = self.make_primitive(prim_print_representation, Arity::Fixed(1));
@@ -62,12 +69,10 @@ impl Runtime {
         self.set_global(&sym("_prim_symbol_make"), &symbol_make);
 
         let get_path = self.make_primitive(prim_get_path, Arity::VarArg(2, 1));
-        self.set_global(&sym("_prim_get_path"), &symbol_make);
-
-        Ok(())
+        self.set_global(&sym("_prim_get_path"), &get_path);
     }
 
-    pub(super) fn register_type_tables(&mut self) -> Result<()> {
+    pub(super) fn register_type_tables(&mut self) {
         self.register_type("string", "string");
         self.register_type("nil_type", "nil");
         self.register_type("bool", "bool");
@@ -82,7 +87,6 @@ impl Runtime {
         self.register_type("function", "function");
         self.register_type("call_continuation", "call_continuation");
         self.register_type("partial_application", "partial_application");
-        Ok(())
     }
 
     fn register_type(&mut self, table_name: &str, type_name: &str) {
@@ -106,6 +110,12 @@ impl Runtime {
         self.add_name(&Name::str("system.dll_prefix"), &dll_prefix)?;
         let exe_ext = self.make_string(std::env::consts::EXE_EXTENSION);
         self.add_name(&Name::str("system.exe_extension"), &exe_ext)?;
+        Ok(())
+    }
+
+    pub(super) fn register_nib_namespace(&mut self) -> Result<()> {
+        let table = Value::from(Table::make(self));
+        self.add_name(&Name::str("nib.packages"), &table)?;
         Ok(())
     }
 

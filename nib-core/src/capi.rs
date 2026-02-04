@@ -4,7 +4,7 @@
 use log::error;
 use std::ffi::{CStr, c_char, c_int};
 
-use crate::{ast::Module, parser::parse_declarations, treewalker::Runtime};
+use crate::{ast::Module, parser::parse_declarations, runtime::Interpreter, treewalker::Runtime};
 
 const NIB_SUCCESS: c_int = 0;
 const NIB_ERROR: c_int = 1;
