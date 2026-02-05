@@ -683,13 +683,15 @@ impl Runtime {
         }
         let extra_args = args - closure.num_args() - 1;
         if let Some(i) = closure.vararg() {
-            let pos = i - 1;
-            let mut var_arg = Array::make(self, extra_args);
-            let argv = self.stack.slice_mut(args, 0);
-            var_arg.fill(&argv[pos..pos + extra_args], 0, extra_args);
-            argv.copy_within(pos + extra_args.., pos + 1);
+            let varargs = extra_args + 1;
+            let mut var_arg = Array::make(self, varargs);
+            let argv = self.stack.slice_mut(args - 1, 0);
+            var_arg.fill(&argv[i..i+varargs], 0, varargs);
+            if args - 1 > i+varargs {
+                argv.copy_within(i + varargs.., i + 1);
+            }
             argv[args - extra_args..].fill(Value::nil());
-            argv[pos] = Value::from(var_arg);
+            argv[i] = Value::from(var_arg);
             self.stack.top -= extra_args;
         } else if extra_args > 0 {
             self.stack_push(Value::call_continuation(extra_args));

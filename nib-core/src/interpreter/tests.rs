@@ -41,6 +41,16 @@ fn roundtrip_pointer() -> Result<()> {
 }
 
 #[test]
+fn roundtrip_cpointer() -> Result<()> {
+    let hello = "hello";
+    let hello_ptr = hello.as_ptr().cast();
+    let val = Value::cpointer(hello_ptr);
+    let roundtripped = val.get_cpointer::<u8>();
+    assert_eq!(roundtripped, hello_ptr);
+    Ok(())
+}
+
+#[test]
 fn roundtrip_char() -> Result<()> {
     let a = 'a';
     let val = Value::char(a);
