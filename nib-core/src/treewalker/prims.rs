@@ -684,9 +684,9 @@ impl Runtime {
     }
 
     pub(super) fn prim_array_ref(&self, args: &[Value]) -> Result<Value> {
-        let arr = args[0].get_array()?;
+        let arr = args[1].get_array()?;
         let array = &arr.borrow().array;
-        let n = usize::try_from(&args[1])?;
+        let n = usize::try_from(&args[0])?;
         if n < array.len() {
             Ok(array[n].clone())
         } else {
@@ -728,8 +728,8 @@ impl Runtime {
     }
 
     pub(super) fn prim_bytes_ref(&self, args: &[Value]) -> Result<Value> {
-        let b = &args[0].get_bytes()?;
-        let n = i64::try_from(&args[1])? as usize;
+        let b = &args[1].get_bytes()?;
+        let n = i64::try_from(&args[0])? as usize;
         let bytes = &mut b.borrow_mut().bytes;
         if let Some(byte) = bytes.get(n) {
             Ok(Value::from(*byte))
@@ -747,11 +747,11 @@ impl Runtime {
     }
 
     pub(super) fn prim_array_set(&self, args: &[Value]) -> Result<Value> {
-        let arr = &args[0].get_array()?;
+        let arr = &args[2].get_array()?;
         let n = i64::try_from(&args[1])? as usize;
         let array = &mut arr.borrow_mut().array;
         if n < array.len() {
-            array[n] = args[2].clone();
+            array[n] = args[0].clone();
             Ok(Value::Nil)
         } else {
             self.error("index out of bounds in _prim_array set")
@@ -790,9 +790,9 @@ impl Runtime {
     }
 
     pub(super) fn prim_bytes_set(&self, args: &[Value]) -> Result<Value> {
-        let b = &args[0].get_bytes()?;
+        let b = &args[2].get_bytes()?;
         let n = i64::try_from(&args[1])? as usize;
-        let v = u8::try_from(&args[2])?;
+        let v = u8::try_from(&args[0])?;
         let bytes = &mut b.borrow_mut().bytes;
         if n < bytes.len() {
             bytes[n] = v;
@@ -803,10 +803,10 @@ impl Runtime {
     }
 
     pub(super) fn prim_table_set(&self, args: &[Value]) -> Result<Value> {
-        let tab = &args[0].get_table()?;
+        let tab = &args[2].get_table()?;
         let sym = &args[1].get_symbol()?;
         let table = &mut tab.borrow_mut().table;
-        table.insert(sym.clone(), args[2].clone());
+        table.insert(sym.clone(), args[0].clone());
         Ok(Value::Nil)
     }
 

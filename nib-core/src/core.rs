@@ -166,8 +166,8 @@ impl DesugarState {
                         self.new_id(),
                         vec![
                             self.named_var("_prim_array_ref"),
-                            self.named_var(&nam_arr.string()),
                             Expression::Literal(self.new_id(), Literal::Integer(i as i64)),
+                            self.named_var(&nam_arr.string()),
                         ],
                     );
                     let binder = if is_local {
@@ -231,8 +231,8 @@ impl DesugarState {
                 for (i, f) in fields.iter().enumerate() {
                     let refer = app(&vec![
                         var(&static_symbol!("_prim_array_ref")),
-                        var(&loc),
                         literal(&Literal::Integer(i as i64)),
+                        var(&loc),
                     ]);
                     let mut field = self.desugar_arg_pattern(&f, &refer)?;
                     parts.append(&mut field);

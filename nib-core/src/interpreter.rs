@@ -6,6 +6,7 @@
 use std::cmp::Ordering;
 use std::ffi::c_void;
 use std::fs::read_to_string;
+use std::mem;
 use std::ops::{BitXor, Shl, Shr};
 use std::path::Path;
 
@@ -714,9 +715,9 @@ impl Runtime {
                 self.ip = 0;
             }
             TYPE_EXTERN => {
-                let fun_ptr = closure.code_value().get_pointer() as *mut PrimFn;
+                let fun_ptr = closure.code_value().get_cpointer() as *const PrimFn;
                 unsafe {
-                    let fun = *fun_ptr;
+                    let fun:PrimFn = mem::transmute(fun_ptr);
                     fun(self)?;
                 }
             }
@@ -857,8 +858,8 @@ impl Runtime {
     }
 
     fn op_put(&mut self) -> Result<bool> {
-        let val = self.stack.pop();
         let depth = self.stack.pop().get_integer() as usize;
+        let val = self.stack.pop();
         self.stack.put(depth, val);
         Ok(false)
     }
@@ -995,17 +996,17 @@ impl Runtime {
     }
 
     fn op_array_get(&mut self) -> Result<bool> {
-        let pos = self.stack.pop();
         let obj = self.stack.pop();
+        let pos = self.stack.pop();
         let val = obj.get_array().at(pos.get_integer() as usize);
         self.stack_push(val);
         Ok(false)
     }
 
     fn op_array_set(&mut self) -> Result<bool> {
-        let val = self.stack.pop();
-        let pos = self.stack.pop();
         let obj = self.stack.pop();
+        let pos = self.stack.pop();
+        let val = self.stack.pop();
         obj.get_array().set(pos.get_integer() as usize, val);
         Ok(false)
     }
@@ -1018,17 +1019,17 @@ impl Runtime {
     }
 
     fn op_bytes_get(&mut self) -> Result<bool> {
-        let pos = self.stack.pop();
         let obj = self.stack.pop();
+        let pos = self.stack.pop();
         let val = obj.get_bytes().at(pos.get_integer() as usize);
         self.stack_push(Value::integer(val as i64));
         Ok(false)
     }
 
     fn op_bytes_set(&mut self) -> Result<bool> {
-        let byte = self.stack.pop();
-        let pos = self.stack.pop();
         let obj = self.stack.pop();
+        let pos = self.stack.pop();
+        let byte = self.stack.pop();
         let val = byte.get_integer() as u8;
         obj.get_bytes().set(pos.get_integer() as usize, val);
         Ok(false)
@@ -1042,17 +1043,17 @@ impl Runtime {
     }
 
     fn op_table_get(&mut self) -> Result<bool> {
-        let sym = self.stack.pop();
         let obj = self.stack.pop();
+        let sym = self.stack.pop();
         let val = obj.get_table().get(sym);
         self.stack_push(val);
         Ok(false)
     }
 
     fn op_table_set(&mut self) -> Result<bool> {
-        let val = self.stack.pop();
-        let sym = self.stack.pop();
         let obj = self.stack.pop();
+        let sym = self.stack.pop();
+        let val = self.stack.pop();
         obj.get_table().insert(self, sym, val);
         Ok(false)
     }
@@ -1076,8 +1077,8 @@ impl Runtime {
     }
 
     fn op_set_local(&mut self) -> Result<bool> {
-        let val = self.stack.pop();
         let index = self.stack.pop().get_integer() as usize;
+        let val = self.stack.pop();
         self.local_env.get_array().set(index, val);
         Ok(false)
     }

@@ -197,6 +197,7 @@ impl Compilation {
             self.get_variable(name, code);
             for fix in fixups {
                 code.push(INSTR_DUP);
+                load_constant_int(fix.1 as i64, code);
                 load_constant_int(fix.0 as i64, code);
                 code.push(INSTR_GET_LOCAL);
                 code.push(INSTR_ARRAY_SET);

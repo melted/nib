@@ -113,9 +113,13 @@ println a =  print a & print "\n"
 //
 //
 
+// Table functions
+table.set tab key value = _prim_table_set value key tab
+table.size = _prim_table_size
+
 // Array functions
-array.ref = _prim_array_ref  
-array.set = _prim_array_set
+array.ref arr pos = _prim_array_ref pos arr 
+array.set arr pos val = _prim_array_set val pos arr
 array.size = _prim_array_size
 array.create = _prim_array_create
 array.for_each f arr = iter 0 where
@@ -144,8 +148,8 @@ array.match v | type v == array = v
 array.match _ = false
 
 bytes.create = _prim_bytes_create
-bytes.ref = _prim_bytes_ref
-bytes.set = _prim_bytes_set
+bytes.ref arr pos = _prim_bytes_ref pos arr
+bytes.set arr pos val = _prim_bytes_set val pos arr
 bytes.size = _prim_bytes_size
 bytes.concat x y = merged where
                         xs = bytes.size x
@@ -160,8 +164,8 @@ bytes.concat x y = merged where
                         _ = go 0
 
 string.create = _prim_bytes_create
-string.ref = _prim_bytes_ref
-string.set = _prim_bytes_set
+string.ref = bytes.ref
+string.set = bytes.set
 string.size = _prim_bytes_size
 string.concat x y = cc where
                         cc = bytes.concat x y

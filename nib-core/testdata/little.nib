@@ -60,12 +60,12 @@ _ = print (fib 5)
 
 // Arrays
 arr = [1,2,3,4,5]
-x = _prim_array_ref arr 2
-_ = _prim_array_set arr 2 (x+19)
+x = _prim_array_ref 2 arr
+_ = _prim_array_set (x+19) 2 arr 
 _ = print arr
 
-array.set = _prim_array_set
-array.ref = _prim_array_ref
+array.set arr pos val = _prim_array_set val pos arr
+array.ref arr pos = _prim_array_ref pos arr
 
 arr2 = _prim_array_create 100
 _ = print (_prim_array_size arr2)
