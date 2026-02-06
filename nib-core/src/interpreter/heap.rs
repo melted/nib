@@ -838,7 +838,7 @@ impl Table {
             let pos = (hash_index + offset) % size;
             let candidate = storage.at(pos);
             if !Self::valid_key(candidate) {
-                storage.set(pos, Value::from(key));
+                storage.set(pos, key);
                 storage.set(pos + 1, value);
                 return pos;
             }
@@ -848,14 +848,15 @@ impl Table {
     }
 
     fn find(&self, key: Value) -> Option<usize> {
-        let hash_index = (key.hash() % self.capacity()) * 2;
-        let mut offset: usize = 0;
         let storage = self.storage();
+        let hash_index = 2 * (key.hash() % (storage.size() / 2));
+        let mut offset: usize = 0;
         let size = storage.size();
         while offset < size {
-            let candidate = storage.at((hash_index + offset) % size);
+            let slot = (hash_index + offset) % size;
+            let candidate = storage.at(slot);
             if Value::from(key) == candidate {
-                return Some(hash_index);
+                return Some(slot);
             } else if candidate.is_nil() {
                 return None;
             }

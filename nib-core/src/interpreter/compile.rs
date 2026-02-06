@@ -7,7 +7,7 @@ use crate::core::{Binder, Binding, Cond, Expression, Lambda, free_vars};
 use crate::interpreter::bytecode::{
     INSTR_ALLOC_ARRAY, INSTR_ALLOC_CLOSURE, INSTR_ALLOC_FLOAT, INSTR_ALLOC_TABLE, INSTR_ARRAY_SET, INSTR_CALL, INSTR_CALL_TAIL, INSTR_DROP, INSTR_DUP, INSTR_GET_LOCAL, INSTR_GLOBAL_ENV, INSTR_IS_TABLE, INSTR_JFALSE, INSTR_JFALSE_IMM8, INSTR_JNEG, INSTR_JNEG_IMM8, INSTR_JNFALSE, INSTR_JNFALSE_IMM8, INSTR_JNNEG, INSTR_JNNEG_IMM8, INSTR_JNPOS, INSTR_JNPOS_IMM8, INSTR_JPOS, INSTR_JPOS_IMM8, INSTR_JUMP, INSTR_JUMP_IMM8, INSTR_JZ, INSTR_JZ_IMM8, INSTR_LOAD_BYTES_IMM, INSTR_LOAD_IMM8, INSTR_LOAD_IMM16, INSTR_LOAD_IMM32, INSTR_LOAD_IMM64, INSTR_PUSH_FALSE, INSTR_PUSH_LAST_SMALL, INSTR_PUSH_MINUS_ONE, INSTR_PUSH_NIL, INSTR_PUSH_TRUE, INSTR_RETURN, INSTR_SET_LOCAL, INSTR_SET_TYPE, INSTR_STACK_LOAD, INSTR_TABLE_GET, INSTR_TABLE_SET
 };
-use crate::interpreter::heap::Value;
+use crate::interpreter::heap::{Value, ValueRepr};
 use crate::interpreter::prims::is_bytecode_primitive;
 use crate::interpreter::stack_return;
 use std::collections::{HashMap, HashSet};
@@ -265,9 +265,7 @@ impl Compilation {
                 code.push(INSTR_ALLOC_FLOAT);
             }
             Literal::Char(c) => {
-                let val = Value::char(*c);
-                code.push(INSTR_LOAD_IMM32);
-                code.extend_from_slice(&val.val.to_le_bytes()[0..4]);
+                load_constant_value( &Value::char(*c), code);
             }
             Literal::String(str) => {
                 let bytes = str.as_bytes().to_vec();
@@ -309,8 +307,8 @@ impl Compilation {
                 (Value::integer(n as i64), Value::integer(i as i64))
             }
         };
-        load_constant_value(&vararg, code);
-        load_constant_value(&arity, code);
+        load_constant(&vararg, code);
+        load_constant_int(arity.get_integer(), code);
         load_constant_int(fun_compilation.module.local_env_size as i64, code);
         code.push(INSTR_ALLOC_ARRAY);
 
@@ -324,7 +322,6 @@ impl Compilation {
         }
         let mut captures_var = None;
         for (var, index) in fun_compilation.module.captures {
-            code.push(INSTR_DUP);
             load_constant_int(index as i64, code);
             if self.future_bindings.contains(&var) {
                 let v = if let Some(v) = captures_var {
@@ -340,6 +337,7 @@ impl Compilation {
                     .or_insert_with(|| vec![(v, index)]);
             } else {
                 self.get_variable(&var, code);
+                load_constant_int(2, code);
                 code.push(INSTR_ARRAY_SET);
             }
         }
@@ -369,7 +367,6 @@ impl Compilation {
         let is_tail = self.is_tail;
         self.is_tail = false;
         let callee = &exps[0];
-        dbg!(&exps);
         let bytecode_prim = if let Expression::Var(_, sym) = callee {
             is_bytecode_primitive(sym)
         } else {
@@ -532,6 +529,15 @@ enum VarLocation {
     Env(usize),
 }
 
+fn load_constant(v:&Value, code: &mut Vec<u8>) {
+    match v.get_repr() {
+        ValueRepr::Nil => push_nil(code),
+        ValueRepr::Bool => push_bool(v.get_bool(), code),
+        ValueRepr::Integer => load_constant_int(v.get_integer(), code),
+        _ => load_constant_value(v, code),
+    } 
+}
+
 fn load_constant_value(v: &Value, code: &mut Vec<u8>) {
     let b = v.val.leading_zeros();
     match b {
@@ -560,7 +566,6 @@ fn load_constant_int(n: i64, code: &mut Vec<u8>) {
         -1 => code.push(INSTR_PUSH_MINUS_ONE),
         0..=LAST_SMALL => code.push(n as u8),
         _ => {
-                    
             let v = Value::integer(n);
             load_constant_value(&v, code);
         }

@@ -188,17 +188,31 @@ fn run_lambda_expression() -> Result<()> {
 fn run_lambda_app_expression() -> Result<()> {
     let mut rt = Runtime::new();
     let val = rt.run_expression("{a} 1")?;
-    dbg!(val);
+    assert_eq!(val.get_integer(), 1);
     Ok(())
 }
 
+#[test]
+fn run_lambda_app_args_expression() -> Result<()> {
+    let mut rt = Runtime::new();
+    let val = rt.run_expression("{ a b -> b } 1 2")?;
+    assert_eq!(val.get_integer(), 2);
+    Ok(())
+}
+
+#[test]
+fn run_lambda_app_multiple_args_expression() -> Result<()> {
+    let mut rt = Runtime::new();
+    let val = rt.run_expression("{ _prim_mul a b } 3 3")?;
+    assert_eq!(val.get_integer(), 9);
+    Ok(())
+}
 
 #[test]
 fn run_simple_binding() -> Result<()> {
     let mut rt = Runtime::new();
     rt.add_code("test","a=1")?;
     let val = rt.get_global(&sym("a"));
-    dbg!(val);
     assert_eq!(val.get_integer(), 1);
     Ok(())
 }

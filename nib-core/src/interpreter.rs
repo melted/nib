@@ -310,16 +310,16 @@ impl Runtime {
         let code_size = self.code.get_bytes().size();
         let bytes = self.code.get_bytes();
         let code = bytes.get_slice();
-        while self.ip < code_size {
-            if self.step(code)? {
+        while self.ip < self.code.get_bytes().size() {
+            if self.step()? {
                 break;
             }
         }
         Ok(())
     }
 
-    fn step(&mut self, code: &[u8]) -> Result<bool> {
-        let instr = code[self.ip];
+    fn step(&mut self) -> Result<bool> {
+        let instr = self.code.get_bytes().at(self.ip);
         self.ip += 1;
         match instr {
             INSTR_PUSH_ZERO..=INSTR_PUSH_LAST_SMALL => self.op_push_small(instr),
@@ -338,7 +338,7 @@ impl Runtime {
             INSTR_JZ..=INSTR_JNFALSE | INSTR_JZ_IMM8..=INSTR_JNFALSE_IMM8 => {
                 self.op_conditional_jump(instr)
             }
-            INSTR_STACK_LOAD => self.op_pick(),
+            INSTR_STACK_LOAD => self.op_stack_load(),
             INSTR_STACK_STORE => self.op_put(),
             INSTR_LOAD_IMM8..=INSTR_LOAD_IMM64 => self.op_load_imm(instr),
             INSTR_LOAD_BYTES_IMM => self.op_load_bytes(),
@@ -700,7 +700,7 @@ impl Runtime {
         }
         match closure.get_tag() {
             TYPE_BYTECODE => {
-                if op == INSTR_CALL || extra_args > 0 {
+                if op == INSTR_CALL || extra_args > 0 || self.call_stack.is_empty() {
                     // Not a tail call, set up a new frame
                     self.ensure_call_stack(3);
                     let frame = vec![
@@ -709,7 +709,7 @@ impl Runtime {
                         Value::integer(self.stack.base as i64),
                     ];
                     self.call_stack.pushv(&frame);
-                    self.stack.base = self.stack.top();
+                    self.stack.base = self.stack.top() - args;
                 }
                 self.closure = Value::from(closure);
                 self.local_env = closure.env();
@@ -853,9 +853,9 @@ impl Runtime {
         Ok(false)
     }
 
-    fn op_pick(&mut self) -> Result<bool> {
-        let depth = self.stack.pop().get_integer() as usize;
-        self.stack.pick(depth);
+    fn op_stack_load(&mut self) -> Result<bool> {
+        let slot = self.stack.pop().get_integer() as usize;
+        self.stack.load_arg(slot);
         Ok(false)
     }
 
@@ -917,7 +917,6 @@ impl Runtime {
         let typ = self.stack.pop();
         let val = self.stack.pop();
         ensure_type(&typ, ValueRepr::Table)?;
-        dbg!(val);
         match val.get_repr() {
             ValueRepr::Array | ValueRepr::Bytes | ValueRepr::Table | ValueRepr::Closure => {
                 let obj = val.get_object();
@@ -1196,12 +1195,17 @@ impl Stack {
         if self.top + n >= self.array.size() {
             panic!("stack overflow");
         }
-        self.array.fill(vals, self.top + 1, self.top + n);
+        self.array.fill(vals, self.top, self.top + n);
         self.top += n;
     }
 
     pub(super) fn pick(&mut self, i: usize) {
         let elem = self.array.at(self.top - i);
+        self.push(elem);
+    }
+
+    pub(super) fn load_arg(&mut self, i:usize) {
+        let elem = self.array.at(self.base + i);
         self.push(elem);
     }
 
