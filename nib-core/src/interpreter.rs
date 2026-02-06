@@ -692,7 +692,9 @@ impl Runtime {
             if args - 1 > i+varargs {
                 argv.copy_within(i + varargs.., i + 1);
             }
-            argv[args - extra_args..].fill(Value::nil());
+            if extra_args > 0 {
+                argv[args - extra_args..].fill(Value::nil());
+            }
             argv[i] = Value::from(var_arg);
             self.stack.top -= extra_args;
         } else if extra_args > 0 {

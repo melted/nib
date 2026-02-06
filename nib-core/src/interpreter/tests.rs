@@ -218,6 +218,24 @@ fn run_simple_binding() -> Result<()> {
 }
 
 #[test]
+fn run_compute_binding() -> Result<()> {
+    let mut rt = Runtime::new();
+    rt.add_code("test","a = _prim_mul 3 5")?;
+    let val = rt.get_global(&sym("a"));
+    assert_eq!(val.get_integer(), 15);
+    Ok(())
+}
+
+#[test]
+fn run_globalref_binding() -> Result<()> {
+    let mut rt = Runtime::new();
+    rt.add_code("test","a = system.arch")?;
+    let val = rt.get_global(&sym("a"));
+    dbg!(val);
+    Ok(())
+}
+
+#[test]
 fn run_fun_binding() -> Result<()> {
     let mut rt = Runtime::new();
     rt.add_code("test","calc a = _prim_mul a 2")?;
