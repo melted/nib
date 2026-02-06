@@ -1109,11 +1109,11 @@ impl Closure {
             }
             Code::Core(ptr) => {
                 self.set_tag(TYPE_CORE);
-                set_value(self.ptr, 1, Value::cpointer(ptr));
+                set_value(self.ptr, 1, Value::cpointer(*ptr));
             }
             Code::Extern(ptr) => {
                 self.set_tag(TYPE_EXTERN);
-                set_value(self.ptr, 1, Value::cpointer(ptr));
+                set_value(self.ptr, 1, Value::cpointer(*ptr));
             }
             Code::Foreign(foreign) => {
                 self.set_tag(TYPE_FOREIGN);
