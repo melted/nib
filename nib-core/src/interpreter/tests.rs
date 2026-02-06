@@ -176,6 +176,22 @@ fn run_array_expression() -> Result<()> {
     Ok(())
 }
 
+#[test]
+fn run_lambda_expression() -> Result<()> {
+    let mut rt = Runtime::new();
+    let val = rt.run_expression("{a}")?;
+    dbg!(val);
+    Ok(())
+}
+
+#[test]
+fn run_lambda_app_expression() -> Result<()> {
+    let mut rt = Runtime::new();
+    let val = rt.run_expression("{a} 1")?;
+    dbg!(val);
+    Ok(())
+}
+
 
 #[test]
 fn run_simple_binding() -> Result<()> {
