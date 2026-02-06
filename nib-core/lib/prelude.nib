@@ -116,6 +116,7 @@ println a =  print a & print "\n"
 // Table functions
 table.set tab key value = _prim_table_set value key tab
 table.size = _prim_table_size
+table.keys = _prim_table_keys
 
 // Array functions
 array.ref arr pos = _prim_array_ref pos arr 

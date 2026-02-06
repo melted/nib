@@ -1,12 +1,6 @@
 use core::slice;
 use std::{
-    collections::HashMap,
-    ffi::c_void,
-    fmt::Debug,
-    hash::{DefaultHasher, Hash, Hasher},
-    mem,
-    ptr::copy_nonoverlapping,
-    slice::{from_raw_parts, from_raw_parts_mut},
+    array, collections::{HashMap, HashSet}, ffi::c_void, fmt::{Debug, Display, write}, hash::{DefaultHasher, Hash, Hasher}, mem, ptr::copy_nonoverlapping, slice::{from_raw_parts, from_raw_parts_mut}
 };
 
 use libffi::middle::Cif;
@@ -260,7 +254,7 @@ pub(super) fn get_object_ptr<T>(base: *mut ObjectHeader, index: usize) -> *mut T
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Value {
     pub val: u64,
 }
@@ -670,6 +664,70 @@ impl Debug for Value {
     }
 }
 
+impl Display for Value {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self.get_repr() {
+            ValueRepr::Nil => write!(f, "nil"),
+            ValueRepr::Undefined => write!(f, "#<undefined>"),
+            ValueRepr::Bool => write!(f, "{}", self.get_bool()),
+            ValueRepr::Integer => write!(f, "{}", self.get_integer()),
+            ValueRepr::Pointer => write!(f, "#<ptr:{:x}>", self.get_pointer::<*mut c_void>().addr()),
+            ValueRepr::Char => write!(f, "{}", self.get_char()),
+            ValueRepr::Float => write!(f, "{}", self.get_float()),
+            ValueRepr::BoxedInteger => todo!(),
+            ValueRepr::Symbol => write!(f, "#({})", self.get_symbol()),
+            ValueRepr::Bytes => write!(f, "{}", self.get_bytes()),
+            ValueRepr::Closure => write!(f, "{}", self.get_closure()),
+            ValueRepr::PartialApplication => write!(f, "#<partial-application:{:x}>", self.val),
+            ValueRepr::CallContinuation => write!(f, "#<call-continuation:{}>", self.get_cc_args()),
+            ValueRepr::Object => write!(f, "#<object>"),
+            _ => display_complex_object(&self, f, &mut HashSet::new())
+        }
+    }
+}
+
+fn display_complex_object(value: &Value, f: &mut std::fmt::Formatter<'_>, seen: &mut HashSet<Value>) -> std::fmt::Result {
+    if seen.contains(value) {
+        write!(f, "#<recurse:{:x}>", value.val)?;
+        return Ok(());
+    }
+    seen.insert(value.clone());
+    match value.get_repr() {
+        ValueRepr::Array => {
+            write!(f, "[")?;
+            let array =  value.get_array();
+            let mut iter = array.values().iter();
+            if let Some(v) = iter.next() {
+                display_complex_object(v, f, seen)?;
+                for v in iter {
+                    write!(f, ", ")?;
+                    display_complex_object(v, f, seen)?;
+                }
+            }
+            write!(f, "]")
+        },
+        ValueRepr::Table => {
+            write!(f, "{{")?;
+            let table = value.get_table();
+            let pairs = table.pairs();
+            let mut iter = pairs.iter();
+            if let Some((k, v)) = iter.next() {
+                display_complex_object(k, f, seen)?;
+                write!(f, ": ")?;
+                display_complex_object(v, f, seen)?;
+                for (k, v) in iter {
+                    write!(f, ", ")?;
+                    display_complex_object(k, f, seen)?;
+                    write!(f, ": ")?;
+                    display_complex_object(v, f, seen)?;
+                }
+            }
+            write!(f, "}}")
+        }
+        _ => write!(f, "{}", value)
+    }
+}
+
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct Array {
     ptr: *mut ObjectHeader,
@@ -940,15 +998,24 @@ pub struct Bytes {
 
 impl Debug for Bytes {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Bytes[")?;
+        write!(f, "{}", self)
+    }
+}
+
+impl Display for Bytes {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "#[")?;
         let vals = self.get_slice();
-        for v in vals {
-            write!(f, "{}, ", *v)?;
+        let mut iter = vals.iter();
+        if let Some(b) = iter.next() {
+            write!(f, "{}", b)?;
+            for b in iter {
+                write!(f, ", {}", b);
+            }
         }
         write!(f, "]")
     }
 }
-
 impl Bytes {
     pub fn make(rt: &mut Runtime, size: usize, v: u8) -> Self {
         let header = ObjectHeader::make(rt, (size + 2 * CELL_SIZE) as u32, ValueRepr::Bytes);
@@ -1036,6 +1103,12 @@ impl Debug for Closure {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "Closure[ptr: {:?}, code: {:?}, env: {:?}, arg: {:?}, vararg: {:?}]",
                  self.ptr, self.get_code(), self.env().get_array().size(), self.num_args(), self.vararg())
+    }
+}
+
+impl Display for Closure {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "#<closure:{:x}>", self.ptr.addr())
     }
 }
 

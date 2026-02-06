@@ -1,7 +1,5 @@
 use std::{
-    collections::{HashMap, HashSet},
-    ffi::c_void,
-    sync::LazyLock,
+    collections::{HashMap, HashSet}, ffi::c_void, path::Path, sync::LazyLock
 };
 
 use symbol_table::static_symbol;
@@ -25,7 +23,7 @@ use crate::{
         },
         ensure_type,
         heap::{Bytes, Closure, Code, Table, Value, ValueRepr},
-    },
+    }, runtime::Interpreter,
 };
 
 pub type PrimFn = fn(&mut Runtime) -> Result<()>;
@@ -67,6 +65,9 @@ impl Runtime {
 
         let symbol_make = self.make_primitive(prim_symbol_make, Arity::Fixed(1));
         self.set_global(&sym("_prim_symbol_make"), &symbol_make);
+
+        let symbol_name = self.make_primitive(prim_symbol_name, Arity::Fixed(1));
+        self.set_global(&sym("_prim_symbol_name"), &symbol_name);
 
         let get_path = self.make_primitive(prim_get_path, Arity::VarArg(2, 1));
         self.set_global(&sym("_prim_get_path"), &get_path);
@@ -158,6 +159,19 @@ impl Runtime {
         self.stack.push(Value::integer((args.len() + 1) as i64));
         self.op_call(INSTR_CALL)
     }
+
+    pub fn is_type(&self, val: &Value, t:&Symbol) -> Result<bool> {
+        Ok(*t == self.get_type_id(val)?)
+    }
+
+    fn get_string(&self, value:&Value) -> Result<String> {
+        if self.is_type(value, &sym("string"))? {
+            let bytes = value.get_bytes();
+            str::from_utf8(bytes.get_slice()).map_err(|_| self.err("Not an utf-8 string")).map(|s|s.to_owned())
+        } else {
+            self.error("Not a string value")
+        }
+    }
 }
 
 fn prim_get_path(rt: &mut Runtime) -> Result<()> {
@@ -195,6 +209,7 @@ fn prim_get_path(rt: &mut Runtime) -> Result<()> {
 fn prim_print_representation(rt: &mut Runtime) -> Result<()> {
     let val = rt.stack.pop();
     print!("{:?}", val);
+    rt.stack_push(Value::nil());
     Ok(())
 }
 
@@ -223,26 +238,63 @@ fn prim_array_make(rt: &mut Runtime) -> Result<()> {
 }
 
 fn prim_array_match(rt: &mut Runtime) -> Result<()> {
+    let val = rt.stack.pop();
+    if val.is_array() {
+        rt.stack.push(val);
+    } else {
+        rt.stack.push(Value::bool(false));
+    }
     Ok(())
 }
 
 fn prim_match(rt: &mut Runtime) -> Result<()> {
+    let val = rt.stack.pop();
+    match val.get_repr() {
+        ValueRepr::Closure => {
+            rt.stack_push(val);
+        }
+        ValueRepr::Table => {
+            let m = static_symbol!("match");
+            let fun = val.get_table().get(Value::symbol(&m));
+            if fun.is_closure() {
+                rt.stack_push(fun);
+            } else {
+                return rt.error("_prim_match: custom matcher in table not a function");
+            }
+        }
+        _ => return rt.error("_prim_match: custom matcher must be function or table with a match entry")
+    }
     Ok(())
 }
 
 fn prim_string_print(rt: &mut Runtime) -> Result<()> {
+    let val = rt.stack.pop();
+    print!("{}", val);
+    rt.stack_push(Value::nil());
     Ok(())
 }
 
 fn prim_to_string(rt: &mut Runtime) -> Result<()> {
+    let val = rt.stack.pop();
+    let str = format!("{}", val);
+    let out = rt.make_string(&str);
+    rt.stack_push(out);
     Ok(())
 }
 
 fn prim_load(rt: &mut Runtime) -> Result<()> {
+    let val = rt.stack.pop();
+    let file = rt.get_string(val)?;
+    rt.load(Path::new(&file), false)?;
+    rt.stack_push(Value::nil());
     Ok(())
 }
 
 fn prim_symbol_name(rt: &mut Runtime) -> Result<()> {
+    let val = rt.stack.pop();
+    ensure_type(&val, ValueRepr::Symbol)?;
+    let out = rt.make_string(val.get_symbol().as_str());
+    rt.stack_push(out);
     Ok(())
 }
 

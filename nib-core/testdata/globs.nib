@@ -1,0 +1,1 @@
+_ = _prim_string_print (_prim_to_string (_prim_array_size (_prim_table_keys global)))
