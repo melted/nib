@@ -169,10 +169,10 @@ fn run_literal_expression_symbol() -> Result<()> {
 
 
 #[test]
-fn run_expression() -> Result<()> {
+fn run_array_expression() -> Result<()> {
     let mut rt = Runtime::new();
     let val = rt.run_expression("[1,2]")?;
-    dbg!(val);
+    assert_eq!(val.get_array().values(), [Value::integer(1), Value::integer(2)]);
     Ok(())
 }
 
