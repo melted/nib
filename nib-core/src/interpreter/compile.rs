@@ -1,12 +1,10 @@
 use symbol_table::static_symbol;
 
 use crate::ast::Literal;
-use crate::common::{Metadata, Name};
+use crate::common::{Metadata, Name, get_symbol};
 use crate::common::{Result, Symbol};
 use crate::core::{Binder, Binding, Cond, Expression, Lambda, free_vars};
-use crate::interpreter::bytecode::{
-    INSTR_ALLOC_ARRAY, INSTR_ALLOC_CLOSURE, INSTR_ALLOC_FLOAT, INSTR_ALLOC_TABLE, INSTR_ARRAY_SET, INSTR_CALL, INSTR_CALL_TAIL, INSTR_DROP, INSTR_DUP, INSTR_GET_LOCAL, INSTR_GLOBAL_ENV, INSTR_IS_TABLE, INSTR_JFALSE, INSTR_JFALSE_IMM8, INSTR_JNEG, INSTR_JNEG_IMM8, INSTR_JNFALSE, INSTR_JNFALSE_IMM8, INSTR_JNNEG, INSTR_JNNEG_IMM8, INSTR_JNPOS, INSTR_JNPOS_IMM8, INSTR_JPOS, INSTR_JPOS_IMM8, INSTR_JUMP, INSTR_JUMP_IMM8, INSTR_JZ, INSTR_JZ_IMM8, INSTR_LOAD_BYTES_IMM, INSTR_LOAD_IMM8, INSTR_LOAD_IMM16, INSTR_LOAD_IMM32, INSTR_LOAD_IMM64, INSTR_PUSH_FALSE, INSTR_PUSH_LAST_SMALL, INSTR_PUSH_MINUS_ONE, INSTR_PUSH_NIL, INSTR_PUSH_TRUE, INSTR_RETURN, INSTR_SET_LOCAL, INSTR_SET_TYPE, INSTR_STACK_LOAD, INSTR_TABLE_GET, INSTR_TABLE_SET
-};
+use crate::interpreter::bytecode::{INSTR_ALLOC_ARRAY, INSTR_ALLOC_CLOSURE, INSTR_ALLOC_FLOAT, INSTR_ALLOC_TABLE, INSTR_ARRAY_SET, INSTR_CALL, INSTR_CALL_TAIL, INSTR_DROP, INSTR_DUP, INSTR_GET_LOCAL, INSTR_GLOBAL_ENV, INSTR_IS_TABLE, INSTR_JFALSE, INSTR_JFALSE_IMM8, INSTR_JNEG, INSTR_JNEG_IMM8, INSTR_JNFALSE, INSTR_JNFALSE_IMM8, INSTR_JNNEG, INSTR_JNNEG_IMM8, INSTR_JNPOS, INSTR_JNPOS_IMM8, INSTR_JPOS, INSTR_JPOS_IMM8, INSTR_JUMP, INSTR_JUMP_IMM8, INSTR_JZ, INSTR_JZ_IMM8, INSTR_LOAD_BYTES_IMM, INSTR_LOAD_IMM8, INSTR_LOAD_IMM16, INSTR_LOAD_IMM32, INSTR_LOAD_IMM64, INSTR_PUSH_FALSE, INSTR_PUSH_LAST_SMALL, INSTR_PUSH_MINUS_ONE, INSTR_PUSH_NIL, INSTR_PUSH_TRUE, INSTR_RETURN, INSTR_SET_LOCAL, INSTR_SET_TYPE, INSTR_STACK_LOAD, INSTR_TABLE_GET, INSTR_TABLE_SET, INSTR_SWAP};
 use crate::interpreter::heap::{Value, ValueRepr};
 use crate::interpreter::prims::is_bytecode_primitive;
 use crate::interpreter::stack_return;
@@ -70,8 +68,8 @@ pub(super) struct Compilation {
     /// lambda's environment
     fixups_needed: HashMap<Symbol, Vec<(usize, usize)>>,
     max_var: usize,
-    used_vars: HashSet<usize>,
-    free_vars: HashSet<usize>,
+    used_locs: HashSet<usize>,
+    free_locs: HashSet<usize>,
     is_tail: bool,
 }
 
@@ -93,8 +91,8 @@ impl Compilation {
             local_vars: Vec::new(),
             future_bindings: HashSet::new(),
             fixups_needed: HashMap::new(),
-            used_vars: HashSet::new(),
-            free_vars: HashSet::new(),
+            used_locs: HashSet::new(),
+            free_locs: HashSet::new(),
             is_tail: true,
         }
     }
@@ -143,53 +141,58 @@ impl Compilation {
         code: &mut Vec<u8>,
     ) -> Result<()> {
         self.is_tail = true;
+        let binding_name = self.get_binding_name(&binding.binder);
+        let global = matches!(&binding.binder, Binder::Public(_));
         self.compile_expression(&binding.body, code)?;
-        match &binding.binder {
-            Binder::Public(Name::Qualified(path, name)) => {
-                self.push_symbol(name, code);
-                let get_path = static_symbol!("_prim_get_path");
-                self.get_global_name(&get_path, code);
-                for s in path {
-                    self.push_symbol(s, code);
-                }
-                load_constant_int((path.len() + 1) as i64, code);
-                code.push(INSTR_CALL);
-                code.push(INSTR_TABLE_SET);
-                self.check_fixups(&path[0], code);
-            }
-            Binder::Public(Name::Plain(name)) => {
-                self.push_symbol(name, code);
-                code.push(INSTR_GLOBAL_ENV);
-                code.push(INSTR_TABLE_SET);
-                self.check_fixups(name, code);
-            }
-            Binder::Local(Name::Qualified(path, name)) => {
-                self.push_symbol(name, code);
-                let get_path = static_symbol!("_prim_get_path");
-                self.get_global_name(&get_path, code);
-                let (first, tail) = path.split_at(1);
-                self.get_local_table(&first[0], code);
-                for s in path {
-                    self.push_symbol(s, code);
-                }
-                load_constant_int((path.len() + 1) as i64, code);
-                code.push(INSTR_CALL);
-                code.push(INSTR_TABLE_SET);
-                self.check_fixups(&path[0], code);
-            }
-            Binder::Local(Name::Plain(name)) => {
-                let h = if top_level {
-                    self.local_top_var(&name)
+        if let Some(name) = binding_name {
+            code.push(INSTR_DUP);
+            let top = name.top();
+            let path = name.path();
+            let loc = self.local_var(&top);
+            set_local(loc, code);
+            if path.is_empty() {
+                if global {
+                    self.get_symbol(&top, code);
+                    code.push(INSTR_GLOBAL_ENV);
+                    code.push(INSTR_TABLE_SET);
                 } else {
-                    self.env_location()
-                };
-                load_constant_int(h as i64, code);
-                code.push(INSTR_SET_LOCAL);
-                self.check_fixups(name, code);
+                    code.push(INSTR_DROP);
+                }
+            } else {
+                let rest = &path[1..];
+                let last = name.base();
+                self.get_symbol(&last, code);
+                self.compile_get_path(code);
+                if global {
+                    self.get_symbol(&top, code);
+                } else {
+                    self.get_local_table(&top, code);
+                }
+                for s in rest {
+                    self.get_symbol(&s, code);
+                }
+                load_constant_int((rest.len() + 1) as i64, code);
+                code.push(INSTR_CALL);
+                code.push(INSTR_TABLE_SET);
             }
-            Binder::Unbound => {}
+            self.check_fixups(&top, code);
+        } else {
+            code.push(INSTR_DROP);
         }
         Ok(())
+    }
+
+    fn get_binding_name(&mut self, binder: &Binder) -> Option<Name> {
+        match binder {
+            Binder::Public(name) |
+            Binder::Local(name) => Some(name.clone()),
+            Binder::Unbound => None,
+        }
+    }
+
+    fn compile_get_path(&mut self, code: &mut Vec<u8>) {
+        let get_path = static_symbol!("_prim_get_path");
+        self.get_global_name(&get_path, code);
     }
 
     fn check_fixups(&mut self, name: &Symbol, code: &mut Vec<u8>) {
@@ -198,8 +201,7 @@ impl Compilation {
             for fix in fixups {
                 code.push(INSTR_DUP);
                 load_constant_int(fix.1 as i64, code);
-                load_constant_int(fix.0 as i64, code);
-                code.push(INSTR_GET_LOCAL);
+                get_local(fix.0, code);
                 code.push(INSTR_ARRAY_SET);
             }
             code.push(INSTR_DROP);
@@ -221,16 +223,7 @@ impl Compilation {
         match expression {
             Expression::Literal(_, literal) => self.compile_literal(literal, code),
             Expression::Var(_, var) => {
-                match self.lookup_var(var) {
-                    VarLocation::Stack(loc) => {
-                        load_constant_int(loc as i64, code);
-                        code.push(INSTR_STACK_LOAD);
-                    }
-                    VarLocation::Env(loc) => {
-                        load_constant_int(loc as i64, code);
-                        code.push(INSTR_GET_LOCAL);
-                    }
-                }
+                self.get_variable(var, code);
                 Ok(())
             }
             Expression::Lambda(_, lambda) => {
@@ -278,8 +271,7 @@ impl Compilation {
             }
             Literal::Symbol(global_symbol) => {
                 let s = self.get_symbol_slot(global_symbol);
-                load_constant_int(s as i64, code);
-                code.push(INSTR_GET_LOCAL);
+                get_local(s, code);
             }
             Literal::Bytearray(items) => {
                 push_bytes(&items, code);
@@ -307,40 +299,34 @@ impl Compilation {
                 (Value::integer(n as i64), Value::integer(i as i64))
             }
         };
+        dbg!(&lambda);
         load_constant(&vararg, code);
         load_constant_int(arity.get_integer(), code);
         load_constant_int(fun_compilation.module.local_env_size as i64, code);
         code.push(INSTR_ALLOC_ARRAY);
-
+        let env_local = self.env_location();
+        set_local(env_local, code);
         for (sym, index) in fun_compilation.module.want_symbols {
-            code.push(INSTR_DUP);
             let slot = self.get_symbol_slot(&sym);
             load_constant_int(index as i64, code);
-            load_constant_int(slot as i64, code);
-            code.push(INSTR_GET_LOCAL);
+            get_local(slot, code);
+            get_local(env_local, code);
             code.push(INSTR_ARRAY_SET);
         }
-        let mut captures_var = None;
         for (var, index) in fun_compilation.module.captures {
-            load_constant_int(index as i64, code);
             if self.future_bindings.contains(&var) {
-                let v = if let Some(v) = captures_var {
-                    v
-                } else {
-                    let n = self.env_location();
-                    captures_var = Some(n);
-                    n
-                };
                 self.fixups_needed
                     .entry(var)
-                    .and_modify(|vec| vec.push((v, index)))
-                    .or_insert_with(|| vec![(v, index)]);
+                    .and_modify(|vec| vec.push((env_local as usize, index)))
+                    .or_insert_with(|| vec![(env_local as usize, index)]);
             } else {
+                load_constant_int(index as i64, code);
                 self.get_variable(&var, code);
-                load_constant_int(2, code);
+                get_local(env_local, code);
                 code.push(INSTR_ARRAY_SET);
             }
         }
+        get_local(env_local, code);
         push_bytes(&fun_compilation.module.byte_code, code);
         code.push(INSTR_ALLOC_CLOSURE);
         Ok(())
@@ -401,8 +387,8 @@ impl Compilation {
     ) -> Result<()> {
         let mut old_fixups = HashMap::new();
         let mut old_future_bindings = HashSet::new();
-        let mut old_used_vars = self.used_vars.clone();
-        let mut old_free_vars = self.free_vars.clone();
+        let mut old_used_vars = self.used_locs.clone();
+        let mut old_free_vars = self.free_locs.clone();
         mem::swap(&mut old_fixups, &mut self.fixups_needed);
         mem::swap(&mut old_future_bindings, &mut self.future_bindings);
         let is_tail = self.is_tail;
@@ -414,8 +400,8 @@ impl Compilation {
         self.compile_expression(exp, code)?;
         mem::swap(&mut old_fixups, &mut self.fixups_needed);
         mem::swap(&mut old_future_bindings, &mut self.future_bindings);
-        mem::swap(&mut old_used_vars, &mut self.used_vars);
-        mem::swap(&mut old_free_vars, &mut self.free_vars);
+        mem::swap(&mut old_used_vars, &mut self.used_locs);
+        mem::swap(&mut old_free_vars, &mut self.free_locs);
         Ok(())
     }
 
@@ -429,28 +415,25 @@ impl Compilation {
         }
     }
 
-    fn push_symbol(&mut self, sym: &Symbol, code: &mut Vec<u8>) {
+    fn get_symbol(&mut self, sym: &Symbol, code: &mut Vec<u8>) {
         let sym_addr = self.get_symbol_slot(sym);
-        load_constant_int(sym_addr as i64, code);
-        code.push(INSTR_GET_LOCAL);
+        get_local(sym_addr, code);
     }
 
     fn get_global_name(&mut self, sym: &Symbol, code: &mut Vec<u8>) {
-        self.push_symbol(&sym, code);
+        self.get_symbol(&sym, code);
         code.push(INSTR_GLOBAL_ENV);
         code.push(INSTR_TABLE_GET);
     }
 
     fn get_local_table(&mut self, sym: &Symbol, code: &mut Vec<u8>) {
-        let h = self.local_top_var(&sym);
-        load_constant_int(h as i64, code);
-        code.push(INSTR_GET_LOCAL);
+        let h = self.local_var(&sym);
+        get_local(h, code);
         code.push(INSTR_DUP);
         code.push(INSTR_IS_TABLE);
         let mut create_table_code = Vec::new();
         create_table_code.push(INSTR_ALLOC_TABLE);
-        load_constant_int(h as i64, &mut create_table_code);
-        create_table_code.push(INSTR_SET_LOCAL);
+        set_local(h, &mut create_table_code);
         optimized_jump(INSTR_JFALSE, (create_table_code.len() + 1) as i64, code);
         code.extend_from_slice(&create_table_code);
     }
@@ -463,8 +446,7 @@ impl Compilation {
                 code.push(INSTR_STACK_LOAD);
             }
             VarLocation::Env(i) => {
-                load_constant_int(i as i64, code);
-                code.push(INSTR_GET_LOCAL);
+                get_local(i, code);
             }
         }
     }
@@ -489,27 +471,27 @@ impl Compilation {
         }
     }
 
-    fn local_top_var(&mut self, sym: &Symbol) -> usize {
+    fn local_var(&mut self, sym: &Symbol) -> usize {
         for (var, loc) in self.local_vars.iter().rev() {
             if var == sym {
                 return *loc;
             }
         }
-        let nvar = self.fresh_env_location();
+        let nvar = self.env_location();
         self.local_vars.push((*sym, nvar));
         nvar
     }
 
-    fn free_local_var(&mut self, n: usize) {
-        self.used_vars.remove(&n);
-        self.free_vars.insert(n);
+    fn free_location(&mut self, n: usize) {
+        self.used_locs.remove(&n);
+        self.free_locs.insert(n);
     }
 
     fn env_location(&mut self) -> usize {
-        let val = self.free_vars.iter().next().map(|u| *u);
+        let val = self.free_locs.iter().next().map(|u| *u);
         if let Some(loc) = val {
-            self.free_vars.remove(&loc);
-            self.used_vars.insert(loc);
+            self.free_locs.remove(&loc);
+            self.used_locs.insert(loc);
             loc
         } else {
             self.fresh_env_location()
@@ -518,7 +500,7 @@ impl Compilation {
 
     fn fresh_env_location(&mut self) -> usize {
         let n = self.max_var;
-        self.used_vars.insert(n);
+        self.used_locs.insert(n);
         self.max_var += 1;
         n
     }
@@ -527,6 +509,17 @@ impl Compilation {
 enum VarLocation {
     Stack(usize),
     Env(usize),
+}
+
+
+fn set_local(n:usize, code: &mut Vec<u8>) {
+    load_constant_int(n as i64, code);
+    code.push(INSTR_SET_LOCAL);
+}
+
+fn get_local(n:usize, code: &mut Vec<u8>) {
+    load_constant_int(n as i64, code);
+    code.push(INSTR_GET_LOCAL);
 }
 
 fn load_constant(v:&Value, code: &mut Vec<u8>) {

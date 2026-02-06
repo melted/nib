@@ -216,3 +216,31 @@ fn run_simple_binding() -> Result<()> {
     assert_eq!(val.get_integer(), 1);
     Ok(())
 }
+
+#[test]
+fn run_fun_binding() -> Result<()> {
+    let mut rt = Runtime::new();
+    rt.add_code("test","calc a = _prim_mul a 2")?;
+    let val = rt.get_global(&sym("calc"));
+    assert_eq!(val.is_closure(), true);
+    Ok(())
+}
+
+#[test]
+fn run_fun_clauses_binding() -> Result<()> {
+    let mut rt = Runtime::new();
+    rt.add_code("test","fac 0 = 1\nfac n = _prim_mul n (fac (_prim_sub n 1))")?;
+    let val = rt.get_global(&sym("fac"));
+    assert_eq!(val.is_closure(), true);
+    Ok(())
+}
+
+#[test]
+fn run_fun_clauses_app_binding() -> Result<()> {
+    let mut rt = Runtime::new();
+    rt.add_code("test","fac 0 = 1\nfac n = _prim_mul n (fac (_prim_sub n 1))\nres=fac 5\n")?;
+    let val = rt.get_global(&sym("res"));
+    dbg!(val);
+    assert_eq!(val.get_integer(), 120);
+    Ok(())
+}

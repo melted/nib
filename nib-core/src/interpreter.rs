@@ -132,7 +132,7 @@ impl Runtime {
             &bc,
             self.local_env.clone(),
             Value::integer(0),
-            Value::integer(0),
+            Value::bool(false),
         );
         self.closure = Value::from(closure);
         self.run()
@@ -664,7 +664,8 @@ impl Runtime {
                 if let Some(method) = self.find_overload(&fun, &static_symbol!("__call")) {
                     self.stack.put(args, method);
                 } else {
-                    return self.error("op_toint: type not convertible to int");
+                    dbg!(self.stack);
+                    return self.error("op_call: type can't be called");
                 }
             }
         };
@@ -686,6 +687,7 @@ impl Runtime {
             let varargs = extra_args + 1;
             let mut var_arg = Array::make(self, varargs);
             let argv = self.stack.slice_mut(args - 1, 0);
+            dbg!(&argv, varargs, extra_args);
             var_arg.fill(&argv[i..i+varargs], 0, varargs);
             if args - 1 > i+varargs {
                 argv.copy_within(i + varargs.., i + 1);
@@ -955,6 +957,7 @@ impl Runtime {
             }
             INSTR_ALLOC_TABLE => Value::from(Table::make(self)),
             INSTR_ALLOC_CLOSURE => {
+                dbg!(&self.stack);
                 let code = self.stack.pop();
                 ensure_type(&code, ValueRepr::Bytes)?;
                 let captures = self.stack.pop();
@@ -962,7 +965,6 @@ impl Runtime {
                 ensure_type(&arity, ValueRepr::Integer)?;
                 let vararg = self.stack.pop();
                 let code_bytes = code.get_bytes();
-
                 let closure = Closure::make_low(self, &code_bytes, captures, arity, vararg);
                 Value::from(closure)
             }

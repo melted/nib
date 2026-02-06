@@ -609,7 +609,7 @@ impl Value {
     }
 
     pub fn get_bool(&self) -> bool {
-        (self.val & TRUE_BTAG) > 0
+        (self.val & TRUE_BTAG) == TRUE_BTAG
     }
 
     pub fn get_tag(&self) -> u64 {
@@ -1035,7 +1035,7 @@ pub struct Closure {
 impl Debug for Closure {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "Closure[ptr: {:?}, code: {:?}, env: {:?}, arg: {:?}, vararg: {:?}]",
-                 self.ptr, self.get_code(), self.env(), self.num_args(), self.vararg())
+                 self.ptr, self.get_code(), self.env().get_array().size(), self.num_args(), self.vararg())
     }
 }
 

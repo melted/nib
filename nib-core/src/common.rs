@@ -235,6 +235,19 @@ impl Name {
         }
     }
 
+    pub fn path(&self) -> Vec<Symbol> {
+        match self {
+            Name::Qualified(path, _) => path.clone(),
+            Name::Plain(global_symbol) => vec![],
+        }
+    }
+
+    pub fn base(&self) -> Symbol {
+        match self {
+            Name::Qualified(_, base) | Name::Plain(base) => *base
+        }
+    }
+
     pub fn append(path: &Name, base: &Name) -> Result<Name> {
         match (path, base) {
             (Name::Qualified(path, last), Name::Plain(b)) => {
