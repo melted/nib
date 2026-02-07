@@ -1082,8 +1082,8 @@ impl Bytes {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Foreign {
-    code: *const c_void,
-    signature: *const Cif,
+    pub code: *const c_void,
+    pub signature_handle: usize,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -1193,7 +1193,7 @@ impl Closure {
                 self.set_tag(TYPE_FOREIGN);
                 let array = Array::make(rt, 2);
                 array.set(0, Value::cpointer(foreign.code));
-                array.set(1, Value::cpointer(foreign.signature));
+                array.set(1, Value::integer(foreign.signature_handle as i64));
                 set_value(self.ptr, 1, Value::from(array));
             }
         }

@@ -1,5 +1,5 @@
 use anyhow::anyhow;
-use std::num::NonZeroU32;
+use std::num::{NonZeroU32, TryFromIntError};
 use std::sync::LazyLock;
 use std::{
     collections::{HashMap, HashSet},
@@ -162,6 +162,14 @@ impl From<anyhow::Error> for Error {
 
 impl From<io::Error> for Error {
     fn from(value: io::Error) -> Self {
+        Error::General {
+            err: anyhow!(value),
+        }
+    }
+}
+
+impl From<TryFromIntError> for Error {
+    fn from(value: TryFromIntError) -> Self {
         Error::General {
             err: anyhow!(value),
         }

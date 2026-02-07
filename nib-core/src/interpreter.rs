@@ -10,15 +10,17 @@ use std::mem;
 use std::ops::{BitXor, Shl, Shr};
 use std::path::Path;
 
+use libffi::low::CodePtr;
 use symbol_table::static_symbol;
 
 use crate::ast;
-use crate::common::{Error, Name, Result, Symbol, sym, symbol_id};
+use crate::common::{Error, Name, Result, Signature, Symbol, sym, symbol_id};
 use crate::core::{desugar, desugar_expression};
 use crate::interpreter::bytecode::*;
 use crate::interpreter::compile::{Module, compile, compile_expression};
+use crate::interpreter::foreign::call_foreign_function;
 use crate::interpreter::heap::{
-    Array, Bytes, Closure, Heap, TYPE_BYTECODE, TYPE_EXTERN, Table, Value, ValueRepr, set_value,
+    Array, Bytes, Closure, Heap, TYPE_BYTECODE, TYPE_EXTERN, TYPE_FOREIGN, Table, Value, ValueRepr, set_value
 };
 use crate::interpreter::prims::PrimFn;
 use crate::parser::{parse_declarations, parse_expression};
@@ -40,6 +42,7 @@ pub struct Runtime {
     closure: Value,
     code: Value,
     ip: usize,
+    ffi_signatures:Vec<Signature>
 }
 
 const DEFAULT_HEAP_SIZE: usize = 1000000;
@@ -90,6 +93,7 @@ impl Runtime {
             code: Value::nil(),
             closure: Value::nil(),
             ip: 0,
+            ffi_signatures:Vec::new()
         };
         let global_env = Value::from(Table::make(&mut runtime));
         let stack = Value::from(Array::make(&mut runtime, DEFAULT_STACK_SIZE));
@@ -726,6 +730,15 @@ impl Runtime {
                     let fun:PrimFn = mem::transmute(fun_ptr);
                     fun(self)?;
                 }
+            }
+            TYPE_FOREIGN => {
+                let ffi_array = closure.code_value().get_array();
+                let code_ptr = ffi_array.at(0).get_pointer::<c_void>();
+                let idx = ffi_array.at(1).get_integer() as usize;
+                let signature = &self.ffi_signatures[idx].clone(); // TODO: fix clone
+                let argv = self.stack.take(args);
+                let ret = call_foreign_function(self, &CodePtr(code_ptr), signature, &argv[1..])?;
+                self.stack_push(ret);
             }
             _ => {
                 return self.error("Core code not supported in bytecode interpreter");

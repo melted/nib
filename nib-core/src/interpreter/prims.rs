@@ -34,6 +34,7 @@ impl Runtime {
         self.register_primitives();
         self.register_nib_namespace().unwrap();
         self.register_system_constants().unwrap();
+        self.register_foreign_interface().unwrap();
     }
 
     pub(super) fn register_primitives(&mut self) {
@@ -172,6 +173,7 @@ impl Runtime {
 fn prim_get_path(rt: &mut Runtime) -> Result<()> {
     let path = rt.stack.pop();
     let first = rt.stack.pop();
+    let _ = rt.stack.pop(); // pop closure
     ensure_type(&path, ValueRepr::Array)?;
     let arr = path.get_array();
     let syms = arr.values();
@@ -203,6 +205,7 @@ fn prim_get_path(rt: &mut Runtime) -> Result<()> {
 
 fn prim_print_representation(rt: &mut Runtime) -> Result<()> {
     let val = rt.stack.pop();
+    let _ = rt.stack.pop(); // pop closure
     print!("{:?}", val);
     rt.stack_push(Value::nil());
     Ok(())
@@ -211,6 +214,7 @@ fn prim_print_representation(rt: &mut Runtime) -> Result<()> {
 fn prim_project(rt: &mut Runtime) -> Result<()> {
     let projection = rt.stack.pop().get_array();
     let start = rt.stack.pop();
+    let _ = rt.stack.pop(); // pop closure
     if let Some(method) = rt.find_overload(&start, &static_symbol!("project")) {
         let mut args = vec![start];
         args.extend_from_slice(projection.values());
@@ -228,12 +232,15 @@ fn prim_project(rt: &mut Runtime) -> Result<()> {
 }
 
 fn prim_array_make(rt: &mut Runtime) -> Result<()> {
-    // Vararg processing does all the work in making an array so just return.
+    let args = rt.stack.pop();
+    let _ = rt.stack.pop(); // pop closure
+    rt.stack_push(args);
     Ok(())
 }
 
 fn prim_array_match(rt: &mut Runtime) -> Result<()> {
     let val = rt.stack.pop();
+    let _ = rt.stack.pop(); // pop closure
     if val.is_array() {
         rt.stack.push(val);
     } else {
@@ -244,6 +251,7 @@ fn prim_array_match(rt: &mut Runtime) -> Result<()> {
 
 fn prim_match(rt: &mut Runtime) -> Result<()> {
     let val = rt.stack.pop();
+    let _ = rt.stack.pop(); // pop closure
     match val.get_repr() {
         ValueRepr::Closure => {
             rt.stack_push(val);
@@ -264,6 +272,7 @@ fn prim_match(rt: &mut Runtime) -> Result<()> {
 
 fn prim_string_print(rt: &mut Runtime) -> Result<()> {
     let val = rt.stack.pop();
+    let _ = rt.stack.pop(); // pop closure
     print!("{}", val);
     rt.stack_push(Value::nil());
     Ok(())
@@ -271,6 +280,7 @@ fn prim_string_print(rt: &mut Runtime) -> Result<()> {
 
 fn prim_to_string(rt: &mut Runtime) -> Result<()> {
     let val = rt.stack.pop();
+    let _ = rt.stack.pop(); // pop closure
     let str = format!("{}", val);
     let out = rt.make_string(&str);
     rt.stack_push(out);
@@ -279,6 +289,7 @@ fn prim_to_string(rt: &mut Runtime) -> Result<()> {
 
 fn prim_load(rt: &mut Runtime) -> Result<()> {
     let val = rt.stack.pop();
+    let _ = rt.stack.pop(); // pop closure
     let file = rt.get_string(&val)?;
     rt.load(Path::new(&file), false)?;
     rt.stack_push(Value::nil());
@@ -287,6 +298,7 @@ fn prim_load(rt: &mut Runtime) -> Result<()> {
 
 fn prim_symbol_name(rt: &mut Runtime) -> Result<()> {
     let val = rt.stack.pop();
+    let _ = rt.stack.pop(); // pop closure
     ensure_type(&val, ValueRepr::Symbol)?;
     let out = rt.make_string(val.get_symbol().as_str());
     rt.stack_push(out);
@@ -295,6 +307,7 @@ fn prim_symbol_name(rt: &mut Runtime) -> Result<()> {
 
 fn prim_symbol_make(rt: &mut Runtime) -> Result<()> {
     let arg = rt.stack.pop();
+    let _ = rt.stack.pop(); // pop closure
     ensure_type(&arg, ValueRepr::Bytes)?;
     let bytes = arg.get_bytes();
     let str = str::from_utf8(bytes.get_slice()).unwrap_or_default();
@@ -305,6 +318,7 @@ fn prim_symbol_make(rt: &mut Runtime) -> Result<()> {
 
 fn prim_bytes_make(rt: &mut Runtime) -> Result<()> {
     let vals = rt.stack.pop();
+    let _ = rt.stack.pop(); // pop closure
     let array = vals.get_array();
     let mut bytes = Vec::new();
     for v in array.values() {
@@ -321,6 +335,7 @@ fn prim_bytes_make(rt: &mut Runtime) -> Result<()> {
 
 fn prim_table_keys(rt: &mut Runtime) -> Result<()> {
     let arg = rt.stack.pop();
+    let _ = rt.stack.pop(); // pop closure
     ensure_type(&arg, ValueRepr::Table)?;
     let table = arg.get_table();
     let keys = table.keys(rt);
@@ -330,6 +345,7 @@ fn prim_table_keys(rt: &mut Runtime) -> Result<()> {
 
 fn prim_table_clear(rt: &mut Runtime) -> Result<()> {
     let arg = rt.stack.pop();
+    let _ = rt.stack.pop(); // pop closure
     ensure_type(&arg, ValueRepr::Table)?;
     let mut table = arg.get_table();
     table.clear(rt);
@@ -339,17 +355,20 @@ fn prim_table_clear(rt: &mut Runtime) -> Result<()> {
 
 fn prim_exit(rt: &mut Runtime) -> Result<()> {
     let exitcode = rt.stack.pop();
+    let _ = rt.stack.pop(); // pop closure
     Err(crate::common::Error::NibExit { exit_code: exitcode.get_integer() as i32 })
 }
 
 fn prim_panic(rt: &mut Runtime) -> Result<()> {
     let msg = rt.stack.pop();
+    let _ = rt.stack.pop(); // pop closure
     let str = rt.get_string(&msg)?;
     Err(crate::common::Error::NibPanic { msg: str })
 }
 
 fn prim_string_pack(rt: &mut Runtime) -> Result<()> {
     let val = rt.stack.pop();
+    let _ = rt.stack.pop(); // pop closure
     let array = val.get_array();
     let mut packed = String::new();
     for i in array.values() {
@@ -363,6 +382,7 @@ fn prim_string_pack(rt: &mut Runtime) -> Result<()> {
 
 fn prim_string_unpack(rt: &mut Runtime) -> Result<()> {
     let msg = rt.stack.pop();
+    let _ = rt.stack.pop(); // pop closure
     let str = rt.get_string(&msg)?;
     let arr = Array::make(rt, str.len());
     for (i, ch) in str.chars().enumerate() {
@@ -373,10 +393,11 @@ fn prim_string_unpack(rt: &mut Runtime) -> Result<()> {
 }
 
 fn prim_string_substring(rt: &mut Runtime) -> Result<()> {
+    let stop = rt.stack.pop().get_integer();
+    let start = rt.stack.pop().get_integer();
     let msg = rt.stack.pop();
     let str = rt.get_string(&msg)?;
-    let start = rt.stack.pop().get_integer();
-    let stop = rt.stack.pop().get_integer();
+    let _ = rt.stack.pop(); // pop closure
     let substring = str.chars().skip(start as usize).take((stop - start) as usize);
     let out = rt.make_string(&String::from_iter(substring));
     rt.stack_push(out);
@@ -385,6 +406,7 @@ fn prim_string_substring(rt: &mut Runtime) -> Result<()> {
 
 fn prim_to_char(rt: &mut Runtime) -> Result<()> {
     let codepoint = rt.stack.pop().get_integer() as u32;
+    let _ = rt.stack.pop(); // pop closure
     if let Some(ch) = char::from_u32(codepoint) {
         rt.stack_push(Value::char(ch));
     } else {
@@ -395,6 +417,7 @@ fn prim_to_char(rt: &mut Runtime) -> Result<()> {
 
 fn prim_to_pointer(rt: &mut Runtime) -> Result<()> {
     let val = rt.stack.pop();
+    let _ = rt.stack.pop(); // pop closure
     match val.get_repr() {
         ValueRepr::Integer => {
             let addr = val.get_integer() as usize;
@@ -409,13 +432,11 @@ fn prim_to_pointer(rt: &mut Runtime) -> Result<()> {
     Ok(())
 }
 
-fn prim_foreign_call(rt: &mut Runtime) -> Result<()> {
-    Ok(())
-}
 
 fn prim_apply(rt: &mut Runtime) -> Result<()> {
     let args = rt.stack.pop();
     let fun = rt.stack.pop();
+    let _ = rt.stack.pop(); // pop closure
     ensure_type(&args, ValueRepr::Array)?;
     let array = args.get_array();
     let quit = rt.call_function(&fun, array.values())?;
