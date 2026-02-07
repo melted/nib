@@ -44,6 +44,12 @@ pub struct Runtime {
     code: Value,
     ip: usize,
     ffi_signatures: Vec<Signature>,
+    options: Options
+}
+
+pub struct Options {
+    output_core: bool,
+    trace: bool
 }
 
 const DEFAULT_HEAP_SIZE: usize = 1000000;
@@ -75,16 +81,27 @@ impl Interpreter for Runtime {
         let mut module = ast::Module::new(file, code);
         parse_declarations(&mut module)?;
         let core = desugar(module)?;
+        if self.options.output_core {
+            println!("{}", core);
+        }
         let bytecode = compile(core)?;
         self.run_module(bytecode)
     }
 
-    fn set_output_core(&mut self, output: bool) {}
+    fn set_output_core(&mut self, output: bool) {
+        self.options.output_core = output;
+    }
 }
 
 impl Default for Runtime {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl Options {
+    fn new() -> Self {
+        Options { output_core: false, trace: false }
     }
 }
 
@@ -101,6 +118,7 @@ impl Runtime {
             closure: Value::nil(),
             ip: 0,
             ffi_signatures: Vec::new(),
+            options: Options::new()
         };
         let global_env = Value::from(Table::make(&mut runtime));
         let stack = Value::from(Array::make(&mut runtime, DEFAULT_STACK_SIZE));
@@ -138,10 +156,11 @@ impl Runtime {
         self.local_env = self.make_local_env(&bytecode);
         let bc = Bytes::with(self, &bytecode.byte_code);
         self.code = Value::from(bc);
+        let local_env = self.local_env.clone().get_array().clone(self);
         let closure = Closure::make_low(
             self,
             &bc,
-            self.local_env,
+            local_env,
             Value::integer(0),
             Value::bool(false),
         );
@@ -152,6 +171,9 @@ impl Runtime {
     pub fn run_expression(&mut self, code: &str) -> Result<Value> {
         let expression = parse_expression(code)?;
         let core = desugar_expression(expression)?;
+        if self.options.output_core {
+            println!("{}", core);
+        }
         let compiled = compile_expression(core)?;
         self.run_module(compiled)?;
         Ok(self.stack.pop())
@@ -727,7 +749,7 @@ impl Runtime {
                     self.stack.base = self.stack.top() - args;
                 }
                 self.closure = Value::from(closure);
-                self.local_env = closure.env();
+                self.local_env = closure.env().get_array().clone(self);
                 self.code = closure.code_value();
                 self.ip = 0;
             }
@@ -771,7 +793,7 @@ impl Runtime {
             let closure = self.call_stack.pop();
             self.closure = closure;
             self.code = closure.get_closure().code_value();
-            self.local_env = closure.get_closure().env();
+            self.local_env = closure.get_closure().env().get_array().clone(self);
             self.ip = ip;
             self.stack.base = old_base;
             Ok(false)
@@ -804,8 +826,8 @@ impl Runtime {
             INSTR_JZ | INSTR_JZ_IMM8 => val.get_integer() == 0,
             INSTR_JPOS | INSTR_JPOS_IMM8 => val.get_integer() > 0,
             INSTR_JNEG | INSTR_JNEG_IMM8 => val.get_integer() < 0,
-            INSTR_JNPOS | INSTR_JNPOS_IMM8 => (val.get_integer() <= 0),
-            INSTR_JNNEG | INSTR_JNNEG_IMM8 => (val.get_integer() >= 0),
+            INSTR_JNPOS | INSTR_JNPOS_IMM8 => val.get_integer() <= 0,
+            INSTR_JNNEG | INSTR_JNNEG_IMM8 => val.get_integer() >= 0,
             INSTR_JFALSE | INSTR_JFALSE_IMM8 => val == Value::bool(false),
             INSTR_JNFALSE | INSTR_JNFALSE_IMM8 => val != Value::bool(false),
             _ => unreachable!(),

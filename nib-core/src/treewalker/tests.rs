@@ -1,6 +1,6 @@
 #![cfg(test)]
 
-use crate::{common::Result, interpreter::Runtime, treewalker::Value};
+use crate::{common::Result, treewalker::Value};
 
 #[test]
 fn equality_of_values() -> Result<()> {

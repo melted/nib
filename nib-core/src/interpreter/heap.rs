@@ -116,6 +116,8 @@ impl Runtime {
     fn trace_roots(&mut self) {
         let new_env = self.copy_object(self.global_env);
         self.global_env = new_env;
+        let new_local_env = self.copy_object(self.local_env);
+        self.local_env = new_local_env;
         let new_stack = self.copy_object(self.stack.to_value());
         self.stack.array = new_stack.get_array();
         let new_call_stack = self.copy_object(self.call_stack.to_value());
@@ -707,12 +709,32 @@ fn display_complex_object(
             write!(f, "[")?;
             let array = value.get_array();
             let mut iter = array.values().iter();
+            let mut nil_count = 0;
             if let Some(v) = iter.next() {
-                display_complex_object(v, f, seen)?;
-                for v in iter {
-                    write!(f, ", ")?;
+                if !v.is_nil() {
                     display_complex_object(v, f, seen)?;
+                } else {
+                    write!(f, "nil ")?;
+                    nil_count += 1;
                 }
+                for v in iter {
+                    if !v.is_nil() {
+                        if nil_count > 0 {
+                            write!(f, "{} times", nil_count)?;
+                            nil_count = 0;
+                        }
+                        write!(f, ", ")?;
+                        display_complex_object(v, f, seen)?;
+                    } else {
+                        if nil_count == 0 {
+                            write!(f, ", nil ")?;
+                        }
+                        nil_count += 1;
+                    }
+                }
+            }
+            if nil_count > 0 {
+                write!(f, "{} times", nil_count)?;
             }
             write!(f, "]")
         }
@@ -745,25 +767,13 @@ pub struct Array {
 
 impl Debug for Array {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Array[")?;
-        let vals = self.values();
-        let mut nil_count = 0;
-        for v in vals {
-            if v.is_nil() {
-                nil_count += 1;
-            } else {
-                if nil_count > 0 {
-                    write!(f, "... {} nil, ", nil_count)?;
-                    nil_count = 0;
-                }
-                write!(f, "{:?}, ", v)?;
-            }
-        }
-        if nil_count > 0 {
-            write!(f, "... {} nil, ", nil_count)?;
-            nil_count = 0;
-        }
-        write!(f, "]")
+        write!(f, "{}", self)
+    }
+}
+
+impl Display for Array {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        display_complex_object(&Value::from(*self), f, &mut HashSet::new())
     }
 }
 
@@ -826,6 +836,12 @@ impl Array {
         }
     }
 
+    pub fn clone(&self, rt: &mut Runtime) -> Value {
+        let new = Array::with(rt, self.values());
+        new.set_type_table(self.type_table());
+        Value::from(new)
+    } 
+
     pub fn type_table(&self) -> Value {
         get_value(self.ptr, 0)
     }
@@ -848,7 +864,13 @@ pub struct Table {
 
 impl Debug for Table {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Table[ptr: {:?} keys: {}]", self.ptr, self.size())
+        write!(f, "{}", self)
+    }
+}
+
+impl Display for Table {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        display_complex_object(&Value::from(*self), f, &mut HashSet::new())
     }
 }
 
