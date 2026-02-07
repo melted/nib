@@ -226,10 +226,8 @@ impl PatternNode {
 
     fn bound_vars_helper(&self, vars: &mut HashSet<Name>) {
         match &self.pattern {
-            Pattern::Ellipsis(name) => {
-                if let Some(n) = name {
-                    vars.insert(n.clone());
-                }
+            Pattern::Ellipsis(Some(name)) => {
+                vars.insert(name.clone());
             }
             Pattern::Var(n) => {
                 vars.insert(n.clone());

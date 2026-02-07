@@ -56,7 +56,7 @@ impl Runtime {
             if self.heap.from_space.top + aligned_size > self.heap.from_space.size {
                 self.collect(aligned_size);
             }
-            let base_ptr = self.heap.from_space.alloc.as_mut_ptr() as *mut T;
+            let base_ptr: *mut T = self.heap.from_space.alloc.as_mut_ptr();
             let top_ptr = base_ptr.byte_add(self.heap.from_space.top);
             self.heap.from_space.top += aligned_size;
             top_ptr
@@ -67,7 +67,7 @@ impl Runtime {
         let Ok(mut alloc) = region::alloc(size, region::Protection::READ_WRITE) else {
             panic!("Couldn't allocate {size} bytes!");
         };
-        let ptr = alloc.as_mut_ptr() as *mut T;
+        let ptr:*mut T = alloc.as_mut_ptr();
         self.heap.big_objects.insert(
             ptr.addr(),
             BigObject {
@@ -118,9 +118,9 @@ impl Runtime {
         self.global_env = new_env;
         let new_local_env = self.copy_object(self.local_env);
         self.local_env = new_local_env;
-        let new_stack = self.copy_object(self.stack.to_value());
+        let new_stack = self.copy_object(self.stack.as_value());
         self.stack.array = new_stack.get_array();
-        let new_call_stack = self.copy_object(self.call_stack.to_value());
+        let new_call_stack = self.copy_object(self.call_stack.as_value());
         self.call_stack.array = new_call_stack.get_array();
     }
 
@@ -375,7 +375,7 @@ impl Value {
 
     pub fn alloc_float(rt: &mut Runtime, x: f64) -> Self {
         let object = ObjectHeader::make(rt, 16, ValueRepr::Float);
-        let ptr = get_object_ptr(object, 0) as *mut f64;
+        let ptr: *mut f64 = get_object_ptr(object, 0);
         unsafe {
             *ptr = x;
         }
@@ -797,7 +797,7 @@ impl Array {
         let me = Array { ptr: header };
         me.set_type_table(Value::nil());
         let src = values.as_ptr();
-        let dst = get_object_ptr(header, 1) as *mut Value;
+        let dst:  *mut Value = get_object_ptr(header, 1);
         unsafe {
             copy_nonoverlapping(src, dst, values.len());
         }
@@ -823,9 +823,9 @@ impl Array {
         }
     }
 
-    pub fn values_mut(&self) -> &mut [Value] {
+    pub fn values_mut(&mut self) -> &mut [Value] {
         unsafe {
-            let ptr = get_object_ptr(self.ptr, 1) as *mut Value;
+            let ptr: *mut Value = get_object_ptr(self.ptr, 1);
             slice::from_raw_parts_mut(ptr, self.size())
         }
     }
@@ -1095,7 +1095,7 @@ impl Bytes {
         }
     }
 
-    pub(super) fn get_slice_mut(&self) -> &mut [u8] {
+    pub(super) fn get_slice_mut(&mut self) -> &mut [u8] {
         unsafe {
             let ptr = self.ptr.byte_add(2 * CELL_SIZE) as *mut u8;
             from_raw_parts_mut(ptr, self.size())

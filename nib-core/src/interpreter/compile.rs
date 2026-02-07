@@ -296,7 +296,7 @@ impl Compilation {
 
     fn compile_lambda(
         &mut self,
-        lambda: &Box<Lambda>,
+        lambda: &Lambda,
         vars: HashSet<Symbol>,
         locals: HashMap<Symbol, i32>,
         code: &mut Vec<u8>,

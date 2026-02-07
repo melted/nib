@@ -754,7 +754,7 @@ impl Runtime {
                 self.ip = 0;
             }
             TYPE_EXTERN => {
-                let fun_ptr = closure.code_value().get_cpointer() as *const PrimFn;
+                let fun_ptr :  *const () = closure.code_value().get_cpointer();
                 unsafe {
                     let fun: PrimFn = mem::transmute(fun_ptr);
                     fun(self)?;
@@ -1292,7 +1292,7 @@ impl Stack {
         self.top - self.base
     }
 
-    pub(super) fn to_value(&self) -> Value {
+    pub(super) fn as_value(&self) -> Value {
         Value::from(self.array)
     }
 

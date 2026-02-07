@@ -81,7 +81,7 @@ impl DesugarState {
         };
         self.metadata.last_id += 1;
         let result = self.desugar_funclauses(self.metadata.last_id, &ast_binding.clauses)?;
-        Ok(vec![Binding::binding(ast_binding.id, binder, result)])
+        Ok(vec![Binding::make(ast_binding.id, binder, result)])
     }
 
     fn desugar_opbinding(
@@ -97,7 +97,7 @@ impl DesugarState {
             .collect();
         self.metadata.last_id += 1;
         let result = self.desugar_funclauses(self.metadata.last_id, &funclauses)?;
-        Ok(vec![Binding::binding(
+        Ok(vec![Binding::make(
             ast_binding.id,
             if is_local {
                 Binder::Local(name)
@@ -122,13 +122,13 @@ impl DesugarState {
                 } else {
                     Binder::Public(self.desugar_binding_name(v)?)
                 };
-                Ok(vec![Binding::binding(ast_binding.id, binder, rhs)])
+                Ok(vec![Binding::make(ast_binding.id, binder, rhs)])
             }
-            Pattern::Wildcard => Ok(vec![Binding::binding(ast_binding.id, Binder::Unbound, rhs)]),
+            Pattern::Wildcard => Ok(vec![Binding::make(ast_binding.id, Binder::Unbound, rhs)]),
             _ => {
                 let mut counter = 0;
                 let mut replacements = HashMap::new();
-                let fun_pat = self.pattern_with_plain_vars(pat, &mut counter, &mut replacements);
+                let fun_pat = Self::pattern_with_plain_vars(pat, &mut counter, &mut replacements);
                 let fun_names = replacements.keys().collect::<Vec<_>>();
                 let v = fun_names
                     .iter()
@@ -158,7 +158,7 @@ impl DesugarState {
                 let desugared = self.desugar_expression(&expr)?;
                 let nam_arr = self.next_local();
                 let binding =
-                    Binding::binding(ast_binding.id, Binder::Local(nam_arr.clone()), desugared);
+                    Binding::make(ast_binding.id, Binder::Local(nam_arr.clone()), desugared);
                 let mut bindings = vec![binding];
                 for (i, k) in fun_names.iter().enumerate() {
                     let old = replacements.get(k).unwrap();
@@ -175,7 +175,7 @@ impl DesugarState {
                     } else {
                         Binder::Public(self.desugar_binding_name(old)?)
                     };
-                    let bind = Binding::binding(self.new_id(), binder, rhs);
+                    let bind = Binding::make(self.new_id(), binder, rhs);
                     bindings.push(bind);
                 }
                 Ok(bindings)
@@ -296,10 +296,11 @@ impl DesugarState {
                 Ok(Expression::App(expression.id, args))
             }
             ast::Expression::Binop(ast::Binop { op, lhs, rhs }) => {
-                let mut args = Vec::new();
-                args.push(self.var(op.to_name()));
-                args.push(self.desugar_expression(lhs)?);
-                args.push(self.desugar_expression(rhs)?);
+                let args = vec![
+                    self.var(op.to_name()),
+                    self.desugar_expression(lhs)?,
+                    self.desugar_expression(rhs)?,
+                ];
                 Ok(Expression::App(expression.id, args))
             }
             ast::Expression::Cond(cond) => {
@@ -352,7 +353,7 @@ impl DesugarState {
             };
             let (is_irrefutable, next_exp) = self.desugar_funclause(c, &args, &fail_exp)?;
             if let Some(e) = &mut exp {
-                let binding = Binding::binding(
+                let binding = Binding::make(
                     0,
                     Binder::Local(Name::Plain(local(i))),
                     lambda(vec![], &Arity::Fixed(0), &next_exp),
@@ -408,7 +409,7 @@ impl DesugarState {
                         exp = rename(&exp, var, v);
                     } else {
                         let binding =
-                            Binding::binding(0, Binder::Local(Name::sym(var)), expression.clone());
+                            Binding::make(0, Binder::Local(Name::sym(var)), expression.clone());
                         match &mut exp {
                             Expression::Where(n, expr, binds) => {
                                 binds.insert(0, binding);
@@ -425,7 +426,6 @@ impl DesugarState {
     }
 
     fn pattern_with_plain_vars(
-        &mut self,
         pattern: &PatternNode,
         counter: &mut i32,
         replacements: &mut HashMap<Name, Name>,
@@ -447,7 +447,7 @@ impl DesugarState {
             Pattern::Array(arr) => {
                 let mut new_arr = Vec::new();
                 for p in arr.iter() {
-                    new_arr.push(self.pattern_with_plain_vars(p, counter, replacements));
+                    new_arr.push(Self::pattern_with_plain_vars(p, counter, replacements));
                 }
                 p.pattern = Pattern::Array(new_arr);
             }
@@ -455,18 +455,18 @@ impl DesugarState {
                 let n = Name::Plain(Symbol::from(format!("$z{}", counter)));
                 *counter += 1;
                 replacements.insert(n.clone(), old.clone());
-                let new_pat = self.pattern_with_plain_vars(pat, counter, replacements);
+                let new_pat = Self::pattern_with_plain_vars(pat, counter, replacements);
                 p.pattern = Pattern::Alias(Box::new(new_pat), n);
             }
             Pattern::Custom(matcher, fields) => {
                 let mut new_fields = Vec::new();
                 for p in fields.iter() {
-                    new_fields.push(self.pattern_with_plain_vars(p, counter, replacements));
+                    new_fields.push(Self::pattern_with_plain_vars(p, counter, replacements));
                 }
                 p.pattern = Pattern::Custom(matcher.clone(), new_fields);
             }
             Pattern::Typed(pat, t) => {
-                let new_pat = self.pattern_with_plain_vars(pat, counter, replacements);
+                let new_pat = Self::pattern_with_plain_vars(pat, counter, replacements);
                 p.pattern = Pattern::Typed(Box::new(new_pat), t.clone());
             }
             _ => {}
@@ -596,7 +596,7 @@ pub struct Binding {
 }
 
 impl Binding {
-    pub fn binding(id: Node, binder: Binder, body: Expression) -> Self {
+    pub fn make(id: Node, binder: Binder, body: Expression) -> Self {
         let name = match &binder {
             Binder::Public(name) | Binder::Local(name) => Some(name.clone()),
             Binder::Unbound => None,
