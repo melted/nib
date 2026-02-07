@@ -22,7 +22,7 @@ use crate::{
             INSTR_TABLE_SET, INSTR_TABLE_SIZE, INSTR_TAN, INSTR_TOINT, INSTR_TYPE,
         },
         ensure_type,
-        heap::{Bytes, Closure, Code, Table, Value, ValueRepr},
+        heap::{Array, Bytes, Closure, Code, Table, Value, ValueRepr},
     }, runtime::Interpreter,
 };
 
@@ -71,6 +71,30 @@ impl Runtime {
 
         let get_path = self.make_primitive(prim_get_path, Arity::VarArg(2, 1));
         self.set_global(&sym("_prim_get_path"), &get_path);
+
+        let bytes_make = self.make_primitive(prim_bytes_make, Arity::VarArg(1, 0));
+        self.set_global(&sym("_prim_bytes_make"), &bytes_make);
+
+        let table_keys = self.make_primitive(prim_table_keys, Arity::Fixed(1));
+        self.set_global(&sym("_prim_table_keys"), &table_keys);
+
+        let table_clear = self.make_primitive(prim_table_clear, Arity::Fixed(1));
+        self.set_global(&sym("_prim_table_clear"), &table_clear);
+
+        let exit = self.make_primitive(prim_exit, Arity::Fixed(1));
+        self.set_global(&sym("_prim_exit"), &exit);
+
+        let nib_panic = self.make_primitive(prim_panic, Arity::Fixed(1));
+        self.set_global(&sym("_prim_panic"), &nib_panic);
+
+        let string_pack = self.make_primitive(prim_string_pack, Arity::Fixed(1));
+        self.set_global(&sym("_prim_string_pack"), &string_pack);
+
+        let string_unpack = self.make_primitive(prim_string_unpack, Arity::Fixed(1));
+        self.set_global(&sym("_prim_string_unpack"), &string_unpack);
+
+        let string_substring = self.make_primitive(prim_string_substring, Arity::Fixed(3));
+        self.set_global(&sym("_prim_string_substring"), &string_substring);
     }
 
     pub(super) fn register_type_tables(&mut self) {
@@ -284,7 +308,7 @@ fn prim_to_string(rt: &mut Runtime) -> Result<()> {
 
 fn prim_load(rt: &mut Runtime) -> Result<()> {
     let val = rt.stack.pop();
-    let file = rt.get_string(val)?;
+    let file = rt.get_string(&val)?;
     rt.load(Path::new(&file), false)?;
     rt.stack_push(Value::nil());
     Ok(())
@@ -309,6 +333,18 @@ fn prim_symbol_make(rt: &mut Runtime) -> Result<()> {
 }
 
 fn prim_bytes_make(rt: &mut Runtime) -> Result<()> {
+    let vals = rt.stack.pop();
+    let array = vals.get_array();
+    let mut bytes = Vec::new();
+    for v in array.values() {
+        let n = v.get_integer();
+        if n < 0 || n > 255 {
+            return rt.error("bytes_make: value out of range for byte");
+        }
+        bytes.push(n as u8);
+    }
+    let out = Bytes::with(rt, &bytes);
+    rt.stack_push(Value::from(out));
     Ok(())
 }
 
@@ -322,26 +358,57 @@ fn prim_table_keys(rt: &mut Runtime) -> Result<()> {
 }
 
 fn prim_table_clear(rt: &mut Runtime) -> Result<()> {
+    let arg = rt.stack.pop();
+    ensure_type(&arg, ValueRepr::Table)?;
+    let mut table = arg.get_table();
+    table.clear(rt);
+    rt.stack_push(Value::nil());
     Ok(())
 }
 
 fn prim_exit(rt: &mut Runtime) -> Result<()> {
-    Ok(())
+    let exitcode = rt.stack.pop();
+    Err(crate::common::Error::NibExit { exit_code: exitcode.get_integer() as i32 })
 }
 
 fn prim_panic(rt: &mut Runtime) -> Result<()> {
-    Ok(())
+    let msg = rt.stack.pop();
+    let str = rt.get_string(&msg)?;
+    Err(crate::common::Error::NibPanic { msg: str })
 }
 
 fn prim_string_pack(rt: &mut Runtime) -> Result<()> {
+    let val = rt.stack.pop();
+    let array = val.get_array();
+    let mut packed = String::new();
+    for i in array.values() {
+        ensure_type(i, ValueRepr::Char)?;
+        packed.push(i.get_char());
+    }
+    let out = rt.make_string(&packed);
+    rt.stack_push(out);
     Ok(())
 }
 
 fn prim_string_unpack(rt: &mut Runtime) -> Result<()> {
+    let msg = rt.stack.pop();
+    let str = rt.get_string(&msg)?;
+    let arr = Array::make(rt, str.len());
+    for (i, ch) in str.chars().enumerate() {
+        arr.set(i, Value::char(ch));
+    }
+    rt.stack_push(Value::from(arr));
     Ok(())
 }
 
 fn prim_string_substring(rt: &mut Runtime) -> Result<()> {
+    let msg = rt.stack.pop();
+    let str = rt.get_string(&msg)?;
+    let start = rt.stack.pop().get_integer();
+    let stop = rt.stack.pop().get_integer();
+    let substring = str.chars().skip(start as usize).take((stop - start) as usize);
+    let out = rt.make_string(&String::from_iter(substring));
+    rt.stack_push(out);
     Ok(())
 }
 
