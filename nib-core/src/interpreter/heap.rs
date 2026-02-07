@@ -1,6 +1,13 @@
 use core::slice;
 use std::{
-    array, collections::{HashMap, HashSet}, ffi::c_void, fmt::{Debug, Display, write}, hash::{DefaultHasher, Hash, Hasher}, mem, ptr::copy_nonoverlapping, slice::{from_raw_parts, from_raw_parts_mut}
+    array,
+    collections::{HashMap, HashSet},
+    ffi::c_void,
+    fmt::{Debug, Display, write},
+    hash::{DefaultHasher, Hash, Hasher},
+    mem,
+    ptr::copy_nonoverlapping,
+    slice::{from_raw_parts, from_raw_parts_mut},
 };
 
 use libffi::middle::Cif;
@@ -653,9 +660,9 @@ impl Debug for Value {
             ValueRepr::Float => write!(f, "{:?}", self.get_float()),
             ValueRepr::BoxedInteger => todo!(),
             ValueRepr::Symbol => write!(f, "{:?}", self.get_symbol()),
-            ValueRepr::Array => write!(f, "{:?}", self.get_array()),
+            ValueRepr::Array => display_complex_object(self, f, &mut HashSet::new()),
             ValueRepr::Bytes => write!(f, "{:?}", self.get_bytes()),
-            ValueRepr::Table => write!(f, "{:?}", self.get_table()),
+            ValueRepr::Table => display_complex_object(self, f, &mut HashSet::new()),
             ValueRepr::Closure => write!(f, "{:?}", self.get_closure()),
             ValueRepr::Object => write!(f, "{:?}", self.get_object()),
             ValueRepr::PartialApplication => write!(f, "{:?}", self.get_array()),
@@ -671,7 +678,9 @@ impl Display for Value {
             ValueRepr::Undefined => write!(f, "#<undefined>"),
             ValueRepr::Bool => write!(f, "{}", self.get_bool()),
             ValueRepr::Integer => write!(f, "{}", self.get_integer()),
-            ValueRepr::Pointer => write!(f, "#<ptr:{:x}>", self.get_pointer::<*mut c_void>().addr()),
+            ValueRepr::Pointer => {
+                write!(f, "#<ptr:{:x}>", self.get_pointer::<*mut c_void>().addr())
+            }
             ValueRepr::Char => write!(f, "{}", self.get_char()),
             ValueRepr::Float => write!(f, "{}", self.get_float()),
             ValueRepr::BoxedInteger => todo!(),
@@ -681,12 +690,16 @@ impl Display for Value {
             ValueRepr::PartialApplication => write!(f, "#<partial-application:{:x}>", self.val),
             ValueRepr::CallContinuation => write!(f, "#<call-continuation:{}>", self.get_cc_args()),
             ValueRepr::Object => write!(f, "#<object>"),
-            _ => display_complex_object(&self, f, &mut HashSet::new())
+            _ => display_complex_object(&self, f, &mut HashSet::new()),
         }
     }
 }
 
-fn display_complex_object(value: &Value, f: &mut std::fmt::Formatter<'_>, seen: &mut HashSet<Value>) -> std::fmt::Result {
+fn display_complex_object(
+    value: &Value,
+    f: &mut std::fmt::Formatter<'_>,
+    seen: &mut HashSet<Value>,
+) -> std::fmt::Result {
     if seen.contains(value) {
         write!(f, "#<recurse:{:x}>", value.val)?;
         return Ok(());
@@ -695,7 +708,7 @@ fn display_complex_object(value: &Value, f: &mut std::fmt::Formatter<'_>, seen: 
     match value.get_repr() {
         ValueRepr::Array => {
             write!(f, "[")?;
-            let array =  value.get_array();
+            let array = value.get_array();
             let mut iter = array.values().iter();
             if let Some(v) = iter.next() {
                 display_complex_object(v, f, seen)?;
@@ -705,7 +718,7 @@ fn display_complex_object(value: &Value, f: &mut std::fmt::Formatter<'_>, seen: 
                 }
             }
             write!(f, "]")
-        },
+        }
         ValueRepr::Table => {
             write!(f, "{{")?;
             let table = value.get_table();
@@ -724,7 +737,7 @@ fn display_complex_object(value: &Value, f: &mut std::fmt::Formatter<'_>, seen: 
             }
             write!(f, "}}")
         }
-        _ => write!(f, "{}", value)
+        _ => write!(f, "{}", value),
     }
 }
 
@@ -841,7 +854,6 @@ impl Debug for Table {
         write!(f, "Table[ptr: {:?} keys: {}]", self.ptr, self.size())
     }
 }
-
 
 const INITIAL_SIZE: usize = 16;
 
@@ -966,7 +978,7 @@ impl Table {
         for i in 0..self.capacity() {
             let key = storage.at(i * 2);
             if Self::valid_key(key) {
-                let value = storage.at(i*2+1);
+                let value = storage.at(i * 2 + 1);
                 kv.push((key, value));
             }
         }
@@ -1010,7 +1022,7 @@ impl Display for Bytes {
         if let Some(b) = iter.next() {
             write!(f, "{}", b)?;
             for b in iter {
-                write!(f, ", {}", b);
+                write!(f, ", {}", b)?;
             }
         }
         write!(f, "]")
@@ -1101,8 +1113,15 @@ pub struct Closure {
 
 impl Debug for Closure {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Closure[ptr: {:?}, code: {:?}, env: {:?}, arg: {:?}, vararg: {:?}]",
-                 self.ptr, self.get_code(), self.env().get_array().size(), self.num_args(), self.vararg())
+        write!(
+            f,
+            "Closure[ptr: {:?}, code: {:?}, env: {:?}, arg: {:?}, vararg: {:?}]",
+            self.ptr,
+            self.get_code(),
+            self.env().get_array().size(),
+            self.num_args(),
+            self.vararg()
+        )
     }
 }
 

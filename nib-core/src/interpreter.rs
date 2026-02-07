@@ -20,7 +20,8 @@ use crate::interpreter::bytecode::*;
 use crate::interpreter::compile::{Module, compile, compile_expression};
 use crate::interpreter::foreign::call_foreign_function;
 use crate::interpreter::heap::{
-    Array, Bytes, Closure, Heap, TYPE_BYTECODE, TYPE_EXTERN, TYPE_FOREIGN, Table, Value, ValueRepr, set_value
+    Array, Bytes, Closure, Heap, TYPE_BYTECODE, TYPE_EXTERN, TYPE_FOREIGN, Table, Value, ValueRepr,
+    set_value,
 };
 use crate::interpreter::prims::PrimFn;
 use crate::parser::{parse_declarations, parse_expression};
@@ -42,7 +43,7 @@ pub struct Runtime {
     closure: Value,
     code: Value,
     ip: usize,
-    ffi_signatures:Vec<Signature>
+    ffi_signatures: Vec<Signature>,
 }
 
 const DEFAULT_HEAP_SIZE: usize = 1000000;
@@ -93,7 +94,7 @@ impl Runtime {
             code: Value::nil(),
             closure: Value::nil(),
             ip: 0,
-            ffi_signatures:Vec::new()
+            ffi_signatures: Vec::new(),
         };
         let global_env = Value::from(Table::make(&mut runtime));
         let stack = Value::from(Array::make(&mut runtime, DEFAULT_STACK_SIZE));
@@ -692,8 +693,8 @@ impl Runtime {
             let mut var_arg = Array::make(self, varargs);
             let argv = self.stack.slice_mut(args - 1, 0);
             dbg!(&argv, varargs, extra_args);
-            var_arg.fill(&argv[i..i+varargs], 0, varargs);
-            if args - 1 > i+varargs {
+            var_arg.fill(&argv[i..i + varargs], 0, varargs);
+            if args - 1 > i + varargs {
                 argv.copy_within(i + varargs.., i + 1);
             }
             if extra_args > 0 {
@@ -727,7 +728,7 @@ impl Runtime {
             TYPE_EXTERN => {
                 let fun_ptr = closure.code_value().get_cpointer() as *const PrimFn;
                 unsafe {
-                    let fun:PrimFn = mem::transmute(fun_ptr);
+                    let fun: PrimFn = mem::transmute(fun_ptr);
                     fun(self)?;
                 }
             }
@@ -826,7 +827,7 @@ impl Runtime {
             INSTR_PUSH_NIL => Value::nil(),
             INSTR_PUSH_TRUE => Value::bool(true),
             INSTR_PUSH_FALSE => Value::bool(false),
-            _ => Value::nil()
+            _ => Value::nil(),
         };
         self.stack.push(val);
         Ok(false)
@@ -1221,7 +1222,7 @@ impl Stack {
         self.push(elem);
     }
 
-    pub(super) fn load_arg(&mut self, i:usize) {
+    pub(super) fn load_arg(&mut self, i: usize) {
         let elem = self.array.at(self.base + i);
         self.push(elem);
     }

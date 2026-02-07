@@ -42,13 +42,15 @@ pub fn parse_expression(code: &str) -> Result<ExpressionNode> {
 /// Is the code a binding?
 /// If there is an equal sign, and a `where` doesn't come before, it is a binding.
 /// This can used to decide whether to parse the code as a declaration or an expression
-/// in a repl. 
-pub fn is_binding(code : &str) -> Result<bool> {
+/// in a repl.
+pub fn is_binding(code: &str) -> Result<bool> {
     let tokens = lex(code)?;
-    let tok = tokens.iter().find(|t| t.value == TokenValue::Equals || t.value == TokenValue::Where);
+    let tok = tokens
+        .iter()
+        .find(|t| t.value == TokenValue::Equals || t.value == TokenValue::Where);
     match tok.map(|t| &t.value) {
         Some(TokenValue::Equals) => Ok(true),
-        _ => Ok(false)
+        _ => Ok(false),
     }
 }
 

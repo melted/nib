@@ -147,7 +147,7 @@ fn run_literal_expression_integer() -> Result<()> {
 fn run_literal_expression_bytes() -> Result<()> {
     let mut rt = Runtime::new();
     let val = rt.run_expression("#[1,2,3]")?;
-    assert_eq!(val.get_bytes().get_slice(), [1,2,3]);
+    assert_eq!(val.get_bytes().get_slice(), [1, 2, 3]);
     Ok(())
 }
 
@@ -155,7 +155,7 @@ fn run_literal_expression_bytes() -> Result<()> {
 fn run_literal_expression_string() -> Result<()> {
     let mut rt = Runtime::new();
     let val = rt.run_expression("\"hej\"")?;
-    assert_eq!(val.get_bytes().get_slice(), [104,101,106]);
+    assert_eq!(val.get_bytes().get_slice(), [104, 101, 106]);
     Ok(())
 }
 
@@ -167,12 +167,14 @@ fn run_literal_expression_symbol() -> Result<()> {
     Ok(())
 }
 
-
 #[test]
 fn run_array_expression() -> Result<()> {
     let mut rt = Runtime::new();
     let val = rt.run_expression("[1,2]")?;
-    assert_eq!(val.get_array().values(), [Value::integer(1), Value::integer(2)]);
+    assert_eq!(
+        val.get_array().values(),
+        [Value::integer(1), Value::integer(2)]
+    );
     Ok(())
 }
 
@@ -211,7 +213,7 @@ fn run_lambda_app_multiple_args_expression() -> Result<()> {
 #[test]
 fn run_simple_binding() -> Result<()> {
     let mut rt = Runtime::new();
-    rt.add_code("test","a=1")?;
+    rt.add_code("test", "a=1")?;
     let val = rt.get_global(&sym("a"));
     assert_eq!(val.get_integer(), 1);
     Ok(())
@@ -220,7 +222,7 @@ fn run_simple_binding() -> Result<()> {
 #[test]
 fn run_compute_binding() -> Result<()> {
     let mut rt = Runtime::new();
-    rt.add_code("test","a = _prim_mul 3 5")?;
+    rt.add_code("test", "a = _prim_mul 3 5")?;
     let val = rt.get_global(&sym("a"));
     assert_eq!(val.get_integer(), 15);
     Ok(())
@@ -229,7 +231,7 @@ fn run_compute_binding() -> Result<()> {
 #[test]
 fn run_globalref_binding() -> Result<()> {
     let mut rt = Runtime::new();
-    rt.add_code("test","a = system.arch")?;
+    rt.add_code("test", "a = system.arch")?;
     let val = rt.get_global(&sym("a"));
     dbg!(val);
     Ok(())
@@ -238,7 +240,7 @@ fn run_globalref_binding() -> Result<()> {
 #[test]
 fn run_fun_binding() -> Result<()> {
     let mut rt = Runtime::new();
-    rt.add_code("test","calc a = _prim_mul a 2")?;
+    rt.add_code("test", "calc a = _prim_mul a 2")?;
     let val = rt.get_global(&sym("calc"));
     assert_eq!(val.is_closure(), true);
     Ok(())
@@ -247,7 +249,10 @@ fn run_fun_binding() -> Result<()> {
 #[test]
 fn run_fun_clauses_binding() -> Result<()> {
     let mut rt = Runtime::new();
-    rt.add_code("test","fac 0 = 1\nfac n = _prim_mul n (fac (_prim_sub n 1))")?;
+    rt.add_code(
+        "test",
+        "fac 0 = 1\nfac n = _prim_mul n (fac (_prim_sub n 1))",
+    )?;
     let val = rt.get_global(&sym("fac"));
     assert_eq!(val.is_closure(), true);
     Ok(())
@@ -256,7 +261,10 @@ fn run_fun_clauses_binding() -> Result<()> {
 #[test]
 fn run_fun_clauses_app_binding() -> Result<()> {
     let mut rt = Runtime::new();
-    rt.add_code("test","fac 0 = 1\nfac n = _prim_mul n (fac (_prim_sub n 1))\nres=fac 5\n")?;
+    rt.add_code(
+        "test",
+        "fac 0 = 1\nfac n = _prim_mul n (fac (_prim_sub n 1))\nres=fac 5\n",
+    )?;
     let val = rt.get_global(&sym("res"));
     dbg!(val);
     assert_eq!(val.get_integer(), 120);

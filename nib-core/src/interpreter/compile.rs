@@ -1,10 +1,19 @@
 use symbol_table::static_symbol;
 
 use crate::ast::Literal;
-use crate::common::{Metadata, Name, get_symbol};
+use crate::common::{Metadata, Name};
 use crate::common::{Result, Symbol};
 use crate::core::{Binder, Binding, Cond, Expression, Lambda, free_vars};
-use crate::interpreter::bytecode::{INSTR_ALLOC_ARRAY, INSTR_ALLOC_CLOSURE, INSTR_ALLOC_FLOAT, INSTR_ALLOC_TABLE, INSTR_ARRAY_SET, INSTR_CALL, INSTR_CALL_TAIL, INSTR_DROP, INSTR_DUP, INSTR_GET_LOCAL, INSTR_GLOBAL_ENV, INSTR_IS_TABLE, INSTR_JFALSE, INSTR_JFALSE_IMM8, INSTR_JNEG, INSTR_JNEG_IMM8, INSTR_JNFALSE, INSTR_JNFALSE_IMM8, INSTR_JNNEG, INSTR_JNNEG_IMM8, INSTR_JNPOS, INSTR_JNPOS_IMM8, INSTR_JPOS, INSTR_JPOS_IMM8, INSTR_JUMP, INSTR_JUMP_IMM8, INSTR_JZ, INSTR_JZ_IMM8, INSTR_LOAD_BYTES_IMM, INSTR_LOAD_IMM8, INSTR_LOAD_IMM16, INSTR_LOAD_IMM32, INSTR_LOAD_IMM64, INSTR_PUSH_FALSE, INSTR_PUSH_LAST_SMALL, INSTR_PUSH_MINUS_ONE, INSTR_PUSH_NIL, INSTR_PUSH_TRUE, INSTR_RETURN, INSTR_SET_LOCAL, INSTR_SET_TYPE, INSTR_STACK_LOAD, INSTR_TABLE_GET, INSTR_TABLE_SET, INSTR_SWAP};
+use crate::interpreter::bytecode::{
+    INSTR_ALLOC_ARRAY, INSTR_ALLOC_CLOSURE, INSTR_ALLOC_FLOAT, INSTR_ALLOC_TABLE, INSTR_ARRAY_SET,
+    INSTR_CALL, INSTR_CALL_TAIL, INSTR_DROP, INSTR_DUP, INSTR_GET_LOCAL, INSTR_GLOBAL_ENV,
+    INSTR_IS_TABLE, INSTR_JFALSE, INSTR_JFALSE_IMM8, INSTR_JNEG, INSTR_JNEG_IMM8, INSTR_JNFALSE,
+    INSTR_JNFALSE_IMM8, INSTR_JNNEG, INSTR_JNNEG_IMM8, INSTR_JNPOS, INSTR_JNPOS_IMM8, INSTR_JPOS,
+    INSTR_JPOS_IMM8, INSTR_JUMP, INSTR_JUMP_IMM8, INSTR_JZ, INSTR_JZ_IMM8, INSTR_LOAD_BYTES_IMM,
+    INSTR_LOAD_IMM8, INSTR_LOAD_IMM16, INSTR_LOAD_IMM32, INSTR_LOAD_IMM64, INSTR_PUSH_FALSE,
+    INSTR_PUSH_LAST_SMALL, INSTR_PUSH_MINUS_ONE, INSTR_PUSH_NIL, INSTR_PUSH_TRUE, INSTR_RETURN,
+    INSTR_SET_LOCAL, INSTR_SET_TYPE, INSTR_STACK_LOAD, INSTR_TABLE_GET, INSTR_TABLE_SET,
+};
 use crate::interpreter::heap::{Value, ValueRepr};
 use crate::interpreter::prims::is_bytecode_primitive;
 use crate::interpreter::stack_return;
@@ -184,8 +193,7 @@ impl Compilation {
 
     fn get_binding_name(&mut self, binder: &Binder) -> Option<Name> {
         match binder {
-            Binder::Public(name) |
-            Binder::Local(name) => Some(name.clone()),
+            Binder::Public(name) | Binder::Local(name) => Some(name.clone()),
             Binder::Unbound => None,
         }
     }
@@ -258,7 +266,7 @@ impl Compilation {
                 code.push(INSTR_ALLOC_FLOAT);
             }
             Literal::Char(c) => {
-                load_constant_value( &Value::char(*c), code);
+                load_constant_value(&Value::char(*c), code);
             }
             Literal::String(str) => {
                 let bytes = str.as_bytes().to_vec();
@@ -511,24 +519,23 @@ enum VarLocation {
     Env(usize),
 }
 
-
-fn set_local(n:usize, code: &mut Vec<u8>) {
+fn set_local(n: usize, code: &mut Vec<u8>) {
     load_constant_int(n as i64, code);
     code.push(INSTR_SET_LOCAL);
 }
 
-fn get_local(n:usize, code: &mut Vec<u8>) {
+fn get_local(n: usize, code: &mut Vec<u8>) {
     load_constant_int(n as i64, code);
     code.push(INSTR_GET_LOCAL);
 }
 
-fn load_constant(v:&Value, code: &mut Vec<u8>) {
+fn load_constant(v: &Value, code: &mut Vec<u8>) {
     match v.get_repr() {
         ValueRepr::Nil => push_nil(code),
         ValueRepr::Bool => push_bool(v.get_bool(), code),
         ValueRepr::Integer => load_constant_int(v.get_integer(), code),
         _ => load_constant_value(v, code),
-    } 
+    }
 }
 
 fn load_constant_value(v: &Value, code: &mut Vec<u8>) {
@@ -554,7 +561,7 @@ fn load_constant_value(v: &Value, code: &mut Vec<u8>) {
 }
 
 fn load_constant_int(n: i64, code: &mut Vec<u8>) {
-    const LAST_SMALL:i64 = INSTR_PUSH_LAST_SMALL as i64;
+    const LAST_SMALL: i64 = INSTR_PUSH_LAST_SMALL as i64;
     match n {
         -1 => code.push(INSTR_PUSH_MINUS_ONE),
         0..=LAST_SMALL => code.push(n as u8),

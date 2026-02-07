@@ -2,11 +2,20 @@
 
 use std::{ffi::c_void, path::PathBuf, ptr};
 
-use libffi::{low::CodePtr, middle::{Arg, Cif, Type, arg}};
+use libffi::{
+    low::CodePtr,
+    middle::{Arg, Cif, Type, arg},
+};
 use minidl::Library;
 
-use crate::{common::{CType, Result, Signature, sym}, core::Arity,
-             interpreter::{Runtime, ensure_type, heap::{Closure, Code, Foreign, Value, ValueRepr}}};
+use crate::{
+    common::{CType, Result, Signature, sym},
+    core::Arity,
+    interpreter::{
+        Runtime, ensure_type,
+        heap::{Closure, Code, Foreign, Value, ValueRepr},
+    },
+};
 
 impl Runtime {
     pub(super) fn register_foreign_interface(&mut self) -> Result<()> {
@@ -18,14 +27,15 @@ impl Runtime {
         Ok(())
     }
 
-    pub fn register_signature(&mut self, signature:Signature) -> usize {
+    pub fn register_signature(&mut self, signature: Signature) -> usize {
         self.ffi_signatures.push(signature);
-        self.ffi_signatures.len()-1
+        self.ffi_signatures.len() - 1
     }
 }
 
-fn prim_load_library(rt : &mut Runtime) -> Result<()> {
+fn prim_load_library(rt: &mut Runtime) -> Result<()> {
     let arg = rt.stack.pop();
+    let _ = rt.stack.pop(); // pop closure
     if !rt.is_type(&arg, &sym("string"))? {
         return rt.error(&format!(
             "_prim_load_library takes a string argument, got {}",
@@ -41,9 +51,10 @@ fn prim_load_library(rt : &mut Runtime) -> Result<()> {
     Ok(())
 }
 
-fn prim_foreign_sym(rt : &mut Runtime) -> Result<()> {
+fn prim_foreign_sym(rt: &mut Runtime) -> Result<()> {
     let name = rt.stack.pop();
     let lib_ptr = rt.stack.pop().get_pointer();
+    let _ = rt.stack.pop(); // pop closure
     if !rt.is_type(&name, &sym("string"))? {
         return rt.error(&format!(
             "The second argument to _prim_foreign_sym must be a string, got {}",
@@ -61,7 +72,7 @@ fn prim_foreign_sym(rt : &mut Runtime) -> Result<()> {
     Ok(())
 }
 
-fn get_foreign_symbol(rt:&mut Runtime, name: &str, lib_ptr: *mut c_void) -> Result<*mut c_void> {
+fn get_foreign_symbol(rt: &mut Runtime, name: &str, lib_ptr: *mut c_void) -> Result<*mut c_void> {
     let mut str = name.to_owned();
     str.push('\0');
     unsafe {
@@ -75,12 +86,12 @@ fn get_foreign_symbol(rt:&mut Runtime, name: &str, lib_ptr: *mut c_void) -> Resu
     }
 }
 
-fn prim_foreign_import(rt : &mut Runtime) -> Result<()> {
+fn prim_foreign_import(rt: &mut Runtime) -> Result<()> {
     let ret_type = rt.stack.pop();
     let arg_types = rt.stack.pop();
     let fun_spec = rt.stack.pop();
     let lib_ptr = rt.stack.pop();
-    
+    let _ = rt.stack.pop(); // pop closure
     ensure_type(&lib_ptr, ValueRepr::Pointer)?;
 
     let code = match fun_spec.get_repr() {
@@ -94,15 +105,17 @@ fn prim_foreign_import(rt : &mut Runtime) -> Result<()> {
             ptr
         }
         _ => {
-            return rt.error(
-                "The first argument to prim_foreign_import must be a string or a pointer",
-            );
+            return rt
+                .error("The first argument to prim_foreign_import must be a string or a pointer");
         }
     };
     let arity = arg_types.get_array().size();
     let sign = make_signature(rt, arg_types.get_array().values(), &ret_type)?;
     let signature_handle = rt.register_signature(sign);
-    let code_object = Code::Foreign(Foreign { code, signature_handle });
+    let code_object = Code::Foreign(Foreign {
+        code,
+        signature_handle,
+    });
     let closure = Closure::make(rt, &code_object, &[], arity, None);
     rt.stack_push(Value::from(closure));
     Ok(())
@@ -125,9 +138,10 @@ fn make_signature(rt: &mut Runtime, args: &[Value], ret: &Value) -> Result<Signa
     Ok(signature)
 }
 
-fn prim_peek(rt : &mut Runtime) -> Result<()> {
+fn prim_peek(rt: &mut Runtime) -> Result<()> {
     let ptr = rt.stack.pop().get_pointer::<c_void>();
     let ct = rt.stack.pop();
+    let _ = rt.stack.pop(); // pop closure
     let (_, t) = get_ffi_type(rt, &ct)?;
     unsafe {
         let out = match t {
@@ -149,10 +163,11 @@ fn prim_peek(rt : &mut Runtime) -> Result<()> {
     }
 }
 
-fn prim_poke(rt : &mut Runtime) -> Result<()> {
+fn prim_poke(rt: &mut Runtime) -> Result<()> {
     let value = rt.stack.pop();
     let ptr = rt.stack.pop().get_pointer::<c_void>();
     let ct = rt.stack.pop();
+    let _ = rt.stack.pop(); // pop closure
     let (_, t) = get_ffi_type(rt, &ct)?;
     unsafe {
         match t {
@@ -175,7 +190,6 @@ fn prim_poke(rt : &mut Runtime) -> Result<()> {
 }
 
 fn get_ffi_type(rt: &Runtime, arg: &Value) -> Result<(Type, CType)> {
-    
     // TODO: Handle passing struct by value
     let sym = if arg.is_array() {
         arg.get_array().at(0).get_symbol()
@@ -219,7 +233,12 @@ pub fn get_arg(rt: &Runtime, val: &Value, ctype: &CType) -> Result<Arg> {
     }
 }
 
-pub fn call_foreign_function(rt:&mut Runtime, code: &CodePtr, signature:&Signature, args:&[Value]) -> Result<Value> {
+pub fn call_foreign_function(
+    rt: &mut Runtime,
+    code: &CodePtr,
+    signature: &Signature,
+    args: &[Value],
+) -> Result<Value> {
     let mut cargs = Vec::new();
     for (a, t) in args.iter().zip(&signature.arg_types) {
         cargs.push(get_arg(rt, a, t)?);

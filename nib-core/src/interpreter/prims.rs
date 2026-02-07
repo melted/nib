@@ -1,6 +1,4 @@
-use std::{
-    collections::HashMap, ffi::c_void, path::Path, sync::LazyLock
-};
+use std::{collections::HashMap, ffi::c_void, path::Path, sync::LazyLock};
 
 use symbol_table::static_symbol;
 
@@ -23,7 +21,8 @@ use crate::{
         },
         ensure_type,
         heap::{Array, Bytes, Closure, Code, Table, Value, ValueRepr},
-    }, runtime::Interpreter,
+    },
+    runtime::Interpreter,
 };
 
 pub type PrimFn = fn(&mut Runtime) -> Result<()>;
@@ -40,7 +39,11 @@ impl Runtime {
     pub(super) fn register_primitives(&mut self) {
         self.set_global(&sym("global"), &self.global_env.clone());
 
-        self.register_primitive("_prim_print_representation", prim_print_representation, Arity::Fixed(1));
+        self.register_primitive(
+            "_prim_print_representation",
+            prim_print_representation,
+            Arity::Fixed(1),
+        );
         self.register_primitive("_prim_project", prim_project, Arity::VarArg(2, 1));
         self.register_primitive("_prim_array_make", prim_array_make, Arity::VarArg(1, 0));
         self.register_primitive("_prim_array_match", prim_array_match, Arity::Fixed(1));
@@ -48,7 +51,7 @@ impl Runtime {
         self.register_primitive("_prim_string_print", prim_string_print, Arity::Fixed(1));
         self.register_primitive("_prim_to_string", prim_to_string, Arity::Fixed(1));
         self.register_primitive("_prim_load", prim_load, Arity::Fixed(1));
-        self.register_primitive("_prim_symbol_make",prim_symbol_make, Arity::Fixed(1));
+        self.register_primitive("_prim_symbol_make", prim_symbol_make, Arity::Fixed(1));
         self.register_primitive("_prim_symbol_name", prim_symbol_name, Arity::Fixed(1));
         self.register_primitive("_prim_get_path", prim_get_path, Arity::VarArg(2, 1));
         self.register_primitive("_prim_bytes_make", prim_bytes_make, Arity::VarArg(1, 0));
@@ -58,7 +61,11 @@ impl Runtime {
         self.register_primitive("_prim_panic", prim_panic, Arity::Fixed(1));
         self.register_primitive("_prim_string_pack", prim_string_pack, Arity::Fixed(1));
         self.register_primitive("_prim_string_unpack", prim_string_unpack, Arity::Fixed(1));
-        self.register_primitive("_prim_string_substring", prim_string_substring, Arity::Fixed(3));
+        self.register_primitive(
+            "_prim_string_substring",
+            prim_string_substring,
+            Arity::Fixed(3),
+        );
         self.register_primitive("_prim_to_char", prim_to_char, Arity::Fixed(1));
         self.register_primitive("_prim_to_pointer", prim_to_pointer, Arity::Fixed(1));
         self.register_primitive("_prim_apply", prim_apply, Arity::Fixed(2));
@@ -111,7 +118,12 @@ impl Runtime {
         Ok(())
     }
 
-    pub fn register_primitive(&mut self, name:&str, fun: fn(&mut Runtime) -> Result<()>, arity: Arity) {
+    pub fn register_primitive(
+        &mut self,
+        name: &str,
+        fun: fn(&mut Runtime) -> Result<()>,
+        arity: Arity,
+    ) {
         let prim = self.make_primitive(fun, arity);
         self.set_global(&sym(name), &prim);
     }
@@ -156,14 +168,16 @@ impl Runtime {
         self.op_call(INSTR_CALL)
     }
 
-    pub fn is_type(&self, val: &Value, t:&Symbol) -> Result<bool> {
+    pub fn is_type(&self, val: &Value, t: &Symbol) -> Result<bool> {
         Ok(*t == self.get_type_id(val)?)
     }
 
-    pub fn get_string(&self, value:&Value) -> Result<String> {
+    pub fn get_string(&self, value: &Value) -> Result<String> {
         if self.is_type(value, &sym("string"))? {
             let bytes = value.get_bytes();
-            str::from_utf8(bytes.get_slice()).map_err(|_| self.err("Not an utf-8 string")).map(|s|s.to_owned())
+            str::from_utf8(bytes.get_slice())
+                .map_err(|_| self.err("Not an utf-8 string"))
+                .map(|s| s.to_owned())
         } else {
             self.error("Not a string value")
         }
@@ -265,7 +279,10 @@ fn prim_match(rt: &mut Runtime) -> Result<()> {
                 return rt.error("_prim_match: custom matcher in table not a function");
             }
         }
-        _ => return rt.error("_prim_match: custom matcher must be function or table with a match entry")
+        _ => {
+            return rt
+                .error("_prim_match: custom matcher must be function or table with a match entry");
+        }
     }
     Ok(())
 }
@@ -356,7 +373,9 @@ fn prim_table_clear(rt: &mut Runtime) -> Result<()> {
 fn prim_exit(rt: &mut Runtime) -> Result<()> {
     let exitcode = rt.stack.pop();
     let _ = rt.stack.pop(); // pop closure
-    Err(crate::common::Error::NibExit { exit_code: exitcode.get_integer() as i32 })
+    Err(crate::common::Error::NibExit {
+        exit_code: exitcode.get_integer() as i32,
+    })
 }
 
 fn prim_panic(rt: &mut Runtime) -> Result<()> {
@@ -398,7 +417,10 @@ fn prim_string_substring(rt: &mut Runtime) -> Result<()> {
     let msg = rt.stack.pop();
     let str = rt.get_string(&msg)?;
     let _ = rt.stack.pop(); // pop closure
-    let substring = str.chars().skip(start as usize).take((stop - start) as usize);
+    let substring = str
+        .chars()
+        .skip(start as usize)
+        .take((stop - start) as usize);
     let out = rt.make_string(&String::from_iter(substring));
     rt.stack_push(out);
     Ok(())
@@ -427,11 +449,10 @@ fn prim_to_pointer(rt: &mut Runtime) -> Result<()> {
             let ptr = val.get_bytes().get_slice().as_ptr();
             rt.stack_push(Value::cpointer(ptr));
         }
-        _ => return rt.error("prim_to_pointer: argument needs to be an integer or a byte array")
+        _ => return rt.error("prim_to_pointer: argument needs to be an integer or a byte array"),
     }
     Ok(())
 }
-
 
 fn prim_apply(rt: &mut Runtime) -> Result<()> {
     let args = rt.stack.pop();

@@ -5,7 +5,7 @@ use crate::common::{Signature, Symbol};
 use crate::runtime::Interpreter;
 use crate::{
     common::{Error, Metadata, Name, Result},
-    core::{desugar, desugar_expression, Arity, Lambda},
+    core::{Arity, Lambda, desugar, desugar_expression},
     parser::{parse_declarations, parse_expression},
     treewalker::evaluate::Environment,
 };

@@ -1,4 +1,5 @@
 use anyhow::anyhow;
+use libffi::middle::Cif;
 use std::num::{NonZeroU32, TryFromIntError};
 use std::sync::LazyLock;
 use std::{
@@ -7,7 +8,6 @@ use std::{
     io,
 };
 use thiserror::Error;
-use libffi::middle::Cif;
 
 pub fn next_source_id() -> u32 {
     unsafe {
@@ -253,7 +253,7 @@ impl Name {
 
     pub fn base(&self) -> Symbol {
         match self {
-            Name::Qualified(_, base) | Name::Plain(base) => *base
+            Name::Qualified(_, base) | Name::Plain(base) => *base,
         }
     }
 
