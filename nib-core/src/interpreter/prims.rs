@@ -39,62 +39,28 @@ impl Runtime {
     pub(super) fn register_primitives(&mut self) {
         self.set_global(&sym("global"), &self.global_env.clone());
 
-        let print_representation = self.make_primitive(prim_print_representation, Arity::Fixed(1));
-        self.set_global(&sym("_prim_print_representation"), &print_representation);
-
-        let project = self.make_primitive(prim_project, Arity::VarArg(2, 1));
-        self.set_global(&sym("_prim_project"), &project);
-
-        let array_make = self.make_primitive(prim_array_make, Arity::VarArg(1, 0));
-        self.set_global(&sym("_prim_array_make"), &array_make);
-
-        let array_match = self.make_primitive(prim_array_match, Arity::Fixed(1));
-        self.set_global(&sym("_prim_array_match"), &array_match);
-
-        let custom_match = self.make_primitive(prim_match, Arity::Fixed(1));
-        self.set_global(&sym("_prim_match"), &custom_match);
-
-        let string_print = self.make_primitive(prim_string_print, Arity::Fixed(1));
-        self.set_global(&sym("_prim_string_print"), &string_print);
-
-        let to_string = self.make_primitive(prim_to_string, Arity::Fixed(1));
-        self.set_global(&sym("_prim_to_string"), &to_string);
-
-        let load = self.make_primitive(prim_load, Arity::Fixed(1));
-        self.set_global(&sym("_prim_load"), &load);
-
-        let symbol_make = self.make_primitive(prim_symbol_make, Arity::Fixed(1));
-        self.set_global(&sym("_prim_symbol_make"), &symbol_make);
-
-        let symbol_name = self.make_primitive(prim_symbol_name, Arity::Fixed(1));
-        self.set_global(&sym("_prim_symbol_name"), &symbol_name);
-
-        let get_path = self.make_primitive(prim_get_path, Arity::VarArg(2, 1));
-        self.set_global(&sym("_prim_get_path"), &get_path);
-
-        let bytes_make = self.make_primitive(prim_bytes_make, Arity::VarArg(1, 0));
-        self.set_global(&sym("_prim_bytes_make"), &bytes_make);
-
-        let table_keys = self.make_primitive(prim_table_keys, Arity::Fixed(1));
-        self.set_global(&sym("_prim_table_keys"), &table_keys);
-
-        let table_clear = self.make_primitive(prim_table_clear, Arity::Fixed(1));
-        self.set_global(&sym("_prim_table_clear"), &table_clear);
-
-        let exit = self.make_primitive(prim_exit, Arity::Fixed(1));
-        self.set_global(&sym("_prim_exit"), &exit);
-
-        let nib_panic = self.make_primitive(prim_panic, Arity::Fixed(1));
-        self.set_global(&sym("_prim_panic"), &nib_panic);
-
-        let string_pack = self.make_primitive(prim_string_pack, Arity::Fixed(1));
-        self.set_global(&sym("_prim_string_pack"), &string_pack);
-
-        let string_unpack = self.make_primitive(prim_string_unpack, Arity::Fixed(1));
-        self.set_global(&sym("_prim_string_unpack"), &string_unpack);
-
-        let string_substring = self.make_primitive(prim_string_substring, Arity::Fixed(3));
-        self.set_global(&sym("_prim_string_substring"), &string_substring);
+        self.register_primitive("_prim_print_representation", prim_print_representation, Arity::Fixed(1));
+        self.register_primitive("_prim_project", prim_project, Arity::VarArg(2, 1));
+        self.register_primitive("_prim_array_make", prim_array_make, Arity::VarArg(1, 0));
+        self.register_primitive("_prim_array_match", prim_array_match, Arity::Fixed(1));
+        self.register_primitive("_prim_match", prim_match, Arity::Fixed(1));
+        self.register_primitive("_prim_string_print", prim_string_print, Arity::Fixed(1));
+        self.register_primitive("_prim_to_string", prim_to_string, Arity::Fixed(1));
+        self.register_primitive("_prim_load", prim_load, Arity::Fixed(1));
+        self.register_primitive("_prim_symbol_make",prim_symbol_make, Arity::Fixed(1));
+        self.register_primitive("_prim_symbol_name", prim_symbol_name, Arity::Fixed(1));
+        self.register_primitive("_prim_get_path", prim_get_path, Arity::VarArg(2, 1));
+        self.register_primitive("_prim_bytes_make", prim_bytes_make, Arity::VarArg(1, 0));
+        self.register_primitive("_prim_table_keys", prim_table_keys, Arity::Fixed(1));
+        self.register_primitive("_prim_table_clear", prim_table_clear, Arity::Fixed(1));
+        self.register_primitive("_prim_exit", prim_exit, Arity::Fixed(1));
+        self.register_primitive("_prim_panic", prim_panic, Arity::Fixed(1));
+        self.register_primitive("_prim_string_pack", prim_string_pack, Arity::Fixed(1));
+        self.register_primitive("_prim_string_unpack", prim_string_unpack, Arity::Fixed(1));
+        self.register_primitive("_prim_string_substring", prim_string_substring, Arity::Fixed(3));
+        self.register_primitive("_prim_to_char", prim_to_char, Arity::Fixed(1));
+        self.register_primitive("_prim_to_pointer", prim_to_pointer, Arity::Fixed(1));
+        self.register_primitive("_prim_apply", prim_apply, Arity::Fixed(2));
     }
 
     pub(super) fn register_type_tables(&mut self) {
@@ -142,6 +108,11 @@ impl Runtime {
         let table = Value::from(Table::make(self));
         self.add_name(&Name::str("nib.packages"), &table)?;
         Ok(())
+    }
+
+    pub fn register_primitive(&mut self, name:&str, fun: fn(&mut Runtime) -> Result<()>, arity: Arity) {
+        let prim = self.make_primitive(fun, arity);
+        self.set_global(&sym(name), &prim);
     }
 
     pub fn make_primitive(&mut self, fun: fn(&mut Runtime) -> Result<()>, arity: Arity) -> Value {
@@ -413,10 +384,28 @@ fn prim_string_substring(rt: &mut Runtime) -> Result<()> {
 }
 
 fn prim_to_char(rt: &mut Runtime) -> Result<()> {
+    let codepoint = rt.stack.pop().get_integer() as u32;
+    if let Some(ch) = char::from_u32(codepoint) {
+        rt.stack_push(Value::char(ch));
+    } else {
+        rt.stack_push(Value::bool(false));
+    }
     Ok(())
 }
 
 fn prim_to_pointer(rt: &mut Runtime) -> Result<()> {
+    let val = rt.stack.pop();
+    match val.get_repr() {
+        ValueRepr::Integer => {
+            let addr = val.get_integer() as usize;
+            rt.stack_push(Value::cpointer(addr as *const c_void));
+        }
+        ValueRepr::Bytes => {
+            let ptr = val.get_bytes().get_slice().as_ptr();
+            rt.stack_push(Value::cpointer(ptr));
+        }
+        _ => return rt.error("prim_to_pointer: argument needs to be an integer or a byte array")
+    }
     Ok(())
 }
 
@@ -425,7 +414,18 @@ fn prim_foreign_call(rt: &mut Runtime) -> Result<()> {
 }
 
 fn prim_apply(rt: &mut Runtime) -> Result<()> {
-    Ok(())
+    let args = rt.stack.pop();
+    let fun = rt.stack.pop();
+    ensure_type(&args, ValueRepr::Array)?;
+    let array = args.get_array();
+    let quit = rt.call_function(&fun, array.values())?;
+    if quit {
+        // TODO: Harmonize prims and intstructions return values
+        // Should probably always signal exit with Err.
+        Err(crate::common::Error::NibExit { exit_code: 0 })
+    } else {
+        Ok(())
+    }
 }
 
 /// Primitives that are implemented as bytecode instructions
