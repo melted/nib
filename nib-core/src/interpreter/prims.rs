@@ -1,5 +1,5 @@
 use std::{
-    collections::{HashMap, HashSet}, ffi::c_void, path::Path, sync::LazyLock
+    collections::HashMap, ffi::c_void, path::Path, sync::LazyLock
 };
 
 use symbol_table::static_symbol;
@@ -159,7 +159,7 @@ impl Runtime {
         Ok(*t == self.get_type_id(val)?)
     }
 
-    fn get_string(&self, value:&Value) -> Result<String> {
+    pub fn get_string(&self, value:&Value) -> Result<String> {
         if self.is_type(value, &sym("string"))? {
             let bytes = value.get_bytes();
             str::from_utf8(bytes.get_slice()).map_err(|_| self.err("Not an utf-8 string")).map(|s|s.to_owned())

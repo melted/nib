@@ -1,13 +1,14 @@
 use std::{os::raw::c_void, path::PathBuf, ptr};
 
-use libffi::middle::{Arg, Cif, CodePtr, Type, arg};
+use libffi::middle::{arg, Arg, Cif, CodePtr, Type};
 use minidl::Library;
 
 use crate::{
     common::Result,
     core::Arity,
-    treewalker::{CType, Runtime, Signature, Value},
+    treewalker::{Runtime, Value},
 };
+use crate::common::{CType, Signature};
 
 impl Runtime {
     pub(super) fn register_foreign_interface(&mut self) -> Result<()> {

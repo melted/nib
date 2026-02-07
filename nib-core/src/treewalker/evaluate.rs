@@ -1,9 +1,9 @@
-use crate::common::Symbol;
+use crate::common::{CType, Symbol};
 use crate::{
     ast::Literal,
     common::{Name, Result},
-    core::{Arity, Binder, Binding, Expression, Lambda, Module, free_vars},
-    treewalker::{CType, Closure, Code, Runtime, Value, new_ref},
+    core::{free_vars, Arity, Binder, Binding, Expression, Lambda, Module},
+    treewalker::{new_ref, Closure, Code, Runtime, Value},
 };
 use log::info;
 use std::{

@@ -1,11 +1,11 @@
 #![allow(clippy::not_unsafe_ptr_arg_deref)]
 #![allow(clippy::mutable_key_type)]
 
-use crate::common::Symbol;
+use crate::common::{Signature, Symbol};
 use crate::runtime::Interpreter;
 use crate::{
     common::{Error, Metadata, Name, Result},
-    core::{Arity, Lambda, desugar, desugar_expression},
+    core::{desugar, desugar_expression, Arity, Lambda},
     parser::{parse_declarations, parse_expression},
     treewalker::evaluate::Environment,
 };
@@ -812,30 +812,6 @@ impl Bytes {
             bytes,
         }
     }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-#[repr(u8)]
-pub enum CType {
-    Int8,
-    Int16,
-    Int32,
-    Int64,
-    UInt8,
-    UInt16,
-    UInt32,
-    UInt64,
-    Float32,
-    Float64,
-    Pointer,
-    Void,
-}
-
-#[derive(Debug, Clone)]
-pub struct Signature {
-    cif: Cif,
-    arg_types: Vec<CType>,
-    ret_type: CType,
 }
 
 #[derive(Debug, Clone)]

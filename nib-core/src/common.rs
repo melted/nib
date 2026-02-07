@@ -7,6 +7,7 @@ use std::{
     io,
 };
 use thiserror::Error;
+use libffi::middle::Cif;
 
 pub fn next_source_id() -> u32 {
     unsafe {
@@ -296,4 +297,28 @@ pub fn symbol_id(symbol: &Symbol) -> u32 {
 
 pub fn get_symbol(id: u32) -> Symbol {
     Symbol::from(NonZeroU32::new(id).unwrap())
+}
+
+#[derive(Debug, Clone, PartialEq)]
+#[repr(u8)]
+pub enum CType {
+    Int8,
+    Int16,
+    Int32,
+    Int64,
+    UInt8,
+    UInt16,
+    UInt32,
+    UInt64,
+    Float32,
+    Float64,
+    Pointer,
+    Void,
+}
+
+#[derive(Debug, Clone)]
+pub struct Signature {
+    pub cif: Cif,
+    pub arg_types: Vec<CType>,
+    pub ret_type: CType,
 }
