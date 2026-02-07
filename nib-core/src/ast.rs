@@ -544,7 +544,7 @@ impl Operator {
 
 fn operator_id(op: &Symbol) -> Symbol {
     if lexer::identifier_initial_char(op.as_str().chars().next().unwrap()) {
-        op.clone()
+        *op
     } else {
         Symbol::from(format!("({})", op))
     }

@@ -1,16 +1,13 @@
 use core::slice;
 use std::{
-    array,
     collections::{HashMap, HashSet},
     ffi::c_void,
-    fmt::{Debug, Display, write},
+    fmt::{Debug, Display},
     hash::{DefaultHasher, Hash, Hasher},
-    mem,
     ptr::copy_nonoverlapping,
     slice::{from_raw_parts, from_raw_parts_mut},
 };
 
-use libffi::middle::Cif;
 use region::Allocation;
 
 use crate::{
@@ -256,8 +253,8 @@ pub(super) fn set_value(base: *mut ObjectHeader, index: usize, value: Value) {
 pub(super) fn get_object_ptr<T>(base: *mut ObjectHeader, index: usize) -> *mut T {
     unsafe {
         let base_ptr = base.add(1) as *mut T;
-        let index_ptr = base_ptr.add(index);
-        index_ptr
+        
+        base_ptr.add(index)
     }
 }
 
@@ -690,7 +687,7 @@ impl Display for Value {
             ValueRepr::PartialApplication => write!(f, "#<partial-application:{:x}>", self.val),
             ValueRepr::CallContinuation => write!(f, "#<call-continuation:{}>", self.get_cc_args()),
             ValueRepr::Object => write!(f, "#<object>"),
-            _ => display_complex_object(&self, f, &mut HashSet::new()),
+            _ => display_complex_object(self, f, &mut HashSet::new()),
         }
     }
 }
@@ -704,7 +701,7 @@ fn display_complex_object(
         write!(f, "#<recurse:{:x}>", value.val)?;
         return Ok(());
     }
-    seen.insert(value.clone());
+    seen.insert(*value);
     match value.get_repr() {
         ValueRepr::Array => {
             write!(f, "[")?;
@@ -925,7 +922,7 @@ impl Table {
         while offset < size {
             let slot = (hash_index + offset) % size;
             let candidate = storage.at(slot);
-            if Value::from(key) == candidate {
+            if key == candidate {
                 return Some(slot);
             } else if candidate.is_nil() {
                 return None;
@@ -1152,7 +1149,7 @@ impl Closure {
         let env_size = captures.len() + arity + if vararg.is_some() { 1 } else { 0 };
         let mut env = Array::make(rt, env_size);
         env.fill(captures, 0, captures.len());
-        me.set_code(rt, &code);
+        me.set_code(rt, code);
         set_value(header, 2, Value::from(env));
         set_value(header, 3, Value::integer(arity as i64));
         let var_pos = if let Some(pos) = vararg {
@@ -1176,7 +1173,7 @@ impl Closure {
         me.set_type_table(Value::nil());
 
         me.set_tag(TYPE_BYTECODE);
-        set_value(header, 1, Value::from(code.clone()));
+        set_value(header, 1, Value::from(*code));
         set_value(header, 2, env);
         set_value(header, 3, arity);
         set_value(header, 4, vararg);
@@ -1196,7 +1193,7 @@ impl Closure {
     pub fn set_code(&mut self, rt: &mut Runtime, code: &Code) {
         match code {
             Code::Bytecode(items) => {
-                let bc = Bytes::with(rt, &items);
+                let bc = Bytes::with(rt, items);
                 self.set_tag(TYPE_BYTECODE);
                 set_value(self.ptr, 1, Value::from(bc));
             }

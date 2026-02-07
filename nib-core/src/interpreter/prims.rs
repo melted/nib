@@ -340,7 +340,7 @@ fn prim_bytes_make(rt: &mut Runtime) -> Result<()> {
     let mut bytes = Vec::new();
     for v in array.values() {
         let n = v.get_integer();
-        if n < 0 || n > 255 {
+        if !(0..=255).contains(&n) {
             return rt.error("bytes_make: value out of range for byte");
         }
         bytes.push(n as u8);

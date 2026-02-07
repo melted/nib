@@ -93,7 +93,7 @@ impl DesugarState {
         let funclauses: Vec<_> = ast_binding
             .clauses
             .iter()
-            .map(|oc| to_funclause(oc))
+            .map(to_funclause)
             .collect();
         self.metadata.last_id += 1;
         let result = self.desugar_funclauses(self.metadata.last_id, &funclauses)?;
@@ -120,7 +120,7 @@ impl DesugarState {
                 let binder = if is_local {
                     Binder::Local(v.clone())
                 } else {
-                    Binder::Public(self.desugar_binding_name(&v)?)
+                    Binder::Public(self.desugar_binding_name(v)?)
                 };
                 Ok(vec![Binding::binding(ast_binding.id, binder, rhs)])
             }
@@ -202,39 +202,33 @@ impl DesugarState {
                     return self.error("Qualified name in alias pattern.");
                 };
                 let mut parts = Vec::new();
-                parts.push(PatternParts::Bind(name.clone(), expr.to_owned()));
-                let mut inner = self.desugar_arg_pattern(&pat, &var(&name))?;
+                parts.push(PatternParts::Bind(*name, expr.to_owned()));
+                let mut inner = self.desugar_arg_pattern(pat, &var(name))?;
                 parts.append(&mut inner);
                 Ok(parts)
             }
             Pattern::Custom(name, fields) => {
                 let mut parts = Vec::new();
-                let loc = self.non_shadowed_var(&expr);
+                let loc = self.non_shadowed_var(expr);
                 parts.push(PatternParts::Bind(
-                    loc.clone(),
+                    loc,
                     Expression::App(pattern.id, vec![name_expr(name), expr.clone()]),
                 ));
-                let failed = app(&vec![
-                    var(&static_symbol!("_prim_eq")),
+                let failed = app(&[var(&static_symbol!("_prim_eq")),
                     var(&loc),
-                    literal(&Literal::Bool(false)),
-                ]);
-                let success = app(&vec![var(&static_symbol!("_prim_bitnot")), failed]);
+                    literal(&Literal::Bool(false))]);
+                let success = app(&[var(&static_symbol!("_prim_bitnot")), failed]);
                 parts.push(PatternParts::Check(success));
-                let size = app(&vec![var(&static_symbol!("_prim_array_size")), var(&loc)]);
-                let size_check = app(&vec![
-                    var(&static_symbol!("_prim_eq")),
+                let size = app(&[var(&static_symbol!("_prim_array_size")), var(&loc)]);
+                let size_check = app(&[var(&static_symbol!("_prim_eq")),
                     size,
-                    literal(&Literal::Integer(fields.len() as i64)),
-                ]);
+                    literal(&Literal::Integer(fields.len() as i64))]);
                 parts.push(PatternParts::Check(size_check));
                 for (i, f) in fields.iter().enumerate() {
-                    let refer = app(&vec![
-                        var(&static_symbol!("_prim_array_ref")),
+                    let refer = app(&[var(&static_symbol!("_prim_array_ref")),
                         literal(&Literal::Integer(i as i64)),
-                        var(&loc),
-                    ]);
-                    let mut field = self.desugar_arg_pattern(&f, &refer)?;
+                        var(&loc)]);
+                    let mut field = self.desugar_arg_pattern(f, &refer)?;
                     parts.append(&mut field);
                 }
                 Ok(parts)
@@ -251,38 +245,33 @@ impl DesugarState {
                     let Name::Plain(s) = n else {
                         return self.error("Qualified name in ellipsis pattern.");
                     };
-                    Ok(vec![PatternParts::Bind(s.clone(), expr.clone())])
+                    Ok(vec![PatternParts::Bind(*s, expr.clone())])
                 } else {
                     Ok(vec![])
                 }
             }
             Pattern::Literal(lit) => {
-                let check = app(&vec![
-                    var(&static_symbol!("_prim_eq")),
+                let check = app(&[var(&static_symbol!("_prim_eq")),
                     expr.clone(),
-                    literal(lit),
-                ]);
+                    literal(lit)]);
                 Ok(vec![PatternParts::Check(check)])
             }
             Pattern::Typed(pat, typ) => {
-                let mut inner = self.desugar_arg_pattern(&pat, expr)?;
+                let mut inner = self.desugar_arg_pattern(pat, expr)?;
                 let mut val = expr.clone();
-                if let Some(PatternParts::Bind(name, exp)) = inner.last() {
-                    if exp == expr {
+                if let Some(PatternParts::Bind(name, exp)) = inner.last()
+                    && exp == expr {
                         val = var(name);
                     }
-                }
-                let get_type = app(&vec![var(&static_symbol!("_prim_type")), val]);
-                let check = app(&vec![
-                    var(&static_symbol!("_prim_eq")),
+                let get_type = app(&[var(&static_symbol!("_prim_type")), val]);
+                let check = app(&[var(&static_symbol!("_prim_eq")),
                     get_type,
-                    name_expr(typ),
-                ]);
+                    name_expr(typ)]);
                 inner.push(PatternParts::Check(check));
                 Ok(inner)
             }
             Pattern::Var(Name::Plain(name)) => {
-                Ok(vec![PatternParts::Bind(name.clone(), expr.clone())])
+                Ok(vec![PatternParts::Bind(*name, expr.clone())])
             }
             Pattern::Var(_) => self.error("Qualified name in arg pattern"),
             Pattern::Wildcard => Ok(vec![]),
@@ -294,7 +283,7 @@ impl DesugarState {
             ast::Expression::App(x) => {
                 let mut args = Vec::new();
                 for a in x {
-                    args.push(self.desugar_expression(&a)?);
+                    args.push(self.desugar_expression(a)?);
                 }
                 Ok(Expression::App(expression.id, args))
             }
@@ -302,15 +291,15 @@ impl DesugarState {
                 let mut args = Vec::new();
                 args.push(self.named_var("_prim_array_make"));
                 for a in v {
-                    args.push(self.desugar_expression(&a)?);
+                    args.push(self.desugar_expression(a)?);
                 }
                 Ok(Expression::App(expression.id, args))
             }
             ast::Expression::Binop(ast::Binop { op, lhs, rhs }) => {
                 let mut args = Vec::new();
                 args.push(self.var(op.to_name()));
-                args.push(self.desugar_expression(&lhs)?);
-                args.push(self.desugar_expression(&rhs)?);
+                args.push(self.desugar_expression(lhs)?);
+                args.push(self.desugar_expression(rhs)?);
                 Ok(Expression::App(expression.id, args))
             }
             ast::Expression::Cond(cond) => {
@@ -328,13 +317,13 @@ impl DesugarState {
                 let mut args = Vec::new();
                 args.push(self.named_var("_prim_project"));
                 for a in projs {
-                    args.push(self.desugar_expression(&a)?);
+                    args.push(self.desugar_expression(a)?);
                 }
                 Ok(Expression::App(expression.id, args))
             }
-            ast::Expression::Var(Name::Plain(n)) => Ok(var(&n)),
+            ast::Expression::Var(Name::Plain(n)) => Ok(var(n)),
             ast::Expression::Where(exp, ast_bindings) => {
-                let lhs = self.desugar_expression(&exp)?;
+                let lhs = self.desugar_expression(exp)?;
                 let mut binds = Vec::new();
                 for binding in ast_bindings {
                     let mut b = self.desugar_binding(binding, true)?;
@@ -347,19 +336,17 @@ impl DesugarState {
     }
 
     fn no_match_expression() -> Expression {
-        app(&vec![
-            var(&static_symbol!("_prim_panic")),
-            literal(&Literal::String("No matching pattern".to_owned())),
-        ])
+        app(&[var(&static_symbol!("_prim_panic")),
+            literal(&Literal::String("No matching pattern".to_owned()))])
     }
 
     fn desugar_funclauses(&mut self, id: Node, clauses: &[ast::FunClause]) -> Result<Expression> {
         let arity = verify_arity(clauses)?;
         let mut exp = None;
         let args = self.args(&arity);
-        for (i, c) in clauses.into_iter().enumerate() {
+        for (i, c) in clauses.iter().enumerate() {
             let fail_exp = if i + 1 < clauses.len() {
-                app(&vec![var(&local(i + 1))])
+                app(&[var(&local(i + 1))])
             } else {
                 Self::no_match_expression()
             };
@@ -397,12 +384,12 @@ impl DesugarState {
         let body = self.desugar_expression(&clause.body)?;
         let mut all_parts = Vec::new();
         for (p, v) in clause.args.iter().zip(args.iter()) {
-            let arg_exp = Expression::Var(0, v.clone());
+            let arg_exp = Expression::Var(0, *v);
             let mut parts = self.desugar_arg_pattern(p, &arg_exp)?;
             all_parts.append(&mut parts);
         }
         if let Some(guard) = &clause.guard {
-            let guard_exp = self.desugar_expression(&guard)?;
+            let guard_exp = self.desugar_expression(guard)?;
             all_parts.push(PatternParts::Check(guard_exp));
         }
         let is_irrefutable = all_parts
@@ -412,7 +399,7 @@ impl DesugarState {
         for p in all_parts.iter().rev() {
             match p {
                 PatternParts::Check(pred) => {
-                    exp = cond(pred, &exp, &on_fail);
+                    exp = cond(pred, &exp, on_fail);
                 }
                 PatternParts::Bind(var, expression) => {
                     if let Expression::Var(n, v) = expression {
@@ -749,7 +736,7 @@ impl Display for Expression {
 }
 
 fn var(s: &Symbol) -> Expression {
-    Expression::Var(0, s.clone())
+    Expression::Var(0, *s)
 }
 
 fn name_expr(n: &Name) -> Expression {
@@ -760,7 +747,7 @@ fn name_expr(n: &Name) -> Expression {
             let rest = p[1..].iter().chain(vec![s]);
             let mut args = vec![var(&Symbol::from("project")), var(&t)];
             for a in rest {
-                args.push(literal(&Literal::Symbol(a.clone())));
+                args.push(literal(&Literal::Symbol(*a)));
             }
             app(&args)
         }
@@ -823,7 +810,7 @@ impl Arity {
 
 pub fn rename(expr: &Expression, old_name: &Symbol, new_name: &Symbol) -> Expression {
     match expr {
-        Expression::Var(n, v) if v == old_name => Expression::Var(*n, new_name.clone()),
+        Expression::Var(n, v) if v == old_name => Expression::Var(*n, *new_name),
         Expression::App(n, exps) => {
             let mut new_exps = Vec::new();
             for e in exps {
@@ -889,14 +876,14 @@ where
 }
 
 fn add_local(locals: &mut HashMap<Symbol, i32>, var: &Symbol) {
-    locals.insert(*var, locals.get(&var).unwrap_or(&0) + 1);
+    locals.insert(*var, locals.get(var).unwrap_or(&0) + 1);
 }
 
 fn remove_local(locals: &mut HashMap<Symbol, i32>, var: &Symbol) {
-    if let Some(v) = locals.get_mut(&var) {
+    if let Some(v) = locals.get_mut(var) {
         *v -= 1;
         if *v == 0 {
-            locals.remove(&var);
+            locals.remove(var);
         }
     }
 }
@@ -917,7 +904,7 @@ pub fn free_vars(expr: &Expression, vars: &mut HashSet<Symbol>, locals: &mut Has
     match expr {
         Expression::Literal(_, literal) => {}
         Expression::Var(_, v) => {
-            if locals.get(&v).is_none() {
+            if locals.get(v).is_none() {
                 vars.insert(*v);
             }
         }
@@ -943,7 +930,7 @@ pub fn free_vars(expr: &Expression, vars: &mut HashSet<Symbol>, locals: &mut Has
                 match &b.binder {
                     Binder::Local(n) | Binder::Public(n) => {
                         let var = Symbol::from(n.top());
-                        bound.push(var.clone());
+                        bound.push(var);
                         add_local(locals, &var);
                     }
                     _ => {}

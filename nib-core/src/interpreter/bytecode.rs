@@ -11,6 +11,12 @@ pub struct BytecodeBuilder {
     references: HashMap<String, Vec<usize>>,
 }
 
+impl Default for BytecodeBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl BytecodeBuilder {
     pub fn new() -> Self {
         BytecodeBuilder {
@@ -223,7 +229,7 @@ pub const INSTR_PUSH_ZERO: u8 = 0; // TODO
 pub const INSTR_PUSH_LAST_SMALL: u8 = 20; // TODO
 
 pub(super) fn is_immediate_jump(op: u8) -> bool {
-    op >= INSTR_JUMP_IMM8 && op <= INSTR_JNFALSE_IMM8
+    (INSTR_JUMP_IMM8..=INSTR_JNFALSE_IMM8).contains(&op)
 }
 
 pub(super) fn stack_return(op: u8) -> usize {

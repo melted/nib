@@ -48,6 +48,12 @@ pub struct Module {
     pub captures: HashMap<Symbol, usize>,
 }
 
+impl Default for Module {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Module {
     pub fn new() -> Self {
         Module {
@@ -178,7 +184,7 @@ impl Compilation {
                     self.get_local_table(&top, code);
                 }
                 for s in rest {
-                    self.get_symbol(&s, code);
+                    self.get_symbol(s, code);
                 }
                 load_constant_int((rest.len() + 1) as i64, code);
                 code.push(INSTR_CALL);
@@ -241,9 +247,9 @@ impl Compilation {
                 self.compile_lambda(lambda, free, locals, code)
             }
             Expression::Cond(_, cond) => self.compile_cond(cond, code),
-            Expression::App(_, expressions) => self.compile_application(&expressions, code),
+            Expression::App(_, expressions) => self.compile_application(expressions, code),
             Expression::Where(_, expression, bindings) => {
-                self.compile_where(&expression, bindings, code)
+                self.compile_where(expression, bindings, code)
             }
         }
     }
@@ -282,7 +288,7 @@ impl Compilation {
                 get_local(s, code);
             }
             Literal::Bytearray(items) => {
-                push_bytes(&items, code);
+                push_bytes(items, code);
             }
         }
         Ok(())
@@ -325,8 +331,8 @@ impl Compilation {
             if self.future_bindings.contains(&var) {
                 self.fixups_needed
                     .entry(var)
-                    .and_modify(|vec| vec.push((env_local as usize, index)))
-                    .or_insert_with(|| vec![(env_local as usize, index)]);
+                    .and_modify(|vec| vec.push((env_local, index)))
+                    .or_insert_with(|| vec![(env_local, index)]);
             } else {
                 load_constant_int(index as i64, code);
                 self.get_variable(&var, code);
@@ -400,7 +406,7 @@ impl Compilation {
         mem::swap(&mut old_fixups, &mut self.fixups_needed);
         mem::swap(&mut old_future_bindings, &mut self.future_bindings);
         let is_tail = self.is_tail;
-        self.collect_binding_names(&bindings);
+        self.collect_binding_names(bindings);
         for b in bindings {
             self.compile_binding(b, false, code)?;
         }
@@ -429,13 +435,13 @@ impl Compilation {
     }
 
     fn get_global_name(&mut self, sym: &Symbol, code: &mut Vec<u8>) {
-        self.get_symbol(&sym, code);
+        self.get_symbol(sym, code);
         code.push(INSTR_GLOBAL_ENV);
         code.push(INSTR_TABLE_GET);
     }
 
     fn get_local_table(&mut self, sym: &Symbol, code: &mut Vec<u8>) {
-        let h = self.local_var(&sym);
+        let h = self.local_var(sym);
         get_local(h, code);
         code.push(INSTR_DUP);
         code.push(INSTR_IS_TABLE);
@@ -447,7 +453,7 @@ impl Compilation {
     }
 
     fn get_variable(&mut self, var: &Symbol, code: &mut Vec<u8>) {
-        let loc = self.lookup_var(&var);
+        let loc = self.lookup_var(var);
         match loc {
             VarLocation::Stack(s) => {
                 load_constant_int(s as i64, code);
@@ -496,7 +502,7 @@ impl Compilation {
     }
 
     fn env_location(&mut self) -> usize {
-        let val = self.free_locs.iter().next().map(|u| *u);
+        let val = self.free_locs.iter().next().copied();
         if let Some(loc) = val {
             self.free_locs.remove(&loc);
             self.used_locs.insert(loc);
@@ -587,11 +593,11 @@ fn push_bool(b: bool, code: &mut Vec<u8>) {
 fn push_bytes(items: &[u8], code: &mut Vec<u8>) {
     code.push(INSTR_LOAD_BYTES_IMM);
     code.extend_from_slice(&(items.len() as u32).to_le_bytes());
-    code.extend_from_slice(&items);
+    code.extend_from_slice(items);
 }
 
 fn optimized_jump(op: u8, n: i64, code: &mut Vec<u8>) {
-    if let Some(b) = i8::try_from(n).ok() {
+    if let Ok(b) = i8::try_from(n) {
         let sop = short_jump_op(op);
         code.push(op);
         code.push(n as u8);

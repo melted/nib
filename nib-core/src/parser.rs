@@ -102,7 +102,7 @@ struct ParserState<'a> {
 impl<'a> ParserState<'a> {
     fn new(code: &'a str, metadata: &'a mut Metadata) -> ParserState<'a> {
         let mut state = ParserState {
-            metadata: metadata,
+            metadata,
             src: code,
             chars: code.char_indices().peekable(),
             token_start: 0,

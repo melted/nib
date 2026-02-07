@@ -216,19 +216,19 @@ impl Name {
             Name::Plain(Symbol::from(parts[0]))
         } else {
             let base = parts.pop().unwrap();
-            let path = parts.into_iter().map(|s| Symbol::from(s)).collect();
+            let path = parts.into_iter().map(Symbol::from).collect();
             Name::Qualified(path, Symbol::from(base))
         }
     }
 
     pub fn sym(s: &Symbol) -> Self {
-        Name::Plain(s.clone())
+        Name::Plain(*s)
     }
 
     pub fn top(&self) -> Symbol {
         match self {
-            Name::Qualified(items, n) => items.first().unwrap_or(n).clone(),
-            Name::Plain(n) => n.clone(),
+            Name::Qualified(items, n) => *items.first().unwrap_or(n),
+            Name::Plain(n) => *n,
         }
     }
 
@@ -261,22 +261,22 @@ impl Name {
         match (path, base) {
             (Name::Qualified(path, last), Name::Plain(b)) => {
                 let mut p = path.clone();
-                p.push(last.clone());
-                Ok(Name::Qualified(p, b.clone()))
+                p.push(*last);
+                Ok(Name::Qualified(p, *b))
             }
             (Name::Plain(parent), Name::Plain(b)) => {
-                Ok(Name::Qualified(vec![parent.clone()], b.clone()))
+                Ok(Name::Qualified(vec![*parent], *b))
             }
             (Name::Qualified(leader, end_leader), Name::Qualified(path, name)) => {
                 let mut p = leader.clone();
-                p.push(end_leader.clone());
+                p.push(*end_leader);
                 p.append(&mut path.clone());
-                Ok(Name::Qualified(p, name.clone()))
+                Ok(Name::Qualified(p, *name))
             }
             (Name::Plain(a), Name::Qualified(path, b)) => {
-                let mut np = vec![a.clone()];
+                let mut np = vec![*a];
                 np.append(&mut path.clone());
-                Ok(Name::Qualified(np, b.clone()))
+                Ok(Name::Qualified(np, *b))
             }
         }
     }

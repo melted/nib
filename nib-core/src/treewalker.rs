@@ -9,7 +9,7 @@ use crate::{
     parser::{parse_declarations, parse_expression},
     treewalker::evaluate::Environment,
 };
-use libffi::middle::{Cif, CodePtr};
+use libffi::middle::CodePtr;
 use std::path::Path;
 use std::{
     cell::RefCell,
@@ -104,7 +104,7 @@ impl Runtime {
     }
 
     pub fn add_global_symbol(&mut self, sym: &Symbol, value: Value) {
-        self.add_to_table(self.globals.clone(), &sym, &value);
+        self.add_to_table(self.globals.clone(), sym, &value);
     }
 
     pub fn delete_global(&mut self, name: &Symbol) {
@@ -116,7 +116,7 @@ impl Runtime {
     }
 
     pub fn get_from_table(&self, table: Rc<RefCell<Table>>, name: &Symbol) -> Option<Value> {
-        table.borrow().table.get(&name).cloned()
+        table.borrow().table.get(name).cloned()
     }
 
     pub fn get_global(&self, name: &Symbol) -> Option<Value> {
@@ -143,7 +143,7 @@ impl Runtime {
             let sym = &rest[0];
             table = {
                 let t = &mut table.borrow_mut().table;
-                let v = t.get(&sym);
+                let v = t.get(sym);
                 match v {
                     Some(Value::Table(n)) => n.clone(),
                     _ => {
@@ -167,7 +167,7 @@ impl Runtime {
             let sym = &rest[0];
             table = {
                 let t = &mut table.borrow_mut().table;
-                let v = t.get(&sym);
+                let v = t.get(sym);
                 match v {
                     Some(Value::Table(n)) => n.clone(),
                     None | Some(Value::Nil) => {
@@ -372,7 +372,7 @@ impl Value {
 
     pub fn get_symbol(&self) -> Result<Symbol> {
         match self {
-            Value::Symbol(t) => Ok(t.clone()),
+            Value::Symbol(t) => Ok(*t),
             _ => Err(Error::runtime_error("Value not a symbol")),
         }
     }

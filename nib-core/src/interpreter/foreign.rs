@@ -148,7 +148,7 @@ fn prim_peek(rt: &mut Runtime) -> Result<()> {
             CType::Int8 => Value::integer((ptr as *mut i8).read() as i64),
             CType::Int16 => Value::integer((ptr as *mut i16).read() as i64),
             CType::Int32 => Value::integer((ptr as *mut i32).read() as i64),
-            CType::Int64 => Value::integer((ptr as *mut i64).read() as i64),
+            CType::Int64 => Value::integer((ptr as *mut i64).read()),
             CType::UInt8 => Value::integer((ptr as *mut u8).read() as i64),
             CType::UInt16 => Value::integer((ptr as *mut u16).read() as i64),
             CType::UInt32 => Value::integer((ptr as *mut u32).read() as i64),

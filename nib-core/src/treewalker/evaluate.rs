@@ -83,13 +83,12 @@ impl Runtime {
         let mut lexical_env = Environment::new();
         lexical_env.push();
         for v in free.iter() {
-            let val = self.lookup(env, &v).unwrap_or(Value::Undefined);
-            if let Some(name) = binding_name {
-                if val == Value::Undefined {
+            let val = self.lookup(env, v).unwrap_or(Value::Undefined);
+            if let Some(name) = binding_name
+                && val == Value::Undefined {
                     let c = self.closures_to_check.entry(*v).or_default();
                     c.insert(name.top());
                 }
-            }
             lexical_env.add(v, &val);
         }
         let arity = lam.arity.clone();
@@ -190,7 +189,7 @@ impl Runtime {
                             Name::Qualified(path, id) => {
                                 let start = &path[0];
                                 let rest = &path[1..];
-                                let first = if let Some(v) = env.get(&start) {
+                                let first = if let Some(v) = env.get(start) {
                                     v.get_table()?
                                 } else {
                                     let nt = Value::new_table();
@@ -240,7 +239,7 @@ impl Runtime {
                 let mut free = HashSet::new();
                 let mut locals = HashMap::new();
                 free_vars(&Expression::Lambda(0, lam.clone()), &mut free, &mut locals);
-                let closure = self.evaluate_lambda(&binding_name, &lam, &free, env)?;
+                let closure = self.evaluate_lambda(binding_name, &lam, &free, env)?;
                 eval_status.value_stack.push(closure);
             }
             Expression::Cond(_, cond) => {
@@ -331,7 +330,7 @@ impl Runtime {
                             args.insert(i as usize, array);
                         }
                         for (v, i) in args.iter().zip(lam.args.iter()) {
-                            env.add(&i, v);
+                            env.add(i, v);
                         }
                         mem::swap(&mut env, current_env);
                         eval_status.work_stack.push(EvalStep::ReplaceEnv(env));

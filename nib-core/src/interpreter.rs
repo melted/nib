@@ -82,6 +82,12 @@ impl Interpreter for Runtime {
     fn set_output_core(&mut self, output: bool) {}
 }
 
+impl Default for Runtime {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Runtime {
     pub fn new() -> Self {
         let heap = Heap::new(DEFAULT_HEAP_SIZE);
@@ -135,7 +141,7 @@ impl Runtime {
         let closure = Closure::make_low(
             self,
             &bc,
-            self.local_env.clone(),
+            self.local_env,
             Value::integer(0),
             Value::bool(false),
         );
@@ -165,7 +171,7 @@ impl Runtime {
 
     pub fn set_global(&mut self, sym: &Symbol, value: &Value) {
         let mut env = self.global_env.get_table();
-        env.insert(self, Value::symbol(sym), value.clone());
+        env.insert(self, Value::symbol(sym), *value);
     }
 
     pub fn get_global(&self, sym: &Symbol) -> Value {
@@ -176,12 +182,12 @@ impl Runtime {
     pub fn add_name(&mut self, name: &Name, val: &Value) -> Result<()> {
         match name {
             Name::Qualified(path, leaf) => {
-                let s = Value::from(leaf.clone());
+                let s = Value::from(*leaf);
                 let t = self.get_or_create_module_path(path, self.global_env)?;
                 t.get_table().insert(self, s, *val);
             }
             Name::Plain(n) => {
-                self.set_global(n, &val);
+                self.set_global(n, val);
             }
         }
         Ok(())
@@ -197,7 +203,7 @@ impl Runtime {
                     Value::nil()
                 }
             }
-            Name::Plain(name) => self.get_global(&name),
+            Name::Plain(name) => self.get_global(name),
         };
         if val.is_nil() { None } else { Some(val) }
     }
@@ -230,7 +236,7 @@ impl Runtime {
             let sym = &rest[0];
             table = {
                 let mut t = table.get_table();
-                let key = Value::from(sym.clone());
+                let key = Value::from(*sym);
                 let v = t.get(key);
                 match v.get_repr() {
                     ValueRepr::Table => v,
@@ -663,7 +669,7 @@ impl Runtime {
                 let pap = pap_array.values();
                 self.stack.lift(args - 1, pap.len());
                 let room = self.stack.slice_mut(pap.len(), args - 1);
-                room.copy_from_slice(&pap);
+                room.copy_from_slice(pap);
             }
             _ => {
                 if let Some(method) = self.find_overload(&fun, &static_symbol!("__call")) {
@@ -713,7 +719,7 @@ impl Runtime {
                     // Not a tail call, set up a new frame
                     self.ensure_call_stack(3);
                     let frame = vec![
-                        self.closure.clone(),
+                        self.closure,
                         Value::integer(self.ip as i64),
                         Value::integer(self.stack.base as i64),
                     ];
@@ -798,8 +804,8 @@ impl Runtime {
             INSTR_JZ | INSTR_JZ_IMM8 => val.get_integer() == 0,
             INSTR_JPOS | INSTR_JPOS_IMM8 => val.get_integer() > 0,
             INSTR_JNEG | INSTR_JNEG_IMM8 => val.get_integer() < 0,
-            INSTR_JNPOS | INSTR_JNPOS_IMM8 => !(val.get_integer() > 0),
-            INSTR_JNNEG | INSTR_JNNEG_IMM8 => !(val.get_integer() < 0),
+            INSTR_JNPOS | INSTR_JNPOS_IMM8 => (val.get_integer() <= 0),
+            INSTR_JNNEG | INSTR_JNNEG_IMM8 => (val.get_integer() >= 0),
             INSTR_JFALSE | INSTR_JFALSE_IMM8 => val == Value::bool(false),
             INSTR_JNFALSE | INSTR_JNFALSE_IMM8 => val != Value::bool(false),
             _ => unreachable!(),
@@ -968,8 +974,8 @@ impl Runtime {
                 let b = val.get_bytes();
                 let x = b.get_slice().first_chunk::<8>().unwrap();
                 let f = f64::from_ne_bytes(*x);
-                let v = Value::alloc_float(self, f);
-                v
+                
+                Value::alloc_float(self, f)
             }
             INSTR_ALLOC_TABLE => Value::from(Table::make(self)),
             INSTR_ALLOC_CLOSURE => {
@@ -1196,13 +1202,13 @@ impl Stack {
         v
     }
 
-    pub(super) fn slice<'a>(&'a self, n: usize, d: usize) -> &'a [Value] {
+    pub(super) fn slice(&self, n: usize, d: usize) -> &[Value] {
         let from = self.top - n - d;
         let to = self.top - d;
         &self.array.values()[from..to]
     }
 
-    pub(super) fn slice_mut<'a>(&'a mut self, n: usize, d: usize) -> &'a mut [Value] {
+    pub(super) fn slice_mut(&mut self, n: usize, d: usize) -> &mut [Value] {
         let from = self.top - n - d;
         let to = self.top - d;
         &mut self.array.values_mut()[from..to]

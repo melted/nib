@@ -23,7 +23,7 @@ impl<'a> ParserState<'a> {
             }
             TokenValue::Ellipsis(name) => {
                 self.get_next_token()?;
-                self.ellipsis_pattern(name.map(|n| Name::Plain(n)))
+                self.ellipsis_pattern(name.map(Name::Plain))
             }
             TokenValue::LeftBracket => self.parse_array_pattern()?,
             TokenValue::LeftParen => self.parse_custom_pattern()?,

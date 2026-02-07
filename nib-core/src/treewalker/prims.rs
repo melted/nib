@@ -806,7 +806,7 @@ impl Runtime {
         let tab = &args[2].get_table()?;
         let sym = &args[1].get_symbol()?;
         let table = &mut tab.borrow_mut().table;
-        table.insert(sym.clone(), args[0].clone());
+        table.insert(*sym, args[0].clone());
         Ok(Value::Nil)
     }
 
@@ -957,7 +957,7 @@ impl Runtime {
                     Ok(Value::Nil)
                 }
             }
-            _ => return self.error("invalid values in projection, must be tables and symbols"),
+            _ => self.error("invalid values in projection, must be tables and symbols"),
         }
     }
 
@@ -975,7 +975,7 @@ impl Runtime {
             let type_tab = tt.get_table()?;
             let tab = &type_tab.borrow().table;
             let res = if let Some(proj_fun) = tab.get(&Symbol::from("project")) {
-                self.prim_apply(&vec![from, projections[0].clone()])?
+                self.prim_apply(&[from, projections[0].clone()])?
             } else {
                 self.project_table(&from, &projections[0])?
             };
@@ -1013,7 +1013,7 @@ impl Runtime {
         let mut keys = Vec::new();
         let table = &tab.borrow().table;
         for k in table.keys() {
-            keys.push(Value::Symbol(k.clone()));
+            keys.push(Value::Symbol(*k));
         }
         // TODO: sort the keys?
         Ok(Value::new_array(&keys))
