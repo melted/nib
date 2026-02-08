@@ -2,10 +2,11 @@
 #![allow(clippy::mutable_key_type)]
 
 use crate::common::{Signature, Symbol};
+use crate::core::Function;
 use crate::runtime::Interpreter;
 use crate::{
     common::{Error, Metadata, Name, Result},
-    core::{Arity, Lambda, desugar, desugar_expression},
+    core::{Arity, desugar, desugar_expression},
     parser::{parse_declarations, parse_expression},
     treewalker::evaluate::Environment,
 };
@@ -29,7 +30,7 @@ pub struct Runtime {
     metadata: HashMap<String, Metadata>,
     globals: Rc<RefCell<Table>>,
     local_module: Option<Rc<RefCell<Table>>>,
-    closures_to_check: HashMap<Symbol, HashSet<Symbol>>,
+    closures_to_check: HashMap<Symbol, Vec<Value>>,
     output_core: bool,
 }
 
@@ -202,13 +203,14 @@ fn new_ref<T>(val: T) -> Rc<RefCell<T>> {
 #[derive(Debug, Clone)]
 pub enum Value {
     Nil,
-    Undefined,
+    Undefined(Symbol),
     Bool(bool),
     Integer(i64),
     Real(f64),
     Char(char),
     Pointer(*mut c_void),
     Symbol(Symbol),
+    Reference(Rc<RefCell<Array>>),
     Bytes(Rc<RefCell<Bytes>>),
     Array(Rc<RefCell<Array>>),
     Table(Rc<RefCell<Table>>),
@@ -265,13 +267,14 @@ impl Display for Value {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Value::Nil => write!(f, "()"),
-            Value::Undefined => write!(f, "<undefined>"),
+            Value::Undefined(symbol) => write!(f, "<undefined:{}>", symbol.as_str()),
             Value::Bool(b) => write!(f, "{}", b),
             Value::Integer(i) => write!(f, "{}", i),
             Value::Real(x) => write!(f, "{}", x),
             Value::Char(c) => write!(f, "{}", c),
             Value::Pointer(p) => write!(f, "ptr({:x})", p.addr()),
             Value::Symbol(symbol) => write!(f, "#<{}>", symbol),
+            Value::Reference(ref_cell) => write!(f, "ref {}", &ref_cell.borrow()),
             Value::Bytes(ref_cell) => write!(f, "{}", &ref_cell.borrow()),
             Value::Array(ref_cell) => write!(f, "{}", &ref_cell.borrow()),
             Value::Table(ref_cell) => write!(f, "{}", &ref_cell.borrow()),
@@ -318,7 +321,7 @@ impl Value {
     pub fn number(&self) -> usize {
         match self {
             Value::Nil => 0,
-            Value::Undefined => 1,
+            Value::Undefined(_) => 1,
             Value::Bool(_) => 3,
             Value::Integer(_) => 4,
             Value::Real(_) => 5,
@@ -329,6 +332,7 @@ impl Value {
             Value::Array(ref_cell) => 10,
             Value::Table(ref_cell) => 11,
             Value::Closure(ref_cell) => 12,
+            Value::Reference(_) => 13,
         }
     }
 
@@ -816,7 +820,7 @@ impl Bytes {
 
 #[derive(Debug, Clone)]
 pub enum Code {
-    Nib(Box<Lambda>),
+    Nib(Box<Function>),
     Extern(fn(&Runtime, &[Value]) -> Result<Value>),
     ExternMut(fn(&mut Runtime, &[Value]) -> Result<Value>),
     ExternSimple(fn(&[Value]) -> Result<Value>),

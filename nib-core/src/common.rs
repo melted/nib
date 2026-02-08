@@ -194,6 +194,12 @@ impl From<&Name> for Name {
     }
 }
 
+impl From<Symbol> for Name {
+    fn from(value: Symbol) -> Self {
+        Name::str(value.as_str())
+    }
+}
+
 impl Name {
     pub fn string(&self) -> String {
         match self {

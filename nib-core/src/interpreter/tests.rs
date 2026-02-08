@@ -251,6 +251,7 @@ fn run_globalref_binding() -> Result<()> {
 
 #[ignore = "flaky"]
 #[test]
+#[ignore = "not working yet"]
 fn run_fun_binding() -> Result<()> {
     let mut rt = Runtime::new();
     rt.add_code("test", "calc a = _prim_mul a 2")?;
@@ -261,6 +262,7 @@ fn run_fun_binding() -> Result<()> {
 
 #[ignore = "flaky"]
 #[test]
+#[ignore = "not working yet"]
 fn run_fun_clauses_binding() -> Result<()> {
     let mut rt = Runtime::new();
     rt.add_code(
@@ -274,6 +276,7 @@ fn run_fun_clauses_binding() -> Result<()> {
 
 #[ignore = "flaky"]
 #[test]
+#[ignore = "not working yet"]
 fn run_fun_clauses_app_binding() -> Result<()> {
     let mut rt = Runtime::new();
     rt.add_code(

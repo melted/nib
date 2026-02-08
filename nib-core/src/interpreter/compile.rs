@@ -3,7 +3,7 @@ use symbol_table::static_symbol;
 use crate::ast::Literal;
 use crate::common::{Metadata, Name};
 use crate::common::{Result, Symbol};
-use crate::core::{Binder, Binding, Cond, Expression, Lambda, free_vars};
+use crate::core::{Bindee, Binder, Binding, Cond, Expression, Function, free_vars};
 use crate::interpreter::bytecode::{
     INSTR_ALLOC_ARRAY, INSTR_ALLOC_CLOSURE, INSTR_ALLOC_FLOAT, INSTR_ALLOC_TABLE, INSTR_ARRAY_SET,
     INSTR_CALL, INSTR_CALL_TAIL, INSTR_DROP, INSTR_DUP, INSTR_GET_LOCAL, INSTR_GLOBAL_ENV,
@@ -155,7 +155,7 @@ impl Compilation {
         self.is_tail = true;
         let binding_name = self.get_binding_name(&binding.binder);
         let global = matches!(&binding.binder, Binder::Public(_));
-        self.compile_expression(&binding.body, code)?;
+        self.compile_bindee(&binding.body, code)?;
         if let Some(name) = binding_name {
             code.push(INSTR_DUP);
             let top = name.top();
@@ -230,18 +230,21 @@ impl Compilation {
         }
     }
 
+    fn compile_bindee(&mut self, bindee: &Bindee, code: &mut Vec<u8>) -> Result<()> {
+        match bindee {
+            Bindee::Function(function) => {
+                self.compile_function(function, code)
+            },
+            Bindee::Expression(expression) => self.compile_expression(expression, code),
+        }
+    }
+
     fn compile_expression(&mut self, expression: &Expression, code: &mut Vec<u8>) -> Result<()> {
         match expression {
             Expression::Literal(_, literal) => self.compile_literal(literal, code),
             Expression::Var(_, var) => {
                 self.get_variable(var, code);
                 Ok(())
-            }
-            Expression::Lambda(_, lambda) => {
-                let mut free = HashSet::new();
-                let mut locals = HashMap::new();
-                free_vars(expression, &mut free, &mut locals);
-                self.compile_lambda(lambda, free, locals, code)
             }
             Expression::Cond(_, cond) => self.compile_cond(cond, code),
             Expression::App(_, expressions) => self.compile_application(expressions, code),
@@ -291,11 +294,9 @@ impl Compilation {
         Ok(())
     }
 
-    fn compile_lambda(
+    fn compile_function(
         &mut self,
-        lambda: &Lambda,
-        vars: HashSet<Symbol>,
-        locals: HashMap<Symbol, i32>,
+        lambda: &Function,
         code: &mut Vec<u8>,
     ) -> Result<()> {
         let mut fun_compilation = Compilation::new();
@@ -311,7 +312,6 @@ impl Compilation {
                 (Value::integer(n as i64), Value::integer(i as i64))
             }
         };
-        dbg!(&lambda);
         load_constant(&vararg, code);
         load_constant_int(arity.get_integer(), code);
         load_constant_int(fun_compilation.module.local_env_size as i64, code);

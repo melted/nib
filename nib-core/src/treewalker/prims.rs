@@ -95,6 +95,10 @@ impl Runtime {
             Value::new_extern_fun(Runtime::prim_eq, &Arity::Fixed(2)),
         );
         self.add_global(
+            "_prim_neq",
+            Value::new_extern_fun(Runtime::prim_neq, &Arity::Fixed(2)),
+        );
+        self.add_global(
             "_prim_array_ref",
             Value::new_extern_fun(Runtime::prim_array_ref, &Arity::Fixed(2)),
         );
@@ -683,6 +687,18 @@ impl Runtime {
         }
     }
 
+    pub(super) fn prim_neq(&self, args: &[Value]) -> Result<Value> {
+        match (&args[0], &args[1]) {
+            (x, y) if std::mem::discriminant(x) == std::mem::discriminant(y) => {
+                Ok(Value::Bool(x != y))
+            }
+            (Value::Integer(a), Value::Integer(b)) => Ok(Value::Bool(a != b)),
+            (Value::Real(a), Value::Real(b)) => Ok(Value::Bool(a != b)),
+            (arg, arg2) => Ok(Value::Bool(true)),
+        }
+    }
+
+
     pub(super) fn prim_array_ref(&self, args: &[Value]) -> Result<Value> {
         let arr = args[1].get_array()?;
         let array = &arr.borrow().array;
@@ -880,7 +896,7 @@ impl Runtime {
     pub fn type_query(&self, arg: &Value) -> Result<Value> {
         match arg {
             Value::Nil => Ok(self.get_global(&Symbol::from("nil_type")).unwrap()),
-            Value::Undefined => Ok(Value::Nil),
+            Value::Undefined(_) => Ok(Value::Nil),
             Value::Bool(_) => Ok(self.get_global(&Symbol::from("bool")).unwrap()),
             Value::Integer(_) => Ok(self.get_global(&Symbol::from("int")).unwrap()),
             Value::Real(_) => Ok(self.get_global(&Symbol::from("float")).unwrap()),
@@ -914,6 +930,10 @@ impl Runtime {
                 } else {
                     Ok(self.get_global(&Symbol::from("function")).unwrap())
                 }
+            }
+            Value::Reference(array) => {
+                let reference = &array.borrow().array[0];
+                self.type_query(reference)
             }
         }
     }
