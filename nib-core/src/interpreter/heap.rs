@@ -659,10 +659,10 @@ impl Debug for Value {
             ValueRepr::Float => write!(f, "{:?}", self.get_float()),
             ValueRepr::BoxedInteger => todo!(),
             ValueRepr::Symbol => write!(f, "{:?}", self.get_symbol()),
-            ValueRepr::Array => display_complex_object(self, f, &mut HashSet::new()),
+            ValueRepr::Array => display_complex_object(self, f, &mut HashSet::new(), true),
             ValueRepr::Bytes => write!(f, "{:?}", self.get_bytes()),
-            ValueRepr::Table => display_complex_object(self, f, &mut HashSet::new()),
-            ValueRepr::Closure => write!(f, "{:?}", self.get_closure()),
+            ValueRepr::Table => display_complex_object(self, f, &mut HashSet::new(), true),
+            ValueRepr::Closure => display_complex_object(self, f, &mut HashSet::new(), true),
             ValueRepr::Object => write!(f, "{:?}", self.get_object()),
             ValueRepr::PartialApplication => write!(f, "{:?}", self.get_array()),
             ValueRepr::CallContinuation => write!(f, "{:?}", self.get_cc_args()),
@@ -685,11 +685,10 @@ impl Display for Value {
             ValueRepr::BoxedInteger => todo!(),
             ValueRepr::Symbol => write!(f, "#({})", self.get_symbol()),
             ValueRepr::Bytes => write!(f, "{}", self.get_bytes()),
-            ValueRepr::Closure => write!(f, "{}", self.get_closure()),
             ValueRepr::PartialApplication => write!(f, "#<partial-application:{:x}>", self.val),
             ValueRepr::CallContinuation => write!(f, "#<call-continuation:{}>", self.get_cc_args()),
             ValueRepr::Object => write!(f, "#<object>"),
-            _ => display_complex_object(self, f, &mut HashSet::new()),
+            _ => display_complex_object(self, f, &mut HashSet::new(), false),
         }
     }
 }
@@ -698,21 +697,22 @@ fn display_complex_object(
     value: &Value,
     f: &mut std::fmt::Formatter<'_>,
     seen: &mut HashSet<Value>,
+    debug:bool
 ) -> std::fmt::Result {
     if seen.contains(value) {
         write!(f, "#<recurse:{:x}>", value.val)?;
         return Ok(());
     }
-    seen.insert(*value);
     match value.get_repr() {
         ValueRepr::Array => {
+            seen.insert(*value);
             write!(f, "[")?;
             let array = value.get_array();
             let mut iter = array.values().iter();
             let mut nil_count = 0;
             if let Some(v) = iter.next() {
                 if !v.is_nil() {
-                    display_complex_object(v, f, seen)?;
+                    display_complex_object(v, f, seen, debug)?;
                 } else {
                     write!(f, "nil ")?;
                     nil_count += 1;
@@ -724,7 +724,7 @@ fn display_complex_object(
                             nil_count = 0;
                         }
                         write!(f, ", ")?;
-                        display_complex_object(v, f, seen)?;
+                        display_complex_object(v, f, seen, debug)?;
                     } else {
                         if nil_count == 0 {
                             write!(f, ", nil ")?;
@@ -736,28 +736,55 @@ fn display_complex_object(
             if nil_count > 0 {
                 write!(f, "{} times", nil_count)?;
             }
-            write!(f, "]")
+            write!(f, "]")?;
         }
         ValueRepr::Table => {
+            seen.insert(*value);
             write!(f, "{{")?;
             let table = value.get_table();
             let pairs = table.pairs();
             let mut iter = pairs.iter();
             if let Some((k, v)) = iter.next() {
-                display_complex_object(k, f, seen)?;
+                display_complex_object(k, f, seen, debug)?;
                 write!(f, ": ")?;
-                display_complex_object(v, f, seen)?;
+                display_complex_object(v, f, seen, debug)?;
                 for (k, v) in iter {
                     write!(f, ", ")?;
-                    display_complex_object(k, f, seen)?;
+                    display_complex_object(k, f, seen, debug)?;
                     write!(f, ": ")?;
-                    display_complex_object(v, f, seen)?;
+                    display_complex_object(v, f, seen, debug)?;
                 }
             }
-            write!(f, "}}")
+            write!(f, "}}")?;
         }
-        _ => write!(f, "{}", value),
+        ValueRepr::Closure => {
+            seen.insert(*value);
+            let closure = value.get_closure();
+            let code = closure.get_code();
+            let arity = closure.num_args();
+            let vararg = closure.vararg();
+            let env = closure.env();
+            if debug {
+                write!(f, "#<closure({:x}) code:{} ", value.val, code)?;
+                display_complex_object(&env, f, seen, debug)?;
+                write!(f, "arity:{} vararg:{:?}>", arity, vararg)?;
+            } else {
+                let va_indicator = if vararg.is_some() { "+" } else { "" };
+                write!(f, "#<closure({:x}):{}:{}:{}{}>", value.val, closure.get_tag(), env.get_array().size(), arity, va_indicator)?;
+            }
+        }
+        _ => {
+            if debug {
+                return write!(f, "{:?}", value);
+            } else {
+                return write!(f, "{}", value);
+            }
+        },
     }
+    if debug {
+        write!(f, "({:x})", value.val)?;
+    }
+    Ok(())
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -767,13 +794,13 @@ pub struct Array {
 
 impl Debug for Array {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self)
+        display_complex_object(&Value::from(*self), f, &mut HashSet::new(), true)
     }
 }
 
 impl Display for Array {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        display_complex_object(&Value::from(*self), f, &mut HashSet::new())
+        display_complex_object(&Value::from(*self), f, &mut HashSet::new(), false)
     }
 }
 
@@ -864,13 +891,13 @@ pub struct Table {
 
 impl Debug for Table {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self)
+        display_complex_object(&Value::from(*self), f, &mut HashSet::new(), true)
     }
 }
 
 impl Display for Table {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        display_complex_object(&Value::from(*self), f, &mut HashSet::new())
+        display_complex_object(&Value::from(*self), f, &mut HashSet::new(), false)
     }
 }
 
@@ -1117,12 +1144,24 @@ pub struct Foreign {
     pub signature_handle: usize,
 }
 
+impl Display for Foreign {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Code {
     Bytecode(Vec<u8>),
     Core(*const Vec<Expression>),
     Extern(*const c_void),
     Foreign(Foreign),
+}
+
+impl Display for Code {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self)
+    }
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
