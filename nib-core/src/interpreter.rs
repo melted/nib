@@ -184,10 +184,6 @@ impl Runtime {
         for (sym, &idx) in &module.want_symbols {
             array.set(idx, Value::symbol(sym));
         }
-        for (sym, &idx) in &module.captures {
-            let val = self.get_global(sym);
-            array.set(idx, val);
-        }
         Value::from(array)
     }
 
@@ -1051,6 +1047,8 @@ impl Runtime {
     }
 
     fn op_array_set(&mut self) -> Result<bool> {
+        dbg!(&self.stack);
+        dbg!(&self.call_stack);
         let obj = self.stack.pop();
         let pos = self.stack.pop();
         let val = self.stack.pop();

@@ -44,8 +44,6 @@ pub struct Module {
     pub local_env_size: usize,
     /// A list of symbol literals that should be put into the local environment.
     pub want_symbols: HashMap<Symbol, usize>,
-    /// Global variables used by the module.
-    pub captures: HashMap<Symbol, usize>,
 }
 
 impl Default for Module {
@@ -61,7 +59,6 @@ impl Module {
             byte_code: Vec::new(),
             local_env_size: 0,
             want_symbols: HashMap::new(),
-            captures: HashMap::new(),
         }
     }
 }
@@ -302,6 +299,7 @@ impl Compilation {
         code: &mut Vec<u8>,
     ) -> Result<()> {
         let mut fun_compilation = Compilation::new();
+        fun_compilation.future_bindings = self.future_bindings.clone();
         for (i, arg) in lambda.args.iter().enumerate() {
             fun_compilation.stack_vars.push((*arg, i + 1));
         }
@@ -327,19 +325,8 @@ impl Compilation {
             get_local(env_local, code);
             code.push(INSTR_ARRAY_SET);
         }
-        for (var, index) in fun_compilation.module.captures {
-            if self.future_bindings.contains(&var) {
-                self.fixups_needed
-                    .entry(var)
-                    .and_modify(|vec| vec.push((env_local, index)))
-                    .or_insert_with(|| vec![(env_local, index)]);
-            } else {
-                load_constant_int(index as i64, code);
-                self.get_variable(&var, code);
-                get_local(env_local, code);
-                code.push(INSTR_ARRAY_SET);
-            }
-        }
+        // TODO: fix lambda compilations knowledge of which bindings are coming from 
+        // containing scope or globally
         get_local(env_local, code);
         push_bytes(&fun_compilation.module.byte_code, code);
         code.push(INSTR_ALLOC_CLOSURE);
@@ -462,6 +449,9 @@ impl Compilation {
             VarLocation::Env(i) => {
                 get_local(i, code);
             }
+            VarLocation::Global => {
+                self.get_global_name(var, code);
+            }
         }
     }
 
@@ -476,13 +466,7 @@ impl Compilation {
                 return VarLocation::Env(*loc);
             }
         }
-        if let Some(v) = self.module.captures.get(var) {
-            VarLocation::Env(*v)
-        } else {
-            let v = self.fresh_env_location();
-            self.module.captures.insert(*var, v);
-            VarLocation::Env(v)
-        }
+        VarLocation::Global
     }
 
     fn local_var(&mut self, sym: &Symbol) -> usize {
@@ -523,6 +507,7 @@ impl Compilation {
 enum VarLocation {
     Stack(usize),
     Env(usize),
+    Global,
 }
 
 fn set_local(n: usize, code: &mut Vec<u8>) {
