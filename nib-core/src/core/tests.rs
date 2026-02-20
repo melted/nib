@@ -16,7 +16,6 @@ fn desugar_pattern() -> Result<()> {
     let mut t = Module::new(None, "[a, b] = [1, 2]");
     parse_declarations(&mut t)?;
     let co = desugar(t)?;
-    dbg!(co);
     Ok(())
 }
 
@@ -27,6 +26,5 @@ fac n = n * (fac (n - 1))";
     let mut t = Module::new(None, prog);
     parse_declarations(&mut t)?;
     let co = desugar(t)?;
-    dbg!(co);
     Ok(())
 }
