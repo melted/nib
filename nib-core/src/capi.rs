@@ -1,7 +1,6 @@
 // This file defines the C API for Nib, it should be kept in sync with the corresponding
 // C header file.
 
-
 // We're in C land, tell clippy to calm down
 #![allow(clippy::not_unsafe_ptr_arg_deref)]
 
@@ -12,7 +11,6 @@ use crate::{ast::Module, parser::parse_declarations, runtime::Interpreter, treew
 
 const NIB_SUCCESS: c_int = 0;
 const NIB_ERROR: c_int = 1;
-
 
 #[unsafe(no_mangle)]
 pub extern "C" fn nib_parse(source: *const c_char, mod_ptr: *mut *mut Module) -> c_int {

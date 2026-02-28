@@ -6,11 +6,11 @@ use crate::{
     ast::{self, Literal, PatternNode},
     common::{Error, Metadata, Name, Node, Result},
 };
-use std::{iter, mem};
 use std::{
     collections::{HashMap, HashSet},
     fmt::Display,
 };
+use std::{iter, mem};
 
 mod tests;
 
@@ -20,7 +20,7 @@ pub fn desugar(module: ast::Module) -> Result<Module> {
     for d in module.declarations {
         match d {
             ast::Declaration::Binding(bind) => {
-                let  names = bind.bound_names();
+                let names = bind.bound_names();
                 to_desugar.push(bind);
             }
         }
@@ -30,7 +30,7 @@ pub fn desugar(module: ast::Module) -> Result<Module> {
     Ok(Module {
         metadata: state.metadata,
         bindings: state.bindings,
-        locals: state.locals
+        locals: state.locals,
     })
 }
 
@@ -39,7 +39,11 @@ pub fn desugar_expression(expr: ExpressionNode) -> Result<Expression> {
     let mut state = DesugarState::new(meta);
     let expression = state.desugar_expression(&expr)?;
     if !state.bindings.is_empty() {
-        Ok(Expression::Where(expr.id, Box::new(expression), state.bindings))
+        Ok(Expression::Where(
+            expr.id,
+            Box::new(expression),
+            state.bindings,
+        ))
     } else {
         Ok(expression)
     }
@@ -84,11 +88,7 @@ impl DesugarState {
         }
     }
 
-    fn desugar_funbinding(
-        &mut self,
-        ast_binding: &ast::FunBinding,
-        is_local: bool
-    ) -> Result<()> {
+    fn desugar_funbinding(&mut self, ast_binding: &ast::FunBinding, is_local: bool) -> Result<()> {
         let binder = self.desugar_binding_name(&ast_binding.name, is_local)?;
         self.metadata.last_id += 1;
         let result = self.desugar_funclauses(self.metadata.last_id, &ast_binding.clauses)?;
@@ -98,7 +98,12 @@ impl DesugarState {
         Ok(())
     }
 
-    fn lambda_lift(&mut self, id:Node, function: &mut Function, captures: &[Symbol]) -> Result<(Binding, Expression)> {
+    fn lambda_lift(
+        &mut self,
+        id: Node,
+        function: &mut Function,
+        captures: &[Symbol],
+    ) -> Result<(Binding, Expression)> {
         let lambda_name = self.next_lambda();
         let lambda_binder = Binder::Local(lambda_name.clone());
         let mut new_args = Vec::new();
@@ -108,42 +113,42 @@ impl DesugarState {
         let ext = captures.len() as u32;
         function.arity = match function.arity {
             Arity::Fixed(n) => Arity::Fixed(n + ext),
-            Arity::VarArg(n, pos) => Arity::VarArg(n + ext, pos+ext),
+            Arity::VarArg(n, pos) => Arity::VarArg(n + ext, pos + ext),
         };
         let mut app = vec![Expression::Var(0, lambda_name.base())];
         app.extend(captures.iter().map(|s| Expression::Var(0, s.clone())));
-        Ok((Binding::make(id, lambda_binder, Bindee::Function(function.clone())), Expression::App(0, app)))
-    }
-    
-    fn desugar_opbinding(
-        &mut self,
-        ast_binding: &ast::OpBinding,
-        is_local: bool
-    ) -> Result<()> {
-        let name = ast_binding.op.to_name(); // No desugar. Operators can't be used qualified,
-        let funclauses: Vec<_> = ast_binding
-            .clauses
-            .iter()
-            .map(to_funclause)
-            .collect();
-        self.desugar_funbinding(&ast::FunBinding { id: ast_binding.id, name, clauses: funclauses }, is_local)
+        Ok((
+            Binding::make(id, lambda_binder, Bindee::Function(function.clone())),
+            Expression::App(0, app),
+        ))
     }
 
-    fn desugar_varbinding(
-        &mut self,
-        ast_binding: &ast::VarBinding,
-        is_local: bool
-    ) -> Result<()> {
+    fn desugar_opbinding(&mut self, ast_binding: &ast::OpBinding, is_local: bool) -> Result<()> {
+        let name = ast_binding.op.to_name(); // No desugar. Operators can't be used qualified,
+        let funclauses: Vec<_> = ast_binding.clauses.iter().map(to_funclause).collect();
+        self.desugar_funbinding(
+            &ast::FunBinding {
+                id: ast_binding.id,
+                name,
+                clauses: funclauses,
+            },
+            is_local,
+        )
+    }
+
+    fn desugar_varbinding(&mut self, ast_binding: &ast::VarBinding, is_local: bool) -> Result<()> {
         let pat = &ast_binding.lhs;
         let rhs = self.desugar_varbinding_rhs(&ast_binding.rhs)?;
         match &pat.pattern {
             Pattern::Var(v) => {
                 let binder = self.desugar_binding_name(v, is_local)?;
-                self.bindings.push(Binding::make(ast_binding.id, binder, rhs));
+                self.bindings
+                    .push(Binding::make(ast_binding.id, binder, rhs));
             }
             Pattern::Wildcard => {
-                self.bindings.push(Binding::make(ast_binding.id, Binder::Unbound, rhs));
-            },
+                self.bindings
+                    .push(Binding::make(ast_binding.id, Binder::Unbound, rhs));
+            }
             _ => {
                 let mut counter = 0;
                 let mut replacements = HashMap::new();
@@ -177,8 +182,11 @@ impl DesugarState {
                 let expression = self.desugar_expression(&expr)?;
                 let nam_arr = self.next_local();
                 // TODO: Untangle this mess. It seems very backward to create a lambda now.
-                let binding =
-                    Binding::make(ast_binding.id, Binder::Local(nam_arr.clone()), Bindee::Expression(expression));
+                let binding = Binding::make(
+                    ast_binding.id,
+                    Binder::Local(nam_arr.clone()),
+                    Bindee::Expression(expression),
+                );
                 for (i, k) in fun_names.iter().enumerate() {
                     let old = replacements.get(k).unwrap();
                     let rhs = Expression::App(
@@ -208,7 +216,6 @@ impl DesugarState {
             } else {
                 Ok(Binder::Public(name.clone()))
             }
-
         }
     }
 
@@ -236,19 +243,25 @@ impl DesugarState {
                     loc,
                     Expression::App(pattern.id, vec![name_expr(name), expr.clone()]),
                 ));
-                let failed = app(&[var(&static_symbol!("_prim_neq")),
+                let failed = app(&[
+                    var(&static_symbol!("_prim_neq")),
                     var(&loc),
-                    literal(&Literal::Bool(false))]);
+                    literal(&Literal::Bool(false)),
+                ]);
                 parts.push(PatternParts::Check(failed));
                 let size = app(&[var(&static_symbol!("_prim_array_size")), var(&loc)]);
-                let size_check = app(&[var(&static_symbol!("_prim_eq")),
+                let size_check = app(&[
+                    var(&static_symbol!("_prim_eq")),
                     size,
-                    literal(&Literal::Integer(fields.len() as i64))]);
+                    literal(&Literal::Integer(fields.len() as i64)),
+                ]);
                 parts.push(PatternParts::Check(size_check));
                 for (i, f) in fields.iter().enumerate() {
-                    let refer = app(&[var(&static_symbol!("_prim_array_ref")),
+                    let refer = app(&[
+                        var(&static_symbol!("_prim_array_ref")),
                         literal(&Literal::Integer(i as i64)),
-                        var(&loc)]);
+                        var(&loc),
+                    ]);
                     let mut field = self.desugar_arg_pattern(f, &refer)?;
                     parts.append(&mut field);
                 }
@@ -273,28 +286,23 @@ impl DesugarState {
             }
             Pattern::Literal(lit) => {
                 // TODO: Will this work for bytes?
-                let check = app(&[var(&static_symbol!("_prim_eq")),
-                    expr.clone(),
-                    literal(lit)]);
+                let check = app(&[var(&static_symbol!("_prim_eq")), expr.clone(), literal(lit)]);
                 Ok(vec![PatternParts::Check(check)])
             }
             Pattern::Typed(pat, typ) => {
                 let mut inner = self.desugar_arg_pattern(pat, expr)?;
                 let mut val = expr.clone();
                 if let Some(PatternParts::Bind(name, exp)) = inner.last()
-                    && exp == expr {
-                        val = var(name);
-                    }
+                    && exp == expr
+                {
+                    val = var(name);
+                }
                 let get_type = app(&[var(&static_symbol!("_prim_type")), val]);
-                let check = app(&[var(&static_symbol!("_prim_eq")),
-                    get_type,
-                    name_expr(typ)]);
+                let check = app(&[var(&static_symbol!("_prim_eq")), get_type, name_expr(typ)]);
                 inner.push(PatternParts::Check(check));
                 Ok(inner)
             }
-            Pattern::Var(Name::Plain(name)) => {
-                Ok(vec![PatternParts::Bind(*name, expr.clone())])
-            }
+            Pattern::Var(Name::Plain(name)) => Ok(vec![PatternParts::Bind(*name, expr.clone())]),
             Pattern::Var(_) => self.error("Qualified name in arg pattern"),
             Pattern::Wildcard => Ok(vec![]),
         }
@@ -313,7 +321,7 @@ impl DesugarState {
                     self.bindings.push(lambda);
                     Ok(Bindee::Expression(pap))
                 }
-            },
+            }
             _ => {
                 let expr = self.desugar_expression(expression)?;
                 Ok(Bindee::Expression(expr))
@@ -358,11 +366,11 @@ impl DesugarState {
             ast::Expression::Lambda(funs) => {
                 let mut fun = self.desugar_funclauses(expression.id, funs)?;
                 let captures = self.captured_vars(&fun)?;
-                let (lifted, pap) = self.lambda_lift(expression.id, &mut fun, &captures)?;           
+                let (lifted, pap) = self.lambda_lift(expression.id, &mut fun, &captures)?;
                 self.bindings.push(lifted);
                 match pap {
                     Expression::App(_, v) if v.len() == 1 => Ok(v[0].clone()),
-                    _ => Ok(pap)
+                    _ => Ok(pap),
                 }
             }
             ast::Expression::Literal(lit) => Ok(Expression::Literal(expression.id, lit.clone())),
@@ -378,7 +386,9 @@ impl DesugarState {
             ast::Expression::Where(exp, ast_bindings) => {
                 let mut new_locals = self.current_bindings.clone();
                 let mut binds = Vec::new();
-                ast_bindings.iter().for_each(|b| new_locals.extend(b.bound_names()));
+                ast_bindings
+                    .iter()
+                    .for_each(|b| new_locals.extend(b.bound_names()));
                 mem::swap(&mut binds, &mut self.bindings);
                 mem::swap(&mut new_locals, &mut self.current_bindings);
                 for binding in ast_bindings {
@@ -393,20 +403,20 @@ impl DesugarState {
         }
     }
 
-    fn captured_vars(&self, function:&Function) -> Result<Vec<Symbol>> {
+    fn captured_vars(&self, function: &Function) -> Result<Vec<Symbol>> {
         let free = free_vars(function)?;
-        let locals:HashSet<Symbol> = self.current_bindings.iter().map(|n| n.top()).collect();
+        let locals: HashSet<Symbol> = self.current_bindings.iter().map(|n| n.top()).collect();
         let captured = locals.intersection(&free).map(|s| s.clone()).collect();
         Ok(captured)
     }
 
-    fn promote_to_reference(&mut self, var: &Symbol) {
-
-    }
+    fn promote_to_reference(&mut self, var: &Symbol) {}
 
     fn no_match_expression() -> Expression {
-        app(&[var(&static_symbol!("_prim_panic")),
-            literal(&Literal::String("No matching pattern".to_owned()))])
+        app(&[
+            var(&static_symbol!("_prim_panic")),
+            literal(&Literal::String("No matching pattern".to_owned())),
+        ])
     }
 
     fn desugar_funclauses(&mut self, id: Node, clauses: &[ast::FunClause]) -> Result<Function> {
@@ -414,7 +424,8 @@ impl DesugarState {
         let mut exp = None;
         let args = self.args(&arity);
         let mut old_current_bindings = self.current_bindings.clone();
-        self.current_bindings.extend(args.iter().map(|s| Name::from(*s)));
+        self.current_bindings
+            .extend(args.iter().map(|s| Name::from(*s)));
         for (i, c) in clauses.iter().enumerate() {
             let fail_exp = if i + 1 < clauses.len() {
                 app(&[var(&local(i + 1)), nil()])
@@ -431,7 +442,10 @@ impl DesugarState {
                     vec![Binding::make(0, Binder::Local(name), Bindee::Function(fun))]
                 } else {
                     let (binding, pap) = self.lambda_lift(0, &mut fun, &captures)?;
-                    vec![binding, Binding::make(0, Binder::Local(name), Bindee::Expression(pap))]
+                    vec![
+                        binding,
+                        Binding::make(0, Binder::Local(name), Bindee::Expression(pap)),
+                    ]
                 };
                 match e {
                     Expression::Where(_, exp, bindings) => {
@@ -485,9 +499,11 @@ impl DesugarState {
                         // creating a binding.
                         exp = rename(&exp, var, v);
                     } else {
-                        let binding =
-                            Binding::make(0, Binder::Local(Name::sym(var)),
-                            Bindee::Expression(expression.clone()));
+                        let binding = Binding::make(
+                            0,
+                            Binder::Local(Name::sym(var)),
+                            Bindee::Expression(expression.clone()),
+                        );
                         match &mut exp {
                             Expression::Where(n, expr, binds) => {
                                 binds.insert(0, binding);
@@ -659,7 +675,7 @@ pub fn get_arity(patterns: &[PatternNode]) -> Arity {
 pub struct Module {
     pub metadata: Metadata,
     pub bindings: Vec<Binding>,
-    pub locals: HashSet<Name>
+    pub locals: HashSet<Name>,
 }
 
 impl Display for Module {
@@ -726,7 +742,11 @@ pub struct Function {
 
 impl Function {
     pub fn new(args: &[Symbol], arity: &Arity, expression: &Expression) -> Self {
-        Function { args: args.to_vec(), arity: arity.clone(), body: expression.clone() }
+        Function {
+            args: args.to_vec(),
+            arity: arity.clone(),
+            body: expression.clone(),
+        }
     }
 }
 
@@ -893,15 +913,15 @@ impl Arity {
     }
 }
 
-pub fn rename_bindee(bindee:&Bindee, old_name: &Symbol, new_name: &Symbol) -> Bindee {
+pub fn rename_bindee(bindee: &Bindee, old_name: &Symbol, new_name: &Symbol) -> Bindee {
     match bindee {
         Bindee::Function(function) => {
             let new_body = rename(&function.body, old_name, new_name);
             Bindee::Function(Function::new(&function.args, &function.arity, &new_body))
-        },
+        }
         Bindee::Expression(expression) => {
             Bindee::Expression(rename(expression, old_name, new_name))
-        },
+        }
     }
 }
 
@@ -952,12 +972,11 @@ pub fn rename(expr: &Expression, old_name: &Symbol, new_name: &Symbol) -> Expres
     }
 }
 
-pub fn free_vars(function:&Function) -> Result<HashSet<Symbol>>
-{
+pub fn free_vars(function: &Function) -> Result<HashSet<Symbol>> {
     let mut vars = HashSet::new();
     let mut locals = HashMap::new();
     add_locals(&mut locals, &function.args);
-    free_vars_expression(&function.body,&mut vars,&mut locals);
+    free_vars_expression(&function.body, &mut vars, &mut locals);
     remove_locals(&mut locals, &function.args);
     Ok(vars)
 }
@@ -987,7 +1006,11 @@ fn remove_locals(locals: &mut HashMap<Symbol, i32>, vars: &[Symbol]) {
     }
 }
 
-pub fn free_vars_expression(expr: &Expression, vars: &mut HashSet<Symbol>, locals: &mut HashMap<Symbol, i32>) {
+pub fn free_vars_expression(
+    expr: &Expression,
+    vars: &mut HashSet<Symbol>,
+    locals: &mut HashMap<Symbol, i32>,
+) {
     match expr {
         Expression::Literal(_, literal) => {}
         Expression::Var(_, v) => {
@@ -1028,13 +1051,17 @@ pub fn free_vars_expression(expr: &Expression, vars: &mut HashSet<Symbol>, local
     }
 }
 
-pub fn free_vars_bindee(bindee:&Bindee, vars: &mut HashSet<Symbol>, locals: &mut HashMap<Symbol, i32>) {
+pub fn free_vars_bindee(
+    bindee: &Bindee,
+    vars: &mut HashSet<Symbol>,
+    locals: &mut HashMap<Symbol, i32>,
+) {
     match bindee {
         Bindee::Function(function) => {
             add_locals(locals, &function.args);
             free_vars_expression(&function.body, vars, locals);
             remove_locals(locals, &function.args);
-        },
+        }
         Bindee::Expression(expression) => free_vars_expression(expression, vars, locals),
     }
 }

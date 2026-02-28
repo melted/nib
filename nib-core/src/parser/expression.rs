@@ -216,10 +216,12 @@ impl<'a> ParserState<'a> {
     }
 
     pub(super) fn parse_implicit_lambda_expression(&mut self) -> Result<ExpressionNode> {
-        let implicits = [Name::str("a"),
+        let implicits = [
+            Name::str("a"),
             Name::str("b"),
             Name::str("c"),
-            Name::str("d")];
+            Name::str("d"),
+        ];
         self.expect(TokenValue::LeftBrace)?;
         let expr = self.parse_expression()?;
         self.expect(TokenValue::RightBrace)?;

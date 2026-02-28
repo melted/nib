@@ -698,7 +698,6 @@ impl Runtime {
         }
     }
 
-
     pub(super) fn prim_array_ref(&self, args: &[Value]) -> Result<Value> {
         let arr = args[1].get_array()?;
         let array = &arr.borrow().array;

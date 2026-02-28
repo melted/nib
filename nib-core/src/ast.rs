@@ -50,15 +50,13 @@ pub enum Binding {
 impl Binding {
     pub fn bound_names(&self) -> Vec<Name> {
         match self {
-            Binding::VarBinding(var_binding) => {
-                var_binding.lhs.bound_vars().into_iter().collect()
-            },
+            Binding::VarBinding(var_binding) => var_binding.lhs.bound_vars().into_iter().collect(),
             Binding::FunBinding(fun_binding) => {
                 vec![fun_binding.name.clone()]
-            },
+            }
             Binding::OpBinding(op_binding) => {
                 vec![op_binding.op.to_name()]
-            },
+            }
         }
     }
 }

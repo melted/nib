@@ -29,14 +29,12 @@ fac n = n * (fac (n - 1))";
     Ok(())
 }
 
-
 #[test]
 fn desugar_array() -> Result<()> {
     let prog = "test [a,b,c] = [1,2,3]";
     let mut t = Module::new(None, prog);
     parse_declarations(&mut t)?;
     let co = desugar(t)?;
- //   dbg!(co);
+    //   dbg!(co);
     Ok(())
 }
-

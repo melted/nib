@@ -232,9 +232,7 @@ impl Compilation {
 
     fn compile_bindee(&mut self, bindee: &Bindee, code: &mut Vec<u8>) -> Result<()> {
         match bindee {
-            Bindee::Function(function) => {
-                self.compile_function(function, code)
-            },
+            Bindee::Function(function) => self.compile_function(function, code),
             Bindee::Expression(expression) => self.compile_expression(expression, code),
         }
     }
@@ -294,11 +292,7 @@ impl Compilation {
         Ok(())
     }
 
-    fn compile_function(
-        &mut self,
-        lambda: &Function,
-        code: &mut Vec<u8>,
-    ) -> Result<()> {
+    fn compile_function(&mut self, lambda: &Function, code: &mut Vec<u8>) -> Result<()> {
         let mut fun_compilation = Compilation::new();
         fun_compilation.future_bindings = self.future_bindings.clone();
         for (i, arg) in lambda.args.iter().enumerate() {
@@ -325,7 +319,7 @@ impl Compilation {
             get_local(env_local, code);
             code.push(INSTR_ARRAY_SET);
         }
-        // TODO: fix lambda compilations knowledge of which bindings are coming from 
+        // TODO: fix lambda compilations knowledge of which bindings are coming from
         // containing scope or globally
         get_local(env_local, code);
         push_bytes(&fun_compilation.module.byte_code, code);

@@ -67,7 +67,7 @@ impl Runtime {
         let Ok(mut alloc) = region::alloc(size, region::Protection::READ_WRITE) else {
             panic!("Couldn't allocate {size} bytes!");
         };
-        let ptr:*mut T = alloc.as_mut_ptr();
+        let ptr: *mut T = alloc.as_mut_ptr();
         self.heap.big_objects.insert(
             ptr.addr(),
             BigObject {
@@ -255,7 +255,7 @@ pub(super) fn set_value(base: *mut ObjectHeader, index: usize, value: Value) {
 pub(super) fn get_object_ptr<T>(base: *mut ObjectHeader, index: usize) -> *mut T {
     unsafe {
         let base_ptr = base.add(1) as *mut T;
-        
+
         base_ptr.add(index)
     }
 }
@@ -697,7 +697,7 @@ fn display_complex_object(
     value: &Value,
     f: &mut std::fmt::Formatter<'_>,
     seen: &mut HashSet<Value>,
-    debug:bool
+    debug: bool,
 ) -> std::fmt::Result {
     if seen.contains(value) {
         write!(f, "#<recurse:{:x}>", value.val)?;
@@ -770,7 +770,15 @@ fn display_complex_object(
                 write!(f, "arity:{} vararg:{:?}>", arity, vararg)?;
             } else {
                 let va_indicator = if vararg.is_some() { "+" } else { "" };
-                write!(f, "#<closure({:x}):{}:{}:{}{}>", value.val, closure.get_tag(), env.get_array().size(), arity, va_indicator)?;
+                write!(
+                    f,
+                    "#<closure({:x}):{}:{}:{}{}>",
+                    value.val,
+                    closure.get_tag(),
+                    env.get_array().size(),
+                    arity,
+                    va_indicator
+                )?;
             }
         }
         _ => {
@@ -779,7 +787,7 @@ fn display_complex_object(
             } else {
                 return write!(f, "{}", value);
             }
-        },
+        }
     }
     if debug {
         write!(f, "({:x})", value.val)?;
@@ -824,7 +832,7 @@ impl Array {
         let me = Array { ptr: header };
         me.set_type_table(Value::nil());
         let src = values.as_ptr();
-        let dst:  *mut Value = get_object_ptr(header, 1);
+        let dst: *mut Value = get_object_ptr(header, 1);
         unsafe {
             copy_nonoverlapping(src, dst, values.len());
         }
@@ -867,7 +875,7 @@ impl Array {
         let new = Array::with(rt, self.values());
         new.set_type_table(self.type_table());
         Value::from(new)
-    } 
+    }
 
     pub fn type_table(&self) -> Value {
         get_value(self.ptr, 0)

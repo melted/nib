@@ -44,12 +44,12 @@ pub struct Runtime {
     code: Value,
     ip: usize,
     ffi_signatures: Vec<Signature>,
-    options: Options
+    options: Options,
 }
 
 pub struct Options {
     output_core: bool,
-    trace: bool
+    trace: bool,
 }
 
 const DEFAULT_HEAP_SIZE: usize = 1000000;
@@ -101,7 +101,10 @@ impl Default for Runtime {
 
 impl Options {
     fn new() -> Self {
-        Options { output_core: false, trace: false }
+        Options {
+            output_core: false,
+            trace: false,
+        }
     }
 }
 
@@ -118,7 +121,7 @@ impl Runtime {
             closure: Value::nil(),
             ip: 0,
             ffi_signatures: Vec::new(),
-            options: Options::new()
+            options: Options::new(),
         };
         let global_env = Value::from(Table::make(&mut runtime));
         let stack = Value::from(Array::make(&mut runtime, DEFAULT_STACK_SIZE));
@@ -157,13 +160,8 @@ impl Runtime {
         let bc = Bytes::with(self, &bytecode.byte_code);
         self.code = Value::from(bc);
         let local_env = self.local_env.clone().get_array().clone(self);
-        let closure = Closure::make_low(
-            self,
-            &bc,
-            local_env,
-            Value::integer(0),
-            Value::bool(false),
-        );
+        let closure =
+            Closure::make_low(self, &bc, local_env, Value::integer(0), Value::bool(false));
         self.closure = Value::from(closure);
         self.run()
     }
@@ -750,7 +748,7 @@ impl Runtime {
                 self.ip = 0;
             }
             TYPE_EXTERN => {
-                let fun_ptr :  *const () = closure.code_value().get_cpointer();
+                let fun_ptr: *const () = closure.code_value().get_cpointer();
                 unsafe {
                     let fun: PrimFn = mem::transmute(fun_ptr);
                     fun(self)?;
@@ -992,7 +990,7 @@ impl Runtime {
                 let b = val.get_bytes();
                 let x = b.get_slice().first_chunk::<8>().unwrap();
                 let f = f64::from_ne_bytes(*x);
-                
+
                 Value::alloc_float(self, f)
             }
             INSTR_ALLOC_TABLE => Value::from(Table::make(self)),
