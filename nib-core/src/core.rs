@@ -150,45 +150,33 @@ impl DesugarState {
                     .push(Binding::make(ast_binding.id, Binder::Unbound, rhs));
             }
             _ => {
-                let mut counter = 0;
-                let mut replacements = HashMap::new();
-                let fun_pat = Self::pattern_with_plain_vars(pat, &mut counter, &mut replacements);
-                let fun_names = replacements.keys().collect::<Vec<_>>();
-                let v = fun_names
-                    .iter()
-                    .map(|&n| ExpressionNode::from(ast::Expression::Var(n.clone())));
-                let arr_exp = ExpressionNode::from(ast::Expression::Array(v.collect()));
-                let panic_exp = ExpressionNode::from(ast::Expression::App(vec![
-                    ExpressionNode::from(ast::Expression::Var(Name::str("_prim_panic"))),
-                    ExpressionNode::from(ast::Expression::Literal(Literal::String(
-                        "irrefutable var pattern mismatch".to_owned(),
-                    ))),
-                ]));
-                let clause = ast::FunClause {
-                    id: 0,
-                    args: vec![fun_pat.clone()],
-                    guard: None,
-                    body: arr_exp,
+                let rhs_expr = match &rhs {
+                    Bindee::Expression(e) => e.clone(),
+                    Bindee::Function(fun) => {
+                        let l = self.next_local();
+                        let funbind = Binding::make(0, Binder::Local(l.clone()), rhs);
+                        self.bindings.push(funbind);
+                        var(&l.top())
+                    }
                 };
-                let fallback = ast::FunClause {
-                    id: 0,
-                    args: vec![ast::PatternNode::from(Pattern::Wildcard)],
-                    guard: None,
-                    body: panic_exp,
-                };
-                let fun = ExpressionNode::from(ast::Expression::Lambda(vec![clause, fallback]));
-                let expr =
-                    ExpressionNode::from(ast::Expression::App(vec![fun, ast_binding.rhs.clone()]));
-                let expression = self.desugar_expression(&expr)?;
+                let parts = self.desugar_arg_pattern(pat, &rhs_expr)?;
+                let vars = pat.bound_vars();
+                let mut var_exp = vec![var(&sym("_prim_array_make"))];
+                let mut var_syms = Vec::new();
+                for v in vars {
+                    var_exp.push(var(&v.top()));
+                    var_syms.push(v);
+                }
+                let on_fail = app(&vec![var(&sym("_prim_panic")), literal(&Literal::String("Failure to match irrefutable varbinding".to_string()))]);
+                let (is_irrefutable, pexpr) =self.build_pattern_expression(&parts, &app(&var_exp), &on_fail)?;
                 let nam_arr = self.next_local();
-                // TODO: Untangle this mess. It seems very backward to create a lambda now.
                 let binding = Binding::make(
                     ast_binding.id,
                     Binder::Local(nam_arr.clone()),
-                    Bindee::Expression(expression),
+                    Bindee::Expression(pexpr),
                 );
-                for (i, k) in fun_names.iter().enumerate() {
-                    let old = replacements.get(k).unwrap();
+                self.bindings.push(binding);
+                for (i, k) in var_syms.iter().enumerate() {
                     let rhs = Expression::App(
                         self.new_id(),
                         vec![
@@ -197,7 +185,7 @@ impl DesugarState {
                             self.named_var(&nam_arr.string()),
                         ],
                     );
-                    let binder = self.desugar_binding_name(k, is_local)?;
+                    let binder = self.desugar_binding_name(&Name::from(k.clone()), is_local)?;
                     let bind = Binding::make(self.new_id(), binder, Bindee::Expression(rhs));
                     self.bindings.push(bind);
                 }
@@ -484,10 +472,15 @@ impl DesugarState {
             let guard_exp = self.desugar_expression(guard)?;
             all_parts.push(PatternParts::Check(guard_exp));
         }
+        let exp = self.desugar_expression(&clause.body)?;
+        self.build_pattern_expression(&all_parts, &exp, on_fail)
+    }
+
+    fn build_pattern_expression(&mut self, all_parts:&[PatternParts], base: &Expression, on_fail:&Expression) -> Result<(bool, Expression)> {
+        let mut exp = base.clone();
         let is_irrefutable = all_parts
             .iter()
             .all(|p| !matches!(p, PatternParts::Check(_)));
-        let mut exp = self.desugar_expression(&clause.body)?;
         for p in all_parts.iter().rev() {
             match p {
                 PatternParts::Check(pred) => {
