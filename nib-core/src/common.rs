@@ -200,6 +200,18 @@ impl From<Symbol> for Name {
     }
 }
 
+impl TryFrom<&Vec<Symbol>> for Name {
+    fn try_from(path: &Vec<Symbol>) -> Result<Name> {
+        match path.len() {
+            0 => Err(Error::Syntax { err: SyntaxError { msg: "name need a non-empty path".to_string(), loc: Location::empty() } }),
+            1 => Ok(Name::Plain(path[0])),
+            n => Ok(Name::Qualified(path[0..n-1].to_vec(), path[n-1]))
+        }
+    }
+    
+    type Error=Error;
+}
+
 impl Name {
     pub fn string(&self) -> String {
         match self {

@@ -100,22 +100,6 @@ fn parse_literal_pattern() -> Result<()> {
 }
 
 #[test]
-fn parse_module_declaration() -> Result<()> {
-    let mut meta = Metadata::empty();
-    let mut state = ParserState::new("module cool.mod", &mut meta);
-    let decl = state.parse_declaration()?;
-    if let Declaration::Module(module) = decl {
-        assert_eq!(
-            module.name,
-            Name::Qualified(vec![Symbol::from("cool")], Symbol::from("mod"))
-        );
-    } else {
-        assert!(false);
-    }
-    Ok(())
-}
-
-#[test]
 fn parse_custom_pattern() -> Result<()> {
     let mut meta = Metadata::empty();
     let mut state = ParserState::new("(pair a b)", &mut meta);

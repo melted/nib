@@ -16,21 +16,17 @@ mod tests;
 
 pub fn desugar(module: ast::Module) -> Result<Module> {
     let mut state = DesugarState::new(module.metadata);
-    state.module_name = state.metadata.base_name.clone();
+    let mut to_desugar = Vec::new();
     for d in module.declarations {
         match d {
-            ast::Declaration::Use(ud) => {
-                state.metadata.using.insert(ud.name);
-            }
-            ast::Declaration::Module(md) => {
-                state.module_name = Some(md.name);
-            }
             ast::Declaration::Binding(bind) => {
-                let mut b = state.desugar_binding(&bind, false)?;
-                state.bindings.append(&mut b);
+                let  names = bind.bound_names();
+                to_desugar.push(bind);
             }
         }
     }
+    state.desugar_bindings(&to_desugar, false)?;
+
     Ok(Module {
         metadata: state.metadata,
         bindings: state.bindings,
@@ -50,7 +46,6 @@ pub fn desugar_expression(expr: ExpressionNode) -> Result<Expression> {
 }
 
 struct DesugarState {
-    module_name: Option<Name>,
     bindings: Vec<Binding>,
     metadata: Metadata,
     locals: HashSet<Name>,
@@ -62,7 +57,6 @@ struct DesugarState {
 impl DesugarState {
     fn new(metadata: Metadata) -> Self {
         DesugarState {
-            module_name: None,
             bindings: Vec::new(),
             metadata,
             locals: HashSet::new(),
@@ -72,7 +66,14 @@ impl DesugarState {
         }
     }
 
-    fn desugar_binding(&mut self, binding: &ast::Binding, is_local: bool) -> Result<Vec<Binding>> {
+    fn desugar_bindings(&mut self, bindings: &[ast::Binding], is_local: bool) -> Result<()> {
+        for b in bindings {
+            self.desugar_binding(b, is_local)?;
+        }
+        Ok(())
+    }
+
+    fn desugar_binding(&mut self, binding: &ast::Binding, is_local: bool) -> Result<()> {
         if !is_local {
             self.current_bindings.clear();
         }
@@ -86,17 +87,15 @@ impl DesugarState {
     fn desugar_funbinding(
         &mut self,
         ast_binding: &ast::FunBinding,
-        is_local: bool,
-    ) -> Result<Vec<Binding>> {
-        let binder = if is_local {
-            Binder::Local(ast_binding.name.clone())
-        } else {
-            Binder::Public(self.desugar_binding_name(&ast_binding.name)?)
-        };
+        is_local: bool
+    ) -> Result<()> {
+        let binder = self.desugar_binding_name(&ast_binding.name, is_local)?;
         self.metadata.last_id += 1;
-
         let result = self.desugar_funclauses(self.metadata.last_id, &ast_binding.clauses)?;
-        Ok(vec![Binding::make(ast_binding.id, binder, Bindee::Function(result))])
+        let bind = Binding::make(ast_binding.id, binder, Bindee::Function(result));
+        self.bindings.push(bind);
+        // TODO: Lambda lift?
+        Ok(())
     }
 
     fn lambda_lift(&mut self, id:Node, function: &mut Function, captures: &[Symbol]) -> Result<(Binding, Expression)> {
@@ -119,8 +118,8 @@ impl DesugarState {
     fn desugar_opbinding(
         &mut self,
         ast_binding: &ast::OpBinding,
-        is_local: bool,
-    ) -> Result<Vec<Binding>> {
+        is_local: bool
+    ) -> Result<()> {
         let name = ast_binding.op.to_name(); // No desugar. Operators can't be used qualified,
         let funclauses: Vec<_> = ast_binding
             .clauses
@@ -133,20 +132,18 @@ impl DesugarState {
     fn desugar_varbinding(
         &mut self,
         ast_binding: &ast::VarBinding,
-        is_local: bool,
-    ) -> Result<Vec<Binding>> {
+        is_local: bool
+    ) -> Result<()> {
         let pat = &ast_binding.lhs;
         let rhs = self.desugar_varbinding_rhs(&ast_binding.rhs)?;
         match &pat.pattern {
             Pattern::Var(v) => {
-                let binder = if is_local {
-                    Binder::Local(v.clone())
-                } else {
-                    Binder::Public(self.desugar_binding_name(v)?)
-                };
-                Ok(vec![Binding::make(ast_binding.id, binder, rhs)])
+                let binder = self.desugar_binding_name(v, is_local)?;
+                self.bindings.push(Binding::make(ast_binding.id, binder, rhs));
             }
-            Pattern::Wildcard => Ok(vec![Binding::make(ast_binding.id, Binder::Unbound, rhs)]),
+            Pattern::Wildcard => {
+                self.bindings.push(Binding::make(ast_binding.id, Binder::Unbound, rhs));
+            },
             _ => {
                 let mut counter = 0;
                 let mut replacements = HashMap::new();
@@ -177,12 +174,11 @@ impl DesugarState {
                 let fun = ExpressionNode::from(ast::Expression::Lambda(vec![clause, fallback]));
                 let expr =
                     ExpressionNode::from(ast::Expression::App(vec![fun, ast_binding.rhs.clone()]));
-                let desugared = self.desugar_expression(&expr)?;
+                let expression = self.desugar_expression(&expr)?;
                 let nam_arr = self.next_local();
                 // TODO: Untangle this mess. It seems very backward to create a lambda now.
                 let binding =
-                    Binding::make(ast_binding.id, Binder::Local(nam_arr.clone()), Bindee::Expression(desugared));
-                let mut bindings = vec![binding];
+                    Binding::make(ast_binding.id, Binder::Local(nam_arr.clone()), Bindee::Expression(expression));
                 for (i, k) in fun_names.iter().enumerate() {
                     let old = replacements.get(k).unwrap();
                     let rhs = Expression::App(
@@ -193,39 +189,26 @@ impl DesugarState {
                             self.named_var(&nam_arr.string()),
                         ],
                     );
-                    let binder = if is_local {
-                        Binder::Local(old.clone())
-                    } else {
-                        Binder::Public(self.desugar_binding_name(old)?)
-                    };
+                    let binder = self.desugar_binding_name(k, is_local)?;
                     let bind = Binding::make(self.new_id(), binder, Bindee::Expression(rhs));
-                    bindings.push(bind);
+                    self.bindings.push(bind);
                 }
-                Ok(bindings)
             }
         }
+        Ok(())
     }
 
-    fn desugar_binding_name(&mut self, name: &Name) -> Result<Name> {
-        match (&self.module_name, name) {
-            (None, _) | (_, Name::Qualified(_, _)) => Ok(name.clone()),
-            (Some(mod_name), Name::Plain(_)) => Ok(Name::append(mod_name, name)?),
-        }
-    }
+    fn desugar_binding_name(&mut self, name: &Name, is_local: bool) -> Result<Binder> {
+        if is_local {
+            Ok(Binder::Local(name.clone()))
+        } else {
+            if name.top() == sym("local") {
+                let slice = name.tail();
+                Ok(Binder::Local(Name::try_from(&slice)?))
+            } else {
+                Ok(Binder::Public(name.clone()))
+            }
 
-    // TODO: Make a couple of tests
-    fn bound_names(&self, binding: &ast::Binding, names: &mut HashSet<Name>) {
-        match binding {
-            ast::Binding::VarBinding(var_binding) => {
-                let vars = var_binding.lhs.bound_vars();
-                names.extend(vars);
-            },
-            ast::Binding::FunBinding(fun_binding) => {
-                names.insert(fun_binding.name.clone());
-            },
-            ast::Binding::OpBinding(op_binding) => {
-                names.insert(op_binding.op.to_name());
-            },
         }
     }
 
@@ -395,12 +378,11 @@ impl DesugarState {
             ast::Expression::Where(exp, ast_bindings) => {
                 let mut new_locals = self.current_bindings.clone();
                 let mut binds = Vec::new();
-                ast_bindings.iter().for_each(|b| self.bound_names(b, &mut new_locals));
-                mem::swap(&mut new_locals, &mut self.current_bindings);
+                ast_bindings.iter().for_each(|b| new_locals.extend(b.bound_names()));
                 mem::swap(&mut binds, &mut self.bindings);
+                mem::swap(&mut new_locals, &mut self.current_bindings);
                 for binding in ast_bindings {
-                    let mut b = self.desugar_binding(binding, true)?;
-                    self.bindings.append(&mut b);
+                    self.desugar_binding(binding, true)?;
                 }
                 let lhs = self.desugar_expression(exp)?;
                 mem::swap(&mut new_locals, &mut self.current_bindings);

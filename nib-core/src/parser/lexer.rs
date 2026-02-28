@@ -173,9 +173,7 @@ impl<'a> super::ParserState<'a> {
         if let Ok(last) = self.snarf(|c| identifier_char(*c)) {
             let id = &self.src[first..last];
             match id {
-                "module" => Ok(self.token(TokenValue::Module)),
                 "nil" => Ok(self.token(TokenValue::Nil)),
-                "use" => Ok(self.token(TokenValue::Use)),
                 "do" => Ok(self.token(TokenValue::Do)),
                 "true" => Ok(self.token(TokenValue::True)),
                 "false" => Ok(self.token(TokenValue::False)),
@@ -510,8 +508,6 @@ pub enum TokenValue {
     As,
     At,
     Do,
-    Use,
-    Module,
     Nil,
     Where,
     True,

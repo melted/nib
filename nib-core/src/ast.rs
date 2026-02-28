@@ -29,16 +29,12 @@ impl Module {
 // Declarations
 #[derive(Debug, Clone, PartialEq)]
 pub enum Declaration {
-    Module(ModuleDirective),
-    Use(UseDirective),
     Binding(Binding),
 }
 
 impl Display for Declaration {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Declaration::Module(m) => write!(f, "{}", m),
-            Declaration::Use(u) => write!(f, "{}", u),
             Declaration::Binding(b) => write!(f, "{}", b),
         }
     }
@@ -49,6 +45,22 @@ pub enum Binding {
     VarBinding(VarBinding),
     FunBinding(FunBinding),
     OpBinding(OpBinding),
+}
+
+impl Binding {
+    pub fn bound_names(&self) -> Vec<Name> {
+        match self {
+            Binding::VarBinding(var_binding) => {
+                var_binding.lhs.bound_vars().into_iter().collect()
+            },
+            Binding::FunBinding(fun_binding) => {
+                vec![fun_binding.name.clone()]
+            },
+            Binding::OpBinding(op_binding) => {
+                vec![op_binding.op.to_name()]
+            },
+        }
+    }
 }
 
 impl Display for Binding {
