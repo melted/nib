@@ -34,7 +34,7 @@ pub fn desugar(module: ast::Module) -> Result<Module> {
     Ok(Module {
         metadata: state.metadata,
         bindings: state.bindings,
-        locals: locals,
+        locals,
     })
 }
 
@@ -115,7 +115,7 @@ impl DesugarState {
             Arity::VarArg(n, pos) => Arity::VarArg(n + ext, pos + ext),
         };
         let mut app = vec![Expression::Var(0, lambda_name.base())];
-        app.extend(captures.iter().map(|s| Expression::Var(0, s.clone())));
+        app.extend(captures.iter().map(|s| Expression::Var(0, *s)));
         Ok((
             Binding::make(id, lambda_binder, Bindee::Function(function.clone())),
             Expression::App(0, app),
@@ -166,7 +166,7 @@ impl DesugarState {
                     var_exp.push(var(&v.top()));
                     var_syms.push(v);
                 }
-                let on_fail = app(&vec![var(&sym("_prim_panic")), literal(&Literal::String("Failure to match irrefutable varbinding".to_string()))]);
+                let on_fail = app(&[var(&sym("_prim_panic")), literal(&Literal::String("Failure to match irrefutable varbinding".to_string()))]);
                 let (is_irrefutable, pexpr) =self.build_pattern_expression(&parts, &app(&var_exp), &on_fail)?;
                 let nam_arr = self.next_local();
                 let binding = Binding::make(
@@ -184,7 +184,7 @@ impl DesugarState {
                             self.named_var(&nam_arr.string()),
                         ],
                     );
-                    let binder = self.desugar_binding_name(&Name::from(k.clone()), is_local)?;
+                    let binder = self.desugar_binding_name(&k.clone(), is_local)?;
                     let bind = Binding::make(self.new_id(), binder, Bindee::Expression(rhs));
                     self.bindings.push(bind);
                 }
@@ -196,13 +196,11 @@ impl DesugarState {
     fn desugar_binding_name(&mut self, name: &Name, is_local: bool) -> Result<Binder> {
         if is_local {
             Ok(Binder::Local(name.clone()))
+        } else if name.top() == sym("local") {
+            let slice = name.tail();
+            Ok(Binder::Local(Name::try_from(&slice)?))
         } else {
-            if name.top() == sym("local") {
-                let slice = name.tail();
-                Ok(Binder::Local(Name::try_from(&slice)?))
-            } else {
-                Ok(Binder::Public(name.clone()))
-            }
+            Ok(Binder::Public(name.clone()))
         }
     }
 
@@ -299,7 +297,7 @@ impl DesugarState {
         match &expression.expr {
             ast::Expression::Lambda(clauses) => {
                 // TODO: Sane as funbinding
-                let mut fun = self.desugar_funclauses(expression.id, &clauses)?;
+                let mut fun = self.desugar_funclauses(expression.id, clauses)?;
                 let captures = self.captured_vars(&fun)?;
                 if captures.is_empty() {
                     Ok(Bindee::Function(fun))
@@ -393,7 +391,7 @@ impl DesugarState {
     fn captured_vars(&self, function: &Function) -> Result<Vec<Symbol>> {
         let free = free_vars(function)?;
         let locals: HashSet<Symbol> = self.current_bindings.iter().map(|n| n.top()).collect();
-        let captured = locals.intersection(&free).map(|s| s.clone()).collect();
+        let captured = locals.intersection(&free).copied().collect();
         Ok(captured)
     }
 

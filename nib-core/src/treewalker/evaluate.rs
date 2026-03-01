@@ -3,7 +3,7 @@ use crate::core::{Bindee, Function, free_vars_bindee};
 use crate::{
     ast::Literal,
     common::{Name, Result},
-    core::{Arity, Binder, Binding, Expression, Module, free_vars},
+    core::{Arity, Binder, Binding, Expression, Module},
     treewalker::{Closure, Code, Runtime, Value, new_ref},
 };
 use log::info;
@@ -49,18 +49,17 @@ impl Runtime {
     }
 
     fn update_closures(&mut self, env: &mut Environment, name: &Symbol) {
-        if let Some(val) = self.lookup(env, name) {
-            if let Some(closures) = self.closures_to_check.get(name) {
+        if let Some(val) = self.lookup(env, name)
+            && let Some(closures) = self.closures_to_check.get(name) {
                 for c in closures {
                     if let Value::Closure(closure) = c {
                         let mut cl = closure.borrow_mut();
-                        let mut cl_env = &mut cl.env;
+                        let cl_env = &mut cl.env;
                         cl_env.remove(name);
                         cl_env.add(name, &val);
                     }
                 }
             }
-        }
     }
 
     fn evaluate_literal(&self, literal: &Literal) -> Result<Value> {
@@ -89,7 +88,7 @@ impl Runtime {
         lexical_env.push();
         let mut undefined = Vec::new();
         for sym in free.iter() {
-            let val = self.lookup(env, sym).unwrap_or(Value::Undefined(sym.clone()));
+            let val = self.lookup(env, sym).unwrap_or(Value::Undefined(*sym));
             if let Value::Undefined(sym) = &val {
                 undefined.push(*sym);
             }

@@ -14,7 +14,7 @@ use libffi::middle::CodePtr;
 use std::path::Path;
 use std::{
     cell::RefCell,
-    collections::{BTreeSet, HashMap, HashSet},
+    collections::{BTreeSet, HashMap},
     ffi::c_void,
     fmt::{Debug, Display},
     fs::read_to_string,

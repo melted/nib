@@ -3,7 +3,7 @@ use symbol_table::static_symbol;
 use crate::ast::Literal;
 use crate::common::{Metadata, Name};
 use crate::common::{Result, Symbol};
-use crate::core::{Bindee, Binder, Binding, Cond, Expression, Function, free_vars};
+use crate::core::{Bindee, Binder, Binding, Cond, Expression, Function};
 use crate::interpreter::bytecode::{
     INSTR_ALLOC_ARRAY, INSTR_ALLOC_CLOSURE, INSTR_ALLOC_FLOAT, INSTR_ALLOC_TABLE, INSTR_ARRAY_SET,
     INSTR_CALL, INSTR_CALL_TAIL, INSTR_DROP, INSTR_DUP, INSTR_GET_LOCAL, INSTR_GLOBAL_ENV,
