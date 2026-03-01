@@ -2,7 +2,7 @@ use super::ParserState;
 use crate::ast::{
     Binding, Binop, Cond, Expression, ExpressionNode, FunClause, Literal, Operator, PatternNode,
 };
-use crate::common::{Location, Name, Result, Symbol};
+use crate::common::{Location, Name, Result, Symbol, sym};
 use crate::parser::lexer::TokenValue;
 
 impl<'a> ParserState<'a> {
@@ -217,10 +217,10 @@ impl<'a> ParserState<'a> {
 
     pub(super) fn parse_implicit_lambda_expression(&mut self) -> Result<ExpressionNode> {
         let implicits = [
-            Name::str("a"),
-            Name::str("b"),
-            Name::str("c"),
-            Name::str("d"),
+            sym("a"),
+            sym("b"),
+            sym("c"),
+            sym("d"),
         ];
         self.expect(TokenValue::LeftBrace)?;
         let expr = self.parse_expression()?;
@@ -228,7 +228,7 @@ impl<'a> ParserState<'a> {
         let free_vars = expr.expr.free_vars();
         let used_implicits = implicits.iter().filter(|&n| free_vars.contains(n));
         let mut pats: Vec<PatternNode> = used_implicits
-            .map(|n| self.var_pattern(n.clone()))
+            .map(|n| self.var_pattern(Name::Plain(*n)))
             .collect();
         if pats.is_empty() {
             pats.push(self.wildcard_pattern());

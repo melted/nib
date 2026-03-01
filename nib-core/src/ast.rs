@@ -48,14 +48,14 @@ pub enum Binding {
 }
 
 impl Binding {
-    pub fn bound_names(&self) -> Vec<Name> {
+    pub fn bound_names(&self) -> Vec<Symbol> {
         match self {
             Binding::VarBinding(var_binding) => var_binding.lhs.bound_vars().into_iter().collect(),
             Binding::FunBinding(fun_binding) => {
-                vec![fun_binding.name.clone()]
+                vec![(&fun_binding.name).into()]
             }
             Binding::OpBinding(op_binding) => {
-                vec![op_binding.op.to_name()]
+                vec![(&op_binding.op.to_name()).into()]
             }
         }
     }
@@ -133,7 +133,7 @@ pub struct FunClause {
 }
 
 impl FunClause {
-    fn free_vars_helper(&self, vars: &mut HashSet<Name>, locals: &mut HashSet<Name>) {
+    fn free_vars_helper(&self, vars: &mut HashSet<Symbol>, locals: &mut HashSet<Symbol>) {
         let mut exp_local = locals.clone();
         for p in &self.args {
             p.bound_vars_helper(&mut exp_local);
@@ -183,7 +183,7 @@ pub struct OpClause {
 }
 
 impl OpClause {
-    fn free_vars_helper(&self, vars: &mut HashSet<Name>, locals: &mut HashSet<Name>) {
+    fn free_vars_helper(&self, vars: &mut HashSet<Symbol>, locals: &mut HashSet<Symbol>) {
         let mut exp_local = locals.clone();
         self.lpat.bound_vars_helper(&mut exp_local);
         self.rpat.bound_vars_helper(&mut exp_local);
@@ -228,19 +228,19 @@ impl PatternNode {
         matches!(self.pattern, Pattern::Ellipsis(_))
     }
 
-    pub fn bound_vars(&self) -> HashSet<Name> {
+    pub fn bound_vars(&self) -> HashSet<Symbol> {
         let mut vars = HashSet::new();
         self.bound_vars_helper(&mut vars);
         vars
     }
 
-    fn bound_vars_helper(&self, vars: &mut HashSet<Name>) {
+    fn bound_vars_helper(&self, vars: &mut HashSet<Symbol>) {
         match &self.pattern {
             Pattern::Ellipsis(Some(name)) => {
-                vars.insert(name.clone());
+                vars.insert(name.into());
             }
             Pattern::Var(n) => {
-                vars.insert(n.clone());
+                vars.insert(n.into());
             }
             Pattern::Array(elems) => {
                 for e in elems {
@@ -249,7 +249,7 @@ impl PatternNode {
             }
             Pattern::Alias(p, n) => {
                 p.bound_vars_helper(vars);
-                vars.insert(n.clone());
+                vars.insert(n.into());
             }
             Pattern::Custom(_, fields) => {
                 for e in fields {
@@ -338,18 +338,19 @@ pub enum Expression {
 }
 
 impl Expression {
-    pub fn free_vars(&self) -> HashSet<Name> {
+    pub fn free_vars(&self) -> HashSet<Symbol> {
         let mut vars = HashSet::new();
         let mut locals = HashSet::new();
         self.free_vars_helper(&mut vars, &mut locals);
         vars
     }
 
-    fn free_vars_helper(&self, vars: &mut HashSet<Name>, locals: &mut HashSet<Name>) {
+    fn free_vars_helper(&self, vars: &mut HashSet<Symbol>, locals: &mut HashSet<Symbol>) {
         match self {
             Expression::Var(n) => {
-                if !locals.contains(n) {
-                    vars.insert(n.clone());
+                let sym = &n.into();
+                if !locals.contains(sym) {
+                    vars.insert(*sym);
                 }
             }
             Expression::Array(elems) => {
@@ -370,7 +371,7 @@ impl Expression {
             Expression::Binop(op) => {
                 op.lhs.expr.free_vars_helper(vars, locals);
                 op.rhs.expr.free_vars_helper(vars, locals);
-                let n = op.op.to_name();
+                let n = (&op.op.to_name()).into();
                 if !locals.contains(&n) {
                     vars.insert(n);
                 }
@@ -387,7 +388,7 @@ impl Expression {
                             }
                         }
                         Binding::FunBinding(fb) => {
-                            let n = fb.name.clone();
+                            let n = (&fb.name).into();
                             for c in &fb.clauses {
                                 c.free_vars_helper(vars, &mut exp_locals);
                             }
@@ -397,7 +398,7 @@ impl Expression {
                             for c in &op.clauses {
                                 c.free_vars_helper(vars, &mut exp_locals);
                             }
-                            exp_locals.insert(op.op.to_name());
+                            exp_locals.insert((&op.op.to_name()).into());
                         }
                     }
                 }

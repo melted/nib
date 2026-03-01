@@ -56,8 +56,7 @@ pub fn desugar_expression(expr: ExpressionNode) -> Result<Expression> {
 struct DesugarState {
     bindings: Vec<Binding>,
     metadata: Metadata,
-    current_locals: HashSet<Name>,
-
+    current_locals: HashSet<Symbol>,
     last_local: u32,
     last_arg: u32,
 }
@@ -170,8 +169,8 @@ impl DesugarState {
                 let mut var_exp = vec![var(&sym("_prim_array_make"))];
                 let mut var_syms = Vec::new();
                 for v in vars {
-                    var_exp.push(var(&v.top()));
-                    var_syms.push(&replaced[&v]);
+                    var_exp.push(var(&v));
+                    var_syms.push(replaced[&v].clone());
                 }
                 let on_fail = app(&[var(&sym("_prim_panic")), literal(&Literal::String("Failure to match irrefutable varbinding".to_string()))]);
                 let (is_irrefutable, pexpr) =self.build_pattern_expression(&parts, &app(&var_exp), &on_fail)?;
@@ -191,7 +190,7 @@ impl DesugarState {
                             self.named_var(&nam_arr.string()),
                         ],
                     );
-                    let binder = self.desugar_binding_name(&k.clone(), is_local)?;
+                    let binder = self.desugar_binding_name(k, is_local)?;
                     let bind = Binding::make(self.new_id(), binder, Bindee::Expression(rhs));
                     self.bindings.push(bind);
                 }
@@ -392,8 +391,7 @@ impl DesugarState {
 
     fn captured_vars(&self, function: &Function) -> Result<Vec<Symbol>> {
         let free = free_vars(function)?;
-        let locals: HashSet<Symbol> = self.current_locals.iter().map(|n| n.top()).collect();
-        let captured = locals.intersection(&free).copied().collect();
+        let captured = self.current_locals.intersection(&free).copied().collect();
         Ok(captured)
     }
 
@@ -412,7 +410,7 @@ impl DesugarState {
         let args = self.args(&arity);
         let mut old_current_bindings = self.current_locals.clone();
         self.current_locals
-            .extend(args.iter().map(|s| Name::from(*s)));
+            .extend(args.iter());
         for (i, c) in clauses.iter().enumerate() {
             let fail_exp = if i + 1 < clauses.len() {
                 app(&[var(&local(i + 1)), nil()])
@@ -424,7 +422,7 @@ impl DesugarState {
                 let mut fun = Function::new(&[sym("$_")], &Arity::Fixed(1), &next_exp);
                 let captures = self.captured_vars(&fun)?;
                 let name = Name::from(local(i));
-                self.current_locals.insert(name.clone());
+                self.current_locals.insert((&name).into());
                 let binds = if captures.is_empty() {
                     vec![Binding::make(0, Binder::Local(name), Bindee::Function(fun))]
                 } else {
@@ -514,21 +512,22 @@ impl DesugarState {
     fn pattern_with_plain_vars(
         pattern: &PatternNode,
         counter: &mut i32,
-        replacements: &mut HashMap<Name, Name>,
+        replacements: &mut HashMap<Symbol, Name>,
     ) -> PatternNode {
         let mut p = pattern.clone();
         match &pattern.pattern {
             Pattern::Ellipsis(Some(old)) => {
-                let n = Name::Plain(Symbol::from(format!("$z{}", counter)));
+                let n = Symbol::from(format!("$z{}", counter));
                 *counter += 1;
-                replacements.insert(n.clone(), old.clone());
-                p.pattern = Pattern::Ellipsis(Some(n));
+                replacements.insert(n, old.clone());
+                p.pattern = Pattern::Ellipsis(Some(Name::Plain(n)));
             }
             Pattern::Var(old) => {
-                let n = Name::Plain(Symbol::from(format!("$z{}", counter)));
+                let n = Symbol::from(format!("$z{}", counter));
                 *counter += 1;
-                replacements.insert(n.clone(), old.clone());
-                p.pattern = Pattern::Var(n)
+                
+                replacements.insert(n, old.clone());
+                p.pattern = Pattern::Var(Name::Plain(n))
             }
             Pattern::Array(arr) => {
                 let mut new_arr = Vec::new();
@@ -538,11 +537,11 @@ impl DesugarState {
                 p.pattern = Pattern::Array(new_arr);
             }
             Pattern::Alias(pat, old) => {
-                let n = Name::Plain(Symbol::from(format!("$z{}", counter)));
+                let n = Symbol::from(format!("$z{}", counter));
                 *counter += 1;
-                replacements.insert(n.clone(), old.clone());
+                replacements.insert(n, old.clone());
                 let new_pat = Self::pattern_with_plain_vars(pat, counter, replacements);
-                p.pattern = Pattern::Alias(Box::new(new_pat), n);
+                p.pattern = Pattern::Alias(Box::new(new_pat), Name::Plain(n));
             }
             Pattern::Custom(matcher, fields) => {
                 let mut new_fields = Vec::new();

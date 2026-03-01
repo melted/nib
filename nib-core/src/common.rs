@@ -316,6 +316,12 @@ pub fn align_int(value: usize, alignment: usize) -> usize {
 
 pub type Symbol = symbol_table::GlobalSymbol;
 
+impl From<&Name> for Symbol {
+    fn from(value: &Name) -> Self {
+        value.top()
+    }
+}
+
 pub fn sym(s: &str) -> Symbol {
     Symbol::from(s)
 }
