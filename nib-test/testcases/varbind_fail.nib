@@ -3,6 +3,6 @@
 
 [a, 2] = [1, 3]
 // @ErrorOut:
-// Error: irrefutable var pattern mismatch
+// Error: Failure to match irrefutable varbinding
 // @EndErrorOut
 // @ExitCode: 1

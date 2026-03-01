@@ -56,7 +56,8 @@ pub fn desugar_expression(expr: ExpressionNode) -> Result<Expression> {
 struct DesugarState {
     bindings: Vec<Binding>,
     metadata: Metadata,
-    current_bindings: HashSet<Name>,
+    current_locals: HashSet<Name>,
+
     last_local: u32,
     last_arg: u32,
 }
@@ -66,13 +67,16 @@ impl DesugarState {
         DesugarState {
             bindings: Vec::new(),
             metadata,
-            current_bindings: HashSet::new(),
+            current_locals: HashSet::new(),
             last_local: 0,
             last_arg: 0,
         }
     }
 
     fn desugar_bindings(&mut self, bindings: &[ast::Binding], is_local: bool) -> Result<()> {
+        bindings
+            .iter()
+            .for_each(|b| self.current_locals.extend(b.bound_names()));
         for b in bindings {
             self.desugar_binding(b, is_local)?;
         }
@@ -158,13 +162,16 @@ impl DesugarState {
                         var(&l.top())
                     }
                 };
-                let parts = self.desugar_arg_pattern(pat, &rhs_expr)?;
-                let vars = pat.bound_vars();
+                let mut replaced = HashMap::new();
+                let mut counter = 0;
+                let p = Self::pattern_with_plain_vars(&pat, &mut counter, &mut replaced);
+                let parts = self.desugar_arg_pattern(&p, &rhs_expr)?;
+                let vars = p.bound_vars();
                 let mut var_exp = vec![var(&sym("_prim_array_make"))];
                 let mut var_syms = Vec::new();
                 for v in vars {
                     var_exp.push(var(&v.top()));
-                    var_syms.push(v);
+                    var_syms.push(&replaced[&v]);
                 }
                 let on_fail = app(&[var(&sym("_prim_panic")), literal(&Literal::String("Failure to match irrefutable varbinding".to_string()))]);
                 let (is_irrefutable, pexpr) =self.build_pattern_expression(&parts, &app(&var_exp), &on_fail)?;
@@ -369,18 +376,13 @@ impl DesugarState {
             }
             ast::Expression::Var(Name::Plain(n)) => Ok(var(n)),
             ast::Expression::Where(exp, ast_bindings) => {
-                let mut new_locals = self.current_bindings.clone();
+                let mut new_locals = self.current_locals.clone();
                 let mut binds = Vec::new();
-                ast_bindings
-                    .iter()
-                    .for_each(|b| new_locals.extend(b.bound_names()));
                 mem::swap(&mut binds, &mut self.bindings);
-                mem::swap(&mut new_locals, &mut self.current_bindings);
-                for binding in ast_bindings {
-                    self.desugar_binding(binding, true)?;
-                }
+                mem::swap(&mut new_locals, &mut self.current_locals);
+                self.desugar_bindings(ast_bindings, true)?;
                 let lhs = self.desugar_expression(exp)?;
-                mem::swap(&mut new_locals, &mut self.current_bindings);
+                mem::swap(&mut new_locals, &mut self.current_locals);
                 mem::swap(&mut binds, &mut self.bindings);
                 Ok(Expression::Where(expression.id, Box::new(lhs), binds))
             }
@@ -390,7 +392,7 @@ impl DesugarState {
 
     fn captured_vars(&self, function: &Function) -> Result<Vec<Symbol>> {
         let free = free_vars(function)?;
-        let locals: HashSet<Symbol> = self.current_bindings.iter().map(|n| n.top()).collect();
+        let locals: HashSet<Symbol> = self.current_locals.iter().map(|n| n.top()).collect();
         let captured = locals.intersection(&free).copied().collect();
         Ok(captured)
     }
@@ -408,8 +410,8 @@ impl DesugarState {
         let arity = verify_arity(clauses)?;
         let mut exp = None;
         let args = self.args(&arity);
-        let mut old_current_bindings = self.current_bindings.clone();
-        self.current_bindings
+        let mut old_current_bindings = self.current_locals.clone();
+        self.current_locals
             .extend(args.iter().map(|s| Name::from(*s)));
         for (i, c) in clauses.iter().enumerate() {
             let fail_exp = if i + 1 < clauses.len() {
@@ -422,7 +424,7 @@ impl DesugarState {
                 let mut fun = Function::new(&[sym("$_")], &Arity::Fixed(1), &next_exp);
                 let captures = self.captured_vars(&fun)?;
                 let name = Name::from(local(i));
-                self.current_bindings.insert(name.clone());
+                self.current_locals.insert(name.clone());
                 let binds = if captures.is_empty() {
                     vec![Binding::make(0, Binder::Local(name), Bindee::Function(fun))]
                 } else {
@@ -449,7 +451,7 @@ impl DesugarState {
                 break;
             }
         }
-        mem::swap(&mut self.current_bindings, &mut old_current_bindings);
+        mem::swap(&mut self.current_locals, &mut old_current_bindings);
         Ok(Function::new(&args, &arity, &exp.unwrap()))
     }
 
