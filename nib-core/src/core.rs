@@ -1,16 +1,14 @@
 use symbol_table::static_symbol;
 
-use crate::ast::{ExpressionNode, Pattern};
-use crate::common::{Symbol, sym};
 use crate::{
-    ast::{self, Literal, PatternNode},
-    common::{Error, Metadata, Name, Node, Result},
+    ast::{self, ExpressionNode, Literal, Pattern, PatternNode},
+    common::{Error, Metadata, Name, Node, Result, Symbol, sym},
 };
 use std::{
     collections::{HashMap, HashSet},
     fmt::Display,
+    mem
 };
-use std::{iter, mem};
 
 mod tests;
 
@@ -26,11 +24,17 @@ pub fn desugar(module: ast::Module) -> Result<Module> {
         }
     }
     state.desugar_bindings(&to_desugar, false)?;
+    let mut locals = HashSet::new();
+    for b in &state.bindings {
+        if let Binder::Local(l) = &b.binder {
+            locals.insert(l.clone());
+        }
+    }
 
     Ok(Module {
         metadata: state.metadata,
         bindings: state.bindings,
-        locals: state.locals,
+        locals: locals,
     })
 }
 
@@ -52,7 +56,6 @@ pub fn desugar_expression(expr: ExpressionNode) -> Result<Expression> {
 struct DesugarState {
     bindings: Vec<Binding>,
     metadata: Metadata,
-    locals: HashSet<Name>,
     current_bindings: HashSet<Name>,
     last_local: u32,
     last_arg: u32,
@@ -63,7 +66,6 @@ impl DesugarState {
         DesugarState {
             bindings: Vec::new(),
             metadata,
-            locals: HashSet::new(),
             current_bindings: HashSet::new(),
             last_local: 0,
             last_arg: 0,
@@ -78,9 +80,6 @@ impl DesugarState {
     }
 
     fn desugar_binding(&mut self, binding: &ast::Binding, is_local: bool) -> Result<()> {
-        if !is_local {
-            self.current_bindings.clear();
-        }
         match binding {
             ast::Binding::FunBinding(fb) => self.desugar_funbinding(fb, is_local),
             ast::Binding::OpBinding(ob) => self.desugar_opbinding(ob, is_local),
