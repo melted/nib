@@ -1,5 +1,5 @@
 use crate::common::{CType, Symbol};
-use crate::core::{Bindee, Function, free_vars_bindee};
+use crate::core::{Function, free_vars_expression};
 use crate::{
     ast::Literal,
     common::{Name, Result},
@@ -117,18 +117,10 @@ impl Runtime {
         eval_status
             .work_stack
             .push(EvalStep::Bind(binding.name.clone(), binding.binder.clone()));
-        match &binding.body {
-            crate::core::Bindee::Function(function) => {
-                eval_status.work_stack.push(EvalStep::Function(binding.name.clone(), function.clone()));
-            },
-            crate::core::Bindee::Expression(expression) => {
-                eval_status.work_stack.push(EvalStep::Expression(
+        eval_status.work_stack.push(EvalStep::Expression(
                     binding.name.clone(),
-                    expression.clone(),
+                    binding.body.clone(),
                 ));
-            },
-        }
-
     }
 
     fn eval(&mut self, eval_status: &mut EvalStatus, env: &mut Environment) -> Result<()> {
@@ -208,13 +200,6 @@ impl Runtime {
             EvalStep::Value(val) => {
                 eval_status.value_stack.push(val);
             }
-            EvalStep::Function(name, function) => {
-                let mut free = HashSet::new();
-                let mut locals = HashMap::new();
-                free_vars_bindee(&Bindee::Function(function.clone()), &mut free, &mut locals);
-                let closure = self.evaluate_lambda(&name, &function, &free, env)?;
-                eval_status.value_stack.push(closure);
-            }
         }
         Ok(())
     }
@@ -259,6 +244,14 @@ impl Runtime {
                         .push(EvalStep::Expression(binding_name.clone(), exp));
                 }
             }
+            Expression::Function(fun) => {
+                let mut free = HashSet::new();
+                let mut locals = HashMap::new();
+                free_vars_expression(&fun.body, &mut free, &mut locals);
+                let closure = self.evaluate_lambda(&binding_name, &fun, &free, env)?;
+                eval_status.value_stack.push(closure);
+
+            }
             Expression::Where(_, exp, binds) => {
                 let mut prev_cc = HashMap::new();
                 mem::swap(&mut prev_cc, &mut self.closures_to_check);
@@ -272,7 +265,6 @@ impl Runtime {
                     self.add_binding(eval_status, &b);
                 }
             }
-            _ => {}
         }
         Ok(())
     }
@@ -413,8 +405,7 @@ pub(super) enum EvalStep {
     Select(Box<EvalStep>, Box<EvalStep>),
     Value(Value),
     Apply(Option<Name>, usize),
-    Bind(Option<Name>, Binder),
-    Function(Option<Name>, Function)
+    Bind(Option<Name>, Binder)
 }
 
 #[derive(Debug, Clone, PartialEq)]
