@@ -327,13 +327,11 @@ impl DesugarState {
         }
     }
 
-    fn captured_vars(&self, function: &Function) -> Result<Vec<Symbol>> {
+    fn set_captured_vars(&self, function: &mut Function) -> Result<()> {
         let free = free_vars(function)?;
-        let captured = self.current_locals.intersection(&free).copied().collect();
-        Ok(captured)
+        function.captures = self.current_locals.intersection(&free).copied().collect();
+        Ok(())
     }
-
-    fn promote_to_reference(&mut self, var: &Symbol) {}
 
     fn no_match_expression() -> Expression {
         app(&[
@@ -358,6 +356,7 @@ impl DesugarState {
             let (is_irrefutable, next_exp) = self.desugar_funclause(c, &args, &fail_exp)?;
             if let Some(e) = &mut exp {
                 let mut function = Function::new(&[sym("$_")], &Arity::Fixed(1), &next_exp);
+                self.set_captured_vars(&mut function)?;
                 let name = Name::from(local(i));
                 self.current_locals.insert((&name).into());
                 let bind = Binding::make(0, Binder::Local(name), fun(function));
@@ -377,7 +376,9 @@ impl DesugarState {
             }
         }
         mem::swap(&mut self.current_locals, &mut old_current_bindings);
-        Ok(Function::new(&args, &arity, &exp.unwrap()))
+        let mut function = Function::new(&args, &arity, &exp.unwrap());
+        self.set_captured_vars(&mut function)?;
+        Ok(function)
     }
 
     fn desugar_funclause(
@@ -639,6 +640,7 @@ pub enum Binder {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Function {
     pub args: Vec<Symbol>,
+    pub captures: Vec<Symbol>,
     pub arity: Arity,
     pub body: Expression,
 }
@@ -647,6 +649,7 @@ impl Function {
     pub fn new(args: &[Symbol], arity: &Arity, expression: &Expression) -> Self {
         Function {
             args: args.to_vec(),
+            captures: Vec::new(),
             arity: arity.clone(),
             body: expression.clone(),
         }
@@ -843,13 +846,15 @@ pub fn rename(expr: &Expression, old_name: &Symbol, new_name: &Symbol) -> Expres
             );
             Expression::Cond(*n, Box::new(new_cond))
         }
-        Expression::Function(fun) => {
-            let new_body = if !fun.args.contains(old_name) {
-                rename(&fun.body, old_name, new_name)
+        Expression::Function(old_function) => {
+            let new_body = if !old_function.args.contains(old_name) {
+                rename(&old_function.body, old_name, new_name)
             } else {
-                fun.body.clone()
+                old_function.body.clone()
             };
-            Expression::Function(Box::new(Function::new(&fun.args, &fun.arity, &new_body)))
+            let mut new_function = Function::new(&old_function.args, &old_function.arity, &new_body);
+            new_function.captures = old_function.captures.clone();
+            fun(new_function)
         }
         Expression::Where(n, exp, defs) => {
             let mut shadowed = false;

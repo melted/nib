@@ -292,6 +292,10 @@ impl Compilation {
         for (i, arg) in lambda.args.iter().enumerate() {
             fun_compilation.stack_vars.push((*arg, i + 1));
         }
+        let arg_end = lambda.args.len() + 1;
+        for (i, cap) in lambda.captures.iter().enumerate() {
+            fun_compilation.stack_vars.push((*cap, i + arg_end));
+        }
         fun_compilation.input = CompilationInput::Expression(lambda.body.clone());
         fun_compilation.compile()?;
         let (arity, vararg) = match lambda.arity {
@@ -302,16 +306,12 @@ impl Compilation {
         };
         load_constant(&vararg, code);
         load_constant_int(arity.get_integer(), code);
-        load_constant_int(fun_compilation.module.local_env_size as i64, code);
+        load_constant_int( lambda.captures.len() as i64, code);
         code.push(INSTR_ALLOC_ARRAY);
         let env_local = self.env_location();
         set_local(env_local, code);
         for (sym, index) in fun_compilation.module.want_symbols {
             let slot = self.get_symbol_slot(&sym);
-            load_constant_int(index as i64, code);
-            get_local(slot, code);
-            get_local(env_local, code);
-            code.push(INSTR_ARRAY_SET);
         }
         // TODO: fix lambda compilations knowledge of which bindings are coming from
         // containing scope or globally
