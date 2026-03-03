@@ -1,11 +1,6 @@
 use core::slice;
 use std::{
-    collections::{HashMap, HashSet},
-    ffi::c_void,
-    fmt::{Debug, Display},
-    hash::{DefaultHasher, Hash, Hasher},
-    ptr::copy_nonoverlapping,
-    slice::{from_raw_parts, from_raw_parts_mut},
+    collections::{HashMap, HashSet}, env, ffi::c_void, fmt::{Debug, Display}, hash::{DefaultHasher, Hash, Hasher}, ptr::copy_nonoverlapping, slice::{from_raw_parts, from_raw_parts_mut}
 };
 
 use region::Allocation;
@@ -1214,12 +1209,16 @@ impl Closure {
         let header = ObjectHeader::make(rt, 48, ValueRepr::Closure);
         let mut me = Closure { ptr: header };
         me.set_type_table(Value::nil());
-
-        let env_size = captures.len() + arity + if vararg.is_some() { 1 } else { 0 };
-        let mut env = Array::make(rt, env_size);
-        env.fill(captures, 0, captures.len());
         me.set_code(rt, code);
-        set_value(header, 2, Value::from(env));
+        let env = if !captures.is_empty() {
+            let env_size = captures.len();
+            let mut env = Array::make(rt, env_size);
+            env.fill(captures, 0, captures.len());
+            Value::from(env)
+        } else {
+            Value::nil()
+        };
+        set_value(header, 2, env);
         set_value(header, 3, Value::integer(arity as i64));
         let var_pos = if let Some(pos) = vararg {
             Value::integer(pos as i64)

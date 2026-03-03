@@ -160,15 +160,14 @@ impl Compilation {
             code.push(INSTR_DUP);
             let top = name.top();
             let path = name.path();
-            let loc = self.local_var(&top);
-            set_local(loc, code);
             if path.is_empty() {
                 if global {
                     self.get_symbol(&top, code);
                     code.push(INSTR_GLOBAL_ENV);
                     code.push(INSTR_TABLE_SET);
                 } else {
-                    code.push(INSTR_DROP);
+                    let loc = self.local_var(&top);
+                    set_local(loc, code);
                 }
             } else {
                 let rest = &path[1..];
@@ -187,6 +186,9 @@ impl Compilation {
                 code.push(INSTR_CALL);
                 code.push(INSTR_TABLE_SET);
             }
+            if !global {
+                self.future_bindings.remove(&top);
+            }
             self.check_fixups(&top, code);
         } else {
             code.push(INSTR_DROP);
@@ -196,7 +198,8 @@ impl Compilation {
 
     fn get_binding_name(&mut self, binder: &Binder) -> Option<Name> {
         match binder {
-            Binder::Public(name) | Binder::Local(name) => Some(name.clone()),
+            Binder::Public(name) => Some(name.clone()),
+            Binder::Local(name) => Some(name.clone()),
             Binder::Unbound => None,
         }
     }
@@ -222,10 +225,10 @@ impl Compilation {
     fn collect_binding_names(&mut self, bindings: &[Binding]) {
         for b in bindings {
             match &b.binder {
-                Binder::Public(name) | Binder::Local(name) => {
+                Binder::Local(name) => {
                     self.future_bindings.insert(name.top());
                 }
-                Binder::Unbound => {}
+                _ => {}
             }
         }
     }
@@ -287,17 +290,19 @@ impl Compilation {
     }
 
     fn compile_function(&mut self, lambda: &Function, code: &mut Vec<u8>) -> Result<()> {
-        let mut fun_compilation = Compilation::new();
-        fun_compilation.future_bindings = self.future_bindings.clone();
+        let mut old_stack_vars = Vec::new();
+        mem::swap(&mut self.stack_vars, &mut old_stack_vars);
         for (i, arg) in lambda.args.iter().enumerate() {
-            fun_compilation.stack_vars.push((*arg, i + 1));
+            self.stack_vars.push((*arg, i + 1));
         }
         let arg_end = lambda.args.len() + 1;
         for (i, cap) in lambda.captures.iter().enumerate() {
-            fun_compilation.stack_vars.push((*cap, i + arg_end));
+            self.stack_vars.push((*cap, i + arg_end));
         }
-        fun_compilation.input = CompilationInput::Expression(lambda.body.clone());
-        fun_compilation.compile()?;
+        let mut fun_code = Vec::new();
+        self.compile_expression(&lambda.body, &mut fun_code)?;
+        fun_code.push(INSTR_RETURN);
+        mem::swap(&mut self.stack_vars, &mut old_stack_vars);
         let (arity, vararg) = match lambda.arity {
             crate::core::Arity::Fixed(n) => (Value::integer(n as i64), Value::bool(false)),
             crate::core::Arity::VarArg(n, i) => {
@@ -310,13 +315,19 @@ impl Compilation {
         code.push(INSTR_ALLOC_ARRAY);
         let env_local = self.env_location();
         set_local(env_local, code);
-        for (sym, index) in fun_compilation.module.want_symbols {
-            let slot = self.get_symbol_slot(&sym);
+        for (i, c) in lambda.captures.iter().enumerate() {
+            if self.future_bindings.contains(c) {
+                let addr = (env_local, i);
+                self.fixups_needed.entry(*c).and_modify(|v| v.push(addr)).or_insert(vec![addr]);
+            } else {
+                self.get_variable(c, code);
+                load_constant_int(i as i64, code);
+                get_local(env_local, code);
+                code.push(INSTR_ARRAY_SET);
+            }
         }
-        // TODO: fix lambda compilations knowledge of which bindings are coming from
-        // containing scope or globally
         get_local(env_local, code);
-        push_bytes(&fun_compilation.module.byte_code, code);
+        push_bytes(&fun_code, code);
         code.push(INSTR_ALLOC_CLOSURE);
         Ok(())
     }

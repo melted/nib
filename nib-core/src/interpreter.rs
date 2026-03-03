@@ -40,7 +40,6 @@ pub struct Runtime {
     local_env: Value,
     stack: Stack,
     call_stack: Stack,
-    closure: Value,
     code: Value,
     ip: usize,
     ffi_signatures: Vec<Signature>,
@@ -118,7 +117,6 @@ impl Runtime {
             stack: Stack::new(Value::nil()),      // Dummy stack
             call_stack: Stack::new(Value::nil()), // Dummy stack
             code: Value::nil(),
-            closure: Value::nil(),
             ip: 0,
             ffi_signatures: Vec::new(),
             options: Options::new(),
@@ -159,10 +157,6 @@ impl Runtime {
         self.local_env = self.make_local_env(&bytecode);
         let bc = Bytes::with(self, &bytecode.byte_code);
         self.code = Value::from(bc);
-        let local_env = self.local_env.clone().get_array().clone(self);
-        let closure =
-            Closure::make_low(self, &bc, local_env, Value::integer(0), Value::bool(false));
-        self.closure = Value::from(closure);
         self.run()
     }
 
@@ -691,7 +685,6 @@ impl Runtime {
                 if let Some(method) = self.find_overload(&fun, &static_symbol!("__call")) {
                     self.stack.put(args, method);
                 } else {
-                    dbg!(self.stack);
                     return self.error("op_call: type can't be called");
                 }
             }
@@ -714,7 +707,6 @@ impl Runtime {
             let varargs = extra_args + 1;
             let mut var_arg = Array::make(self, varargs);
             let argv = self.stack.slice_mut(args - 1, 0);
-            dbg!(&argv, varargs, extra_args);
             var_arg.fill(&argv[i..i + varargs], 0, varargs);
             if args - 1 > i + varargs {
                 argv.copy_within(i + varargs.., i + 1);
@@ -729,21 +721,28 @@ impl Runtime {
             let elems = self.stack.slice_mut(args, 0);
             elems.rotate_right(extra_args + 1);
         }
+        let mut env_size = 0;
+        if closure.env().is_array() {
+            env_size = closure.env().get_array().size();
+            for v in closure.env().get_array().values() {
+                self.stack_push(*v);
+            }
+        }
         match closure.get_tag() {
             TYPE_BYTECODE => {
                 if op == INSTR_CALL || extra_args > 0 || self.call_stack.is_empty() {
                     // Not a tail call, set up a new frame
                     self.ensure_call_stack(3);
                     let frame = vec![
-                        self.closure,
+                        Value::from(closure),
                         Value::integer(self.ip as i64),
                         Value::integer(self.stack.base as i64),
                     ];
                     self.call_stack.pushv(&frame);
-                    self.stack.base = self.stack.top() - args;
+                    self.stack.base = self.stack.top() - args - env_size - 1;
+                    dbg!(&self.call_stack);
+                    dbg!(&self.stack);
                 }
-                self.closure = Value::from(closure);
-                self.local_env = closure.env().get_array().clone(self);
                 self.code = closure.code_value();
                 self.ip = 0;
             }
@@ -785,11 +784,11 @@ impl Runtime {
             let old_base = self.call_stack.pop().get_integer() as usize;
             let ip = self.call_stack.pop().get_integer() as usize;
             let closure = self.call_stack.pop();
-            self.closure = closure;
             self.code = closure.get_closure().code_value();
-            self.local_env = closure.get_closure().env().get_array().clone(self);
             self.ip = ip;
             self.stack.base = old_base;
+            dbg!(&self.call_stack);
+            dbg!(&self.stack);
             Ok(false)
         }
     }
@@ -995,7 +994,6 @@ impl Runtime {
             }
             INSTR_ALLOC_TABLE => Value::from(Table::make(self)),
             INSTR_ALLOC_CLOSURE => {
-                dbg!(&self.stack);
                 let code = self.stack.pop();
                 ensure_type(&code, ValueRepr::Bytes)?;
                 let captures = self.stack.pop();
@@ -1045,8 +1043,6 @@ impl Runtime {
     }
 
     fn op_array_set(&mut self) -> Result<bool> {
-        dbg!(&self.stack);
-        dbg!(&self.call_stack);
         let obj = self.stack.pop();
         let pos = self.stack.pop();
         let val = self.stack.pop();
