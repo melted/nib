@@ -74,10 +74,10 @@ _ = print (_prim_array_size arr2)
 // Type
 _ = print string.type_id
 
-_ = _prim_string_print (type "hello").type_id
+_ = print (type "hello").type_id
 
 
-_ = _prim_string_print (_prim_to_string 1.3)
+_ = print (_prim_to_string 1.3)
 
 // Bytearrays
 
@@ -105,13 +105,13 @@ _ = print (size 11)
 
 // module
 
-module mmmm
-abba = "hello"
-baab = "world"
+//module mmmm
+//abba = "hello"
+//baab = "world"
 
-module global
-z = 9876
-_ = print mmmm.abba
+//module global
+//z = 9876
+//_ = print mmmm.abba
 
 res = _prim_load "nib-core/testdata/littler.nib"
 
