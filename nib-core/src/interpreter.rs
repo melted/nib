@@ -176,6 +176,10 @@ impl Runtime {
         for (sym, &idx) in &module.want_symbols {
             array.set(idx, Value::symbol(sym));
         }
+        for (blob, &idx) in &module.data {
+            let bytes = Bytes::with(self, &blob);
+            array.set(idx, Value::from(bytes));
+        }
         Value::from(array)
     }
 

@@ -44,6 +44,8 @@ pub struct Module {
     pub local_env_size: usize,
     /// A list of symbol literals that should be put into the local environment.
     pub want_symbols: HashMap<Symbol, usize>,
+    /// Byte arrays to be put on the heap and made available in the local env
+    pub data: HashMap<Vec<u8>, usize>,
 }
 
 impl Default for Module {
@@ -59,6 +61,7 @@ impl Module {
             byte_code: Vec::new(),
             local_env_size: 0,
             want_symbols: HashMap::new(),
+            data: HashMap::new(),
         }
     }
 }
@@ -282,7 +285,7 @@ impl Compilation {
                 get_local(s, code);
             }
             Literal::Bytearray(items) => {
-                push_bytes(items, code);
+                self.compile_bytes(items, code);
             }
         }
         Ok(())
@@ -298,8 +301,6 @@ impl Compilation {
         for (i, cap) in lambda.captures.iter().enumerate() {
             self.stack_vars.push((*cap, i + arg_end));
         }
-        // TODO: Lift the bytecode to a top-level local var and refer to it
-        // when making the closure, instead of keeping the bytecode inline.
         let mut fun_code = Vec::new();
         self.compile_expression(&lambda.body, &mut fun_code)?;
         fun_code.push(INSTR_RETURN);
@@ -328,7 +329,7 @@ impl Compilation {
             }
         }
         get_local(env_local, code);
-        push_bytes(&fun_code, code);
+        self.compile_bytes(&fun_code, code);
         code.push(INSTR_ALLOC_CLOSURE);
         Ok(())
     }
@@ -403,6 +404,21 @@ impl Compilation {
         mem::swap(&mut old_used_vars, &mut self.used_locs);
         mem::swap(&mut old_free_vars, &mut self.free_locs);
         Ok(())
+    }
+
+    fn compile_bytes(&mut self, data: &[u8], code: &mut Vec<u8>) {
+        let loc = self.get_data_slot(data);
+        get_local(loc, code);
+    }
+
+    fn get_data_slot(&mut self, data: &[u8]) -> usize {
+        if let Some(loc) = self.module.data.get(data) {
+            *loc
+        } else {
+            let loc = self.fresh_env_location();
+            self.module.data.insert(data.to_vec(), loc);
+            loc
+        }
     }
 
     fn get_symbol_slot(&mut self, sym: &Symbol) -> usize {
