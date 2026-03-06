@@ -48,7 +48,7 @@ pub enum Binding {
 }
 
 impl Binding {
-    pub fn bound_names(&self) -> Vec<Symbol> {
+    pub fn bound_names(&self) -> Vec<Name> {
         match self {
             Binding::VarBinding(var_binding) => var_binding.lhs.bound_vars().into_iter().collect(),
             Binding::FunBinding(fun_binding) => {
@@ -133,7 +133,7 @@ pub struct FunClause {
 }
 
 impl FunClause {
-    fn free_vars_helper(&self, vars: &mut HashSet<Symbol>, locals: &mut HashSet<Symbol>) {
+    fn free_vars_helper(&self, vars: &mut HashSet<Name>, locals: &mut HashSet<Name>) {
         let mut exp_local = locals.clone();
         for p in &self.args {
             p.bound_vars_helper(&mut exp_local);
@@ -183,7 +183,7 @@ pub struct OpClause {
 }
 
 impl OpClause {
-    fn free_vars_helper(&self, vars: &mut HashSet<Symbol>, locals: &mut HashSet<Symbol>) {
+    fn free_vars_helper(&self, vars: &mut HashSet<Name>, locals: &mut HashSet<Name>) {
         let mut exp_local = locals.clone();
         self.lpat.bound_vars_helper(&mut exp_local);
         self.rpat.bound_vars_helper(&mut exp_local);
@@ -228,16 +228,16 @@ impl PatternNode {
         matches!(self.pattern, Pattern::Ellipsis(_))
     }
 
-    pub fn bound_vars(&self) -> HashSet<Symbol> {
+    pub fn bound_vars(&self) -> HashSet<Name> {
         let mut vars = HashSet::new();
         self.bound_vars_helper(&mut vars);
         vars
     }
 
-    fn bound_vars_helper(&self, vars: &mut HashSet<Symbol>) {
+    fn bound_vars_helper(&self, vars: &mut HashSet<Name>) {
         match &self.pattern {
             Pattern::Ellipsis(Some(name)) => {
-                vars.insert(name.into());
+                vars.insert(name.clone());
             }
             Pattern::Var(n) => {
                 vars.insert(n.into());
@@ -338,19 +338,19 @@ pub enum Expression {
 }
 
 impl Expression {
-    pub fn free_vars(&self) -> HashSet<Symbol> {
+    pub fn free_vars(&self) -> HashSet<Name> {
         let mut vars = HashSet::new();
         let mut locals = HashSet::new();
         self.free_vars_helper(&mut vars, &mut locals);
         vars
     }
 
-    fn free_vars_helper(&self, vars: &mut HashSet<Symbol>, locals: &mut HashSet<Symbol>) {
+    fn free_vars_helper(&self, vars: &mut HashSet<Name>, locals: &mut HashSet<Name>) {
         match self {
             Expression::Var(n) => {
                 let sym = &n.into();
                 if !locals.contains(sym) {
-                    vars.insert(*sym);
+                    vars.insert(sym.into());
                 }
             }
             Expression::Array(elems) => {

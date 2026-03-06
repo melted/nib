@@ -226,7 +226,7 @@ impl<'a> ParserState<'a> {
         let expr = self.parse_expression()?;
         self.expect(TokenValue::RightBrace)?;
         let free_vars = expr.expr.free_vars();
-        let used_implicits = implicits.iter().filter(|&n| free_vars.contains(n));
+        let used_implicits = implicits.iter().filter(|&n| free_vars.contains(&Name::from(*n)));
         let mut pats: Vec<PatternNode> = used_implicits
             .map(|n| self.var_pattern(Name::Plain(*n)))
             .collect();

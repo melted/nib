@@ -328,9 +328,6 @@ impl Runtime {
     }
 
     fn run(&mut self) -> Result<()> {
-        let code_size = self.code.get_bytes().size();
-        let bytes = self.code.get_bytes();
-        let code = bytes.get_slice();
         while self.ip < self.code.get_bytes().size() {
             if self.step()? {
                 break;
@@ -340,7 +337,8 @@ impl Runtime {
     }
 
     fn step(&mut self) -> Result<bool> {
-        let instr = self.code.get_bytes().at(self.ip);
+        let code = self.code.get_bytes();
+        let instr = code.at(self.ip);
         self.ip += 1;
         match instr {
             INSTR_PUSH_ZERO..=INSTR_PUSH_LAST_SMALL => self.op_push_small(instr),
@@ -695,16 +693,17 @@ impl Runtime {
 
     fn make_call(&mut self, op: u8, args: usize) -> Result<()> {
         let closure = self.stack.peek(args).get_closure();
-        if args - 1 < closure.num_args() {
+        let params = args - 1;
+        if params < closure.num_args() {
             // Underapplication, create a partial application
             let cargs = self.stack.take(args);
             let pap = Array::with(self, &cargs);
             self.stack.push(Value::partial_application(pap));
             return Ok(());
         }
-        let extra_args = args - closure.num_args() - 1;
+        let extra_args = params - closure.num_args();
         if let Some(i) = closure.vararg() {
-            let varargs = extra_args + 1;
+            let varargs = params - (closure.num_args() - 1);
             let mut var_arg = Array::make(self, varargs);
             let argv = self.stack.slice_mut(args - 1, 0);
             var_arg.fill(&argv[i..i + varargs], 0, varargs);
@@ -734,14 +733,13 @@ impl Runtime {
                     // Not a tail call, set up a new frame
                     self.ensure_call_stack(3);
                     let frame = vec![
-                        Value::from(closure),
+                        Value::from(self.code),
                         Value::integer(self.ip as i64),
                         Value::integer(self.stack.base as i64),
                     ];
+                    self.call_stack.base = self.call_stack.top;
                     self.call_stack.pushv(&frame);
-                    self.stack.base = self.stack.top() - args - env_size - 1;
-                    dbg!(&self.call_stack);
-                    dbg!(&self.stack);
+                    self.stack.base = self.stack.top() - args - env_size;
                 }
                 self.code = closure.code_value();
                 self.ip = 0;
@@ -771,7 +769,7 @@ impl Runtime {
 
     fn op_return(&mut self) -> Result<bool> {
         let cc = if self.stack.top() > 0 {
-            self.stack.peek(1)
+            self.stack.pop()
         } else {
             Value::nil()
         };
@@ -783,18 +781,26 @@ impl Runtime {
         } else {
             let old_base = self.call_stack.pop().get_integer() as usize;
             let ip = self.call_stack.pop().get_integer() as usize;
-            let closure = self.call_stack.pop();
-            self.code = closure.get_closure().code_value();
+            let code = self.call_stack.pop();
+            self.code = code;
             self.ip = ip;
+            self.stack.set_top(self.stack.base);
             self.stack.base = old_base;
-            dbg!(&self.call_stack);
-            dbg!(&self.stack);
+            self.stack.push(cc);
             Ok(false)
         }
     }
 
     fn op_jump(&mut self, op: u8) -> Result<bool> {
-        let dist = self.stack.pop().get_integer();
+        let bytes = self.code.get_bytes();
+        let code = bytes.get_slice();
+        let dist = if is_immediate_jump(op) {
+            let next = (code[self.ip] as i8) as i64;
+            self.ip += 1;
+            next
+        } else {
+            self.stack.pop().get_integer()
+        };
         let target = (self.ip as i64 + dist) as usize;
         if target < self.code.get_bytes().size() {
             self.ip = target;
@@ -911,10 +917,10 @@ impl Runtime {
     }
 
     fn op_swap(&mut self) -> Result<bool> {
-        let top = self.stack.array.at(self.stack.top());
-        let next = self.stack.array.at(self.stack.top() - 1);
-        self.stack.array.set(self.stack.top(), next);
-        self.stack.array.set(self.stack.top() - 1, top);
+        let top = self.stack.array.at(self.stack.top() - 1);
+        let next = self.stack.array.at(self.stack.top() - 2);
+        self.stack.array.set(self.stack.top() - 1, next);
+        self.stack.array.set(self.stack.top() - 2, top);
         Ok(false)
     }
 
@@ -1158,13 +1164,13 @@ impl Runtime {
     }
 
     fn ensure_stack(&mut self, extra: usize) {
-        if self.stack.top + extra == self.stack.array.size() {
+        if self.stack.top + extra >= self.stack.array.size() {
             self.stack = self.stack_expand(self.stack);
         }
     }
 
     fn ensure_call_stack(&mut self, extra: usize) {
-        if self.stack.top + extra == self.call_stack.array.size() {
+        if self.call_stack.top + extra >= self.call_stack.array.size() {
             self.call_stack = self.stack_expand(self.call_stack);
         }
     }

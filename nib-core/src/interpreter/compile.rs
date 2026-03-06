@@ -157,7 +157,6 @@ impl Compilation {
         let global = matches!(&binding.binder, Binder::Public(_));
         self.compile_expression(&binding.body, code)?;
         if let Some(name) = binding_name {
-            code.push(INSTR_DUP);
             let top = name.top();
             let path = name.path();
             if path.is_empty() {
@@ -340,10 +339,10 @@ impl Compilation {
         self.compile_expression(&cond.if_false, &mut if_false_code)?;
         optimized_jump(
             INSTR_JUMP,
-            if_false_code.len() as i64 + 1,
+            if_false_code.len() as i64,
             &mut if_true_code,
         );
-        optimized_jump(INSTR_JFALSE, if_true_code.len() as i64 + 1, code);
+        optimized_jump(INSTR_JFALSE, if_true_code.len() as i64, code);
         code.extend_from_slice(&if_true_code);
         code.extend_from_slice(&if_false_code);
         Ok(())
@@ -386,11 +385,10 @@ impl Compilation {
         code: &mut Vec<u8>,
     ) -> Result<()> {
         let mut old_fixups = HashMap::new();
-        let mut old_future_bindings = HashSet::new();
+        let mut old_future_bindings = self.future_bindings.clone();
         let mut old_used_vars = self.used_locs.clone();
         let mut old_free_vars = self.free_locs.clone();
         mem::swap(&mut old_fixups, &mut self.fixups_needed);
-        mem::swap(&mut old_future_bindings, &mut self.future_bindings);
         let is_tail = self.is_tail;
         self.collect_binding_names(bindings);
         for b in bindings {
@@ -583,7 +581,7 @@ fn push_bytes(items: &[u8], code: &mut Vec<u8>) {
 fn optimized_jump(op: u8, n: i64, code: &mut Vec<u8>) {
     if let Ok(b) = i8::try_from(n) {
         let sop = short_jump_op(op);
-        code.push(op);
+        code.push(sop);
         code.push(n as u8);
     } else {
         load_constant_int(n, code);

@@ -251,10 +251,9 @@ fn run_globalref_binding() -> Result<()> {
 
 #[ignore = "flaky"]
 #[test]
-#[ignore = "not working yet"]
 fn run_fun_binding() -> Result<()> {
     let mut rt = Runtime::new();
-    rt.add_code("test", "calc a = _prim_mul a 2")?;
+    rt.add_code("test", "calc a = _prim_mul a 2\nres = calc 4")?;
     let val = rt.get_global(&sym("calc"));
     assert_eq!(val.is_closure(), true);
     Ok(())
@@ -262,7 +261,6 @@ fn run_fun_binding() -> Result<()> {
 
 #[ignore = "flaky"]
 #[test]
-#[ignore = "not working yet"]
 fn run_fun_clauses_binding() -> Result<()> {
     let mut rt = Runtime::new();
     rt.add_code(
@@ -276,7 +274,6 @@ fn run_fun_clauses_binding() -> Result<()> {
 
 #[ignore = "flaky"]
 #[test]
-#[ignore = "not working yet"]
 fn run_fun_clauses_app_binding() -> Result<()> {
     let mut rt = Runtime::new();
     rt.add_code(
@@ -288,3 +285,4 @@ fn run_fun_clauses_app_binding() -> Result<()> {
     assert_eq!(val.get_integer(), 120);
     Ok(())
 }
+

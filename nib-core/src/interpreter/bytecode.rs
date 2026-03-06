@@ -221,12 +221,12 @@ pub const INSTR_IS_PAP: u8 = 137;
 pub const INSTR_IS_CALL_CONT: u8 = 138;
 pub const INSTR_IS_OBJECT: u8 = 139;
 pub const INSTR_IS_IMMEDIATE: u8 = 140;
-pub const INSTR_PUSH_MINUS_ONE: u8 = 152; //TODO
-pub const INSTR_PUSH_NIL: u8 = 153; //TODO
-pub const INSTR_PUSH_FALSE: u8 = 154; //TODO
-pub const INSTR_PUSH_TRUE: u8 = 155; //TODO
-pub const INSTR_PUSH_ZERO: u8 = 0; // TODO
-pub const INSTR_PUSH_LAST_SMALL: u8 = 20; // TODO
+pub const INSTR_PUSH_MINUS_ONE: u8 = 152;
+pub const INSTR_PUSH_NIL: u8 = 153;
+pub const INSTR_PUSH_FALSE: u8 = 154;
+pub const INSTR_PUSH_TRUE: u8 = 155;
+pub const INSTR_PUSH_ZERO: u8 = 0;
+pub const INSTR_PUSH_LAST_SMALL: u8 = 20;
 
 pub(super) fn is_immediate_jump(op: u8) -> bool {
     (INSTR_JUMP_IMM8..=INSTR_JNFALSE_IMM8).contains(&op)
