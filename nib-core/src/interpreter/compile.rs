@@ -272,8 +272,8 @@ impl Compilation {
                 let bytes = str.as_bytes().to_vec();
                 self.compile_literal(&Literal::Bytearray(bytes), code)?;
                 code.push(INSTR_DUP);
-                code.push(INSTR_GLOBAL_ENV);
                 self.compile_literal(&Literal::Symbol(Symbol::from("string")), code)?;
+                code.push(INSTR_GLOBAL_ENV);
                 code.push(INSTR_TABLE_GET);
                 code.push(INSTR_SET_TYPE);
             }
@@ -298,6 +298,8 @@ impl Compilation {
         for (i, cap) in lambda.captures.iter().enumerate() {
             self.stack_vars.push((*cap, i + arg_end));
         }
+        // TODO: Lift the bytecode to a top-level local var and refer to it
+        // when making the closure, instead of keeping the bytecode inline.
         let mut fun_code = Vec::new();
         self.compile_expression(&lambda.body, &mut fun_code)?;
         fun_code.push(INSTR_RETURN);

@@ -768,6 +768,9 @@ impl Runtime {
     }
 
     fn op_return(&mut self) -> Result<bool> {
+        if self.call_stack.is_empty() {
+            return Ok(true)
+        }
         let cc = if self.stack.top() > 0 {
             self.stack.pop()
         } else {
@@ -776,8 +779,6 @@ impl Runtime {
         if cc.is_call_continuation() {
             self.stack.dip(cc.get_cc_args());
             self.op_call(INSTR_CALL_TAIL)
-        } else if self.call_stack.is_empty() {
-            Ok(true)
         } else {
             let old_base = self.call_stack.pop().get_integer() as usize;
             let ip = self.call_stack.pop().get_integer() as usize;
