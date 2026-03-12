@@ -392,8 +392,8 @@ impl Compilation {
             }
         }
         get_local(env_local, code);
-        let loc = self.get_bytecode_slot(&lambda.code_ref, &fun_code);
-        get_local(loc, code);
+        self.set_bytecode_slot(&lambda.code_ref, &fun_code);
+        self.get_variable(&lambda.code_ref, code);
         code.push(INSTR_ALLOC_CLOSURE);
         Ok(())
     }
@@ -474,15 +474,9 @@ impl Compilation {
         push_bytes(data, code);
     }
 
-    fn get_bytecode_slot(&mut self, sym: &Symbol, data: &[u8]) -> usize {
-        if let Some(&loc) = self.module.data.get(data) {
-            loc
-        } else {
-            let loc = self.base_context().fresh_env_location();
-            self.base_context().local_vars.push((*sym, loc));
-            self.module.data.insert(data.to_vec(), loc);
-            loc
-        }
+    fn set_bytecode_slot(&mut self, sym: &Symbol, data: &[u8]) {
+        let b = self.base_context().local_var(sym);
+        self.module.data.insert(data.to_vec(), b);
     }
 
     fn get_symbol_slot(&mut self, sym: &Symbol) -> usize {
