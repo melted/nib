@@ -281,8 +281,28 @@ fn run_fun_clauses_app_binding() -> Result<()> {
         "fac 0 = 1\nfac n = _prim_mul n (fac (_prim_sub n 1))\nres=fac 5\n",
     )?;
     let val = rt.get_global(&sym("res"));
-    dbg!(val);
     assert_eq!(val.get_integer(), 120);
     Ok(())
 }
 
+#[test]
+fn run_local_binding() -> Result<()> {
+    let mut rt = Runtime::new();
+    rt.add_code("test", "res = a where b = 1; a = _prim_add b 4");
+    let val = rt.get_global(&sym("res"));
+    assert_eq!(val.get_integer(), 5);
+    Ok(())
+}
+
+#[test]
+fn run_local_clauses_app_binding() -> Result<()> {
+    let mut rt = Runtime::new();
+    rt.set_output_core(true);
+    rt.add_code(
+        "test",
+        "fac = go where go 0 = 1; go n = _prim_mul n (go (_prim_sub n 1))\nres=fac 5\n",
+    )?;
+    let val = rt.get_global(&sym("res"));
+    assert_eq!(val.get_integer(), 120);
+    Ok(())
+}

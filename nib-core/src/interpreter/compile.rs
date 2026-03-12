@@ -75,12 +75,12 @@ pub(super) struct Compilation {
     local_vars: Vec<(Symbol, usize)>,
     stack_vars: Vec<(Symbol, usize)>,
 
-    /// Future bindings in this scope, so we can bind to them instead of trying to import a global
-    /// of the same name.
+    /// Future bindings in this scope, so we can bind to them instead of trying to import a
+    ///  global of the same name.
     future_bindings: HashSet<Symbol>,
-    /// This is requested fixups for bindings not yet in scope when a lambda was defined, the first usize
-    /// is where the lambdas environment is in the local environment and the second is the offset in the
-    /// lambda's environment
+    /// This is requested fixups for bindings not yet in scope when a lambda was defined, the 
+    /// first usize is where the lambdas environment is in the local environment and the
+    /// second is the offset in the lambda's environment
     fixups_needed: HashMap<Symbol, Vec<(usize, usize)>>,
     max_var: usize,
     used_locs: HashSet<usize>,
