@@ -66,14 +66,84 @@ impl Module {
     }
 }
 
+#[derive(Debug, Clone)]
+pub(super) struct Context {
+    pub local_vars: Vec<(Symbol, usize)>,
+    pub stack_vars: Vec<(Symbol, usize)>,
+    pub max_var: usize,
+    pub used_locs: HashSet<usize>,
+    pub free_locs: HashSet<usize>,
+}
+
+impl Context {
+    fn new() -> Self {
+        Context { 
+            local_vars: Vec::new(),
+            stack_vars: Vec::new(),
+            max_var: 0,
+            used_locs: HashSet::new(),
+            free_locs: HashSet::new()
+        }
+    }
+
+    fn lookup_var(&self, var: &Symbol) -> VarLocation {
+        for (sym, loc) in &self.stack_vars {
+            if var == sym {
+                return VarLocation::Stack(*loc);
+            }
+        }
+        for (sym, loc) in self.local_vars.iter().rev() {
+            if var == sym {
+                return VarLocation::Env(*loc);
+            }
+        }
+        VarLocation::Global
+    }
+
+    
+    fn local_var(&mut self, sym: &Symbol) -> usize {
+        for (var, loc) in self.local_vars.iter().rev() {
+            if var == sym {
+                return *loc;
+            }
+        }
+        let nvar = self.env_location();
+        self.local_vars.push((*sym, nvar));
+        nvar
+    }
+
+    fn free_location(&mut self, n: usize) {
+        self.used_locs.remove(&n);
+        self.free_locs.insert(n);
+    }
+
+    fn env_location(&mut self) -> usize {
+        let val = self.free_locs.iter().next().copied();
+        if let Some(loc) = val {
+            self.free_locs.remove(&loc);
+            self.used_locs.insert(loc);
+            loc
+        } else {
+            self.fresh_env_location()
+        }
+    }
+
+    fn fresh_env_location(&mut self) -> usize {
+        let n = self.max_var;
+        self.used_locs.insert(n);
+        self.max_var += 1;
+        n
+    }
+}
+
+
 /// State held during compilation. Everything that can be discarded when finished
 /// goes here.
 #[derive(Debug, Clone)]
 pub(super) struct Compilation {
     module: Module,
     input: CompilationInput,
-    local_vars: Vec<(Symbol, usize)>,
-    stack_vars: Vec<(Symbol, usize)>,
+    current_context: Context,
 
     /// Future bindings in this scope, so we can bind to them instead of trying to import a
     ///  global of the same name.
@@ -82,9 +152,6 @@ pub(super) struct Compilation {
     /// first usize is where the lambdas environment is in the local environment and the
     /// second is the offset in the lambda's environment
     fixups_needed: HashMap<Symbol, Vec<(usize, usize)>>,
-    max_var: usize,
-    used_locs: HashSet<usize>,
-    free_locs: HashSet<usize>,
     is_tail: bool,
 }
 
@@ -96,18 +163,15 @@ pub enum CompilationInput {
     Expression(Expression),
 }
 
+
 impl Compilation {
     pub(super) fn new() -> Self {
         Compilation {
             module: Module::new(),
+            current_context: Context::new(),
             input: CompilationInput::Nothing,
-            stack_vars: Vec::new(),
-            max_var: 0,
-            local_vars: Vec::new(),
             future_bindings: HashSet::new(),
             fixups_needed: HashMap::new(),
-            used_locs: HashSet::new(),
-            free_locs: HashSet::new(),
             is_tail: true,
         }
     }
@@ -145,7 +209,7 @@ impl Compilation {
         }
         code.push(INSTR_RETURN);
         self.module.byte_code = code;
-        self.module.local_env_size = self.max_var + 1;
+        self.module.local_env_size = self.current_context.max_var + 1;
         Ok(())
     }
 
@@ -168,7 +232,7 @@ impl Compilation {
                     code.push(INSTR_GLOBAL_ENV);
                     code.push(INSTR_TABLE_SET);
                 } else {
-                    let loc = self.local_var(&top);
+                    let loc = self.current_context.local_var(&top);
                     set_local(loc, code);
                 }
             } else {
@@ -292,19 +356,19 @@ impl Compilation {
     }
 
     fn compile_function(&mut self, lambda: &Function, code: &mut Vec<u8>) -> Result<()> {
-        let mut old_stack_vars = Vec::new();
-        mem::swap(&mut self.stack_vars, &mut old_stack_vars);
+        let mut old_context = Context::new();
+        mem::swap(&mut self.current_context, &mut old_context);
         for (i, arg) in lambda.args.iter().enumerate() {
-            self.stack_vars.push((*arg, i + 1));
+            self.current_context.stack_vars.push((*arg, i + 1));
         }
         let arg_end = lambda.args.len() + 1;
         for (i, cap) in lambda.captures.iter().enumerate() {
-            self.stack_vars.push((*cap, i + arg_end));
+            self.current_context.stack_vars.push((*cap, i + arg_end));
         }
         let mut fun_code = Vec::new();
         self.compile_expression(&lambda.body, &mut fun_code)?;
         fun_code.push(INSTR_RETURN);
-        mem::swap(&mut self.stack_vars, &mut old_stack_vars);
+        mem::swap(&mut self.current_context, &mut old_context);
         let (arity, vararg) = match lambda.arity {
             crate::core::Arity::Fixed(n) => (Value::integer(n as i64), Value::bool(false)),
             crate::core::Arity::VarArg(n, i) => {
@@ -315,7 +379,7 @@ impl Compilation {
         load_constant_int(arity.get_integer(), code);
         load_constant_int( lambda.captures.len() as i64, code);
         code.push(INSTR_ALLOC_ARRAY);
-        let env_local = self.env_location();
+        let env_local = self.current_context.env_location();
         set_local(env_local, code);
         for (i, c) in lambda.captures.iter().enumerate() {
             if self.future_bindings.contains(c) {
@@ -389,8 +453,8 @@ impl Compilation {
     ) -> Result<()> {
         let mut old_fixups = HashMap::new();
         let mut old_future_bindings = self.future_bindings.clone();
-        let mut old_used_vars = self.used_locs.clone();
-        let mut old_free_vars = self.free_locs.clone();
+        let mut old_used_vars = self.current_context.used_locs.clone();
+        let mut old_free_vars = self.current_context.free_locs.clone();
         mem::swap(&mut old_fixups, &mut self.fixups_needed);
         let is_tail = self.is_tail;
         self.collect_binding_names(bindings);
@@ -401,21 +465,20 @@ impl Compilation {
         self.compile_expression(exp, code)?;
         mem::swap(&mut old_fixups, &mut self.fixups_needed);
         mem::swap(&mut old_future_bindings, &mut self.future_bindings);
-        mem::swap(&mut old_used_vars, &mut self.used_locs);
-        mem::swap(&mut old_free_vars, &mut self.free_locs);
+        mem::swap(&mut old_used_vars, &mut self.current_context.used_locs);
+        mem::swap(&mut old_free_vars, &mut self.current_context.free_locs);
         Ok(())
     }
 
     fn compile_bytes(&mut self, data: &[u8], code: &mut Vec<u8>) {
-        let loc = self.get_data_slot(data);
-        get_local(loc, code);
+        push_bytes(data, code);
     }
 
-    fn get_data_slot(&mut self, data: &[u8]) -> usize {
-        if let Some(loc) = self.module.data.get(data) {
-            *loc
+    fn get_bytecode_slot(&mut self, data: &[u8]) -> usize {
+        if let Some(&loc) = self.module.data.get(data) {
+            loc
         } else {
-            let loc = self.fresh_env_location();
+            let loc = self.current_context.fresh_env_location();
             self.module.data.insert(data.to_vec(), loc);
             loc
         }
@@ -425,7 +488,7 @@ impl Compilation {
         if let Some(loc) = self.module.want_symbols.get(sym) {
             *loc
         } else {
-            let v = self.fresh_env_location();
+            let v = self.current_context.fresh_env_location();
             self.module.want_symbols.insert(*sym, v);
             v
         }
@@ -443,7 +506,7 @@ impl Compilation {
     }
 
     fn get_local_table(&mut self, sym: &Symbol, code: &mut Vec<u8>) {
-        let h = self.local_var(sym);
+        let h = self.current_context.local_var(sym);
         get_local(h, code);
         code.push(INSTR_DUP);
         code.push(INSTR_IS_TABLE);
@@ -455,7 +518,7 @@ impl Compilation {
     }
 
     fn get_variable(&mut self, var: &Symbol, code: &mut Vec<u8>) {
-        let loc = self.lookup_var(var);
+        let loc = self.current_context.lookup_var(var);
         match loc {
             VarLocation::Stack(s) => {
                 load_constant_int(s as i64, code);
@@ -468,54 +531,6 @@ impl Compilation {
                 self.get_global_name(var, code);
             }
         }
-    }
-
-    fn lookup_var(&mut self, var: &Symbol) -> VarLocation {
-        for (sym, loc) in &self.stack_vars {
-            if var == sym {
-                return VarLocation::Stack(*loc);
-            }
-        }
-        for (sym, loc) in self.local_vars.iter().rev() {
-            if var == sym {
-                return VarLocation::Env(*loc);
-            }
-        }
-        VarLocation::Global
-    }
-
-    fn local_var(&mut self, sym: &Symbol) -> usize {
-        for (var, loc) in self.local_vars.iter().rev() {
-            if var == sym {
-                return *loc;
-            }
-        }
-        let nvar = self.env_location();
-        self.local_vars.push((*sym, nvar));
-        nvar
-    }
-
-    fn free_location(&mut self, n: usize) {
-        self.used_locs.remove(&n);
-        self.free_locs.insert(n);
-    }
-
-    fn env_location(&mut self) -> usize {
-        let val = self.free_locs.iter().next().copied();
-        if let Some(loc) = val {
-            self.free_locs.remove(&loc);
-            self.used_locs.insert(loc);
-            loc
-        } else {
-            self.fresh_env_location()
-        }
-    }
-
-    fn fresh_env_location(&mut self) -> usize {
-        let n = self.max_var;
-        self.used_locs.insert(n);
-        self.max_var += 1;
-        n
     }
 }
 

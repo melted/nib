@@ -7,7 +7,7 @@ use crate::{
 use std::{
     collections::{BTreeSet, HashMap, HashSet},
     fmt::Display,
-    mem
+    mem, sync::LazyLock
 };
 
 mod tests;
@@ -330,6 +330,7 @@ impl DesugarState {
         }
     }
 
+
     fn set_captured_vars(&self, function: &mut Function) -> Result<()> {
         let free = free_vars(function)?;
         let current_locals = self.current_bindings.iter().filter_map(|b| {
@@ -648,20 +649,63 @@ pub enum Binder {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Function {
+    pub code_ref: Symbol,
     pub args: Vec<Symbol>,
     pub captures: Vec<Symbol>,
+    pub code_captures: HashSet<Symbol>,
     pub arity: Arity,
     pub body: Expression,
 }
 
 impl Function {
     pub fn new(args: &[Symbol], arity: &Arity, expression: &Expression) -> Self {
+        let mut captures = HashSet::new();
+        code_captures(expression, &mut captures);
         Function {
+            code_ref: next_code_id(),
             args: args.to_vec(),
             captures: Vec::new(),
+            code_captures: captures,
             arity: arity.clone(),
             body: expression.clone(),
         }
+    }
+}
+
+fn code_captures(expression: &Expression, captures: &mut HashSet<Symbol> ) {
+    match expression {
+        Expression::Cond(_, cond) => {
+            code_captures(&cond.pred, captures);
+            code_captures(&cond.if_true, captures);
+            code_captures(&cond.if_false, captures);
+        },
+        Expression::App(_, expressions) => {
+            for e in expressions {
+                code_captures(e, captures);
+            }
+        },
+        Expression::Function(function) => {
+            captures.insert(function.code_ref);
+            for c in &function.code_captures {
+                captures.insert(*c);
+            }
+        },
+        Expression::Where(_, expression, bindings) => {
+            code_captures(expression, captures);
+            for b in bindings {
+                code_captures(&b.body, captures);
+            }
+        },
+        _ => {}
+    }
+}
+
+
+pub fn next_code_id() -> Symbol {
+    unsafe {
+        static mut LOCAL_VAL: LazyLock<u32> = LazyLock::new(|| 0);
+        *LOCAL_VAL += 1;
+        sym(&format!("$code{}", *LOCAL_VAL))
     }
 }
 
