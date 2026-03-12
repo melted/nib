@@ -143,7 +143,7 @@ impl Context {
 pub(super) struct Compilation {
     module: Module,
     input: CompilationInput,
-    current_context: Context,
+    contexts: Vec<Context>,
 
     /// Future bindings in this scope, so we can bind to them instead of trying to import a
     ///  global of the same name.
@@ -168,7 +168,7 @@ impl Compilation {
     pub(super) fn new() -> Self {
         Compilation {
             module: Module::new(),
-            current_context: Context::new(),
+            contexts: vec![Context::new()],
             input: CompilationInput::Nothing,
             future_bindings: HashSet::new(),
             fixups_needed: HashMap::new(),
@@ -209,7 +209,7 @@ impl Compilation {
         }
         code.push(INSTR_RETURN);
         self.module.byte_code = code;
-        self.module.local_env_size = self.current_context.max_var + 1;
+        self.module.local_env_size = self.current_context().max_var + 1;
         Ok(())
     }
 
@@ -232,7 +232,7 @@ impl Compilation {
                     code.push(INSTR_GLOBAL_ENV);
                     code.push(INSTR_TABLE_SET);
                 } else {
-                    let loc = self.current_context.local_var(&top);
+                    let loc = self.current_context().local_var(&top);
                     set_local(loc, code);
                 }
             } else {
@@ -356,19 +356,18 @@ impl Compilation {
     }
 
     fn compile_function(&mut self, lambda: &Function, code: &mut Vec<u8>) -> Result<()> {
-        let mut old_context = Context::new();
-        mem::swap(&mut self.current_context, &mut old_context);
+        self.contexts.push(Context::new());
         for (i, arg) in lambda.args.iter().enumerate() {
-            self.current_context.stack_vars.push((*arg, i + 1));
+            self.current_context().stack_vars.push((*arg, i + 1));
         }
         let arg_end = lambda.args.len() + 1;
         for (i, cap) in lambda.captures.iter().enumerate() {
-            self.current_context.stack_vars.push((*cap, i + arg_end));
+            self.current_context().stack_vars.push((*cap, i + arg_end));
         }
         let mut fun_code = Vec::new();
         self.compile_expression(&lambda.body, &mut fun_code)?;
         fun_code.push(INSTR_RETURN);
-        mem::swap(&mut self.current_context, &mut old_context);
+        self.contexts.pop();
         let (arity, vararg) = match lambda.arity {
             crate::core::Arity::Fixed(n) => (Value::integer(n as i64), Value::bool(false)),
             crate::core::Arity::VarArg(n, i) => {
@@ -379,7 +378,7 @@ impl Compilation {
         load_constant_int(arity.get_integer(), code);
         load_constant_int( lambda.captures.len() as i64, code);
         code.push(INSTR_ALLOC_ARRAY);
-        let env_local = self.current_context.env_location();
+        let env_local = self.current_context().env_location();
         set_local(env_local, code);
         for (i, c) in lambda.captures.iter().enumerate() {
             if self.future_bindings.contains(c) {
@@ -393,7 +392,8 @@ impl Compilation {
             }
         }
         get_local(env_local, code);
-        self.compile_bytes(&fun_code, code);
+        let loc = self.get_bytecode_slot(&lambda.code_ref, &fun_code);
+        get_local(loc, code);
         code.push(INSTR_ALLOC_CLOSURE);
         Ok(())
     }
@@ -453,8 +453,8 @@ impl Compilation {
     ) -> Result<()> {
         let mut old_fixups = HashMap::new();
         let mut old_future_bindings = self.future_bindings.clone();
-        let mut old_used_vars = self.current_context.used_locs.clone();
-        let mut old_free_vars = self.current_context.free_locs.clone();
+        let mut old_used_vars = self.current_context().used_locs.clone();
+        let mut old_free_vars = self.current_context().free_locs.clone();
         mem::swap(&mut old_fixups, &mut self.fixups_needed);
         let is_tail = self.is_tail;
         self.collect_binding_names(bindings);
@@ -465,8 +465,8 @@ impl Compilation {
         self.compile_expression(exp, code)?;
         mem::swap(&mut old_fixups, &mut self.fixups_needed);
         mem::swap(&mut old_future_bindings, &mut self.future_bindings);
-        mem::swap(&mut old_used_vars, &mut self.current_context.used_locs);
-        mem::swap(&mut old_free_vars, &mut self.current_context.free_locs);
+        mem::swap(&mut old_used_vars, &mut self.current_context().used_locs);
+        mem::swap(&mut old_free_vars, &mut self.current_context().free_locs);
         Ok(())
     }
 
@@ -474,11 +474,12 @@ impl Compilation {
         push_bytes(data, code);
     }
 
-    fn get_bytecode_slot(&mut self, data: &[u8]) -> usize {
+    fn get_bytecode_slot(&mut self, sym: &Symbol, data: &[u8]) -> usize {
         if let Some(&loc) = self.module.data.get(data) {
             loc
         } else {
-            let loc = self.current_context.fresh_env_location();
+            let loc = self.base_context().fresh_env_location();
+            self.base_context().local_vars.push((*sym, loc));
             self.module.data.insert(data.to_vec(), loc);
             loc
         }
@@ -488,7 +489,7 @@ impl Compilation {
         if let Some(loc) = self.module.want_symbols.get(sym) {
             *loc
         } else {
-            let v = self.current_context.fresh_env_location();
+            let v = self.current_context().fresh_env_location();
             self.module.want_symbols.insert(*sym, v);
             v
         }
@@ -506,7 +507,7 @@ impl Compilation {
     }
 
     fn get_local_table(&mut self, sym: &Symbol, code: &mut Vec<u8>) {
-        let h = self.current_context.local_var(sym);
+        let h = self.current_context().local_var(sym);
         get_local(h, code);
         code.push(INSTR_DUP);
         code.push(INSTR_IS_TABLE);
@@ -518,7 +519,7 @@ impl Compilation {
     }
 
     fn get_variable(&mut self, var: &Symbol, code: &mut Vec<u8>) {
-        let loc = self.current_context.lookup_var(var);
+        let loc = self.current_context().lookup_var(var);
         match loc {
             VarLocation::Stack(s) => {
                 load_constant_int(s as i64, code);
@@ -531,6 +532,14 @@ impl Compilation {
                 self.get_global_name(var, code);
             }
         }
+    }
+
+    fn current_context(&mut self) -> &mut Context {
+        self.contexts.last_mut().unwrap()
+    }
+
+    fn base_context(&mut self) -> &mut Context {
+        self.contexts.get_mut(0).unwrap()
     }
 }
 

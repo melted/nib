@@ -652,7 +652,8 @@ pub struct Function {
     pub code_ref: Symbol,
     pub args: Vec<Symbol>,
     pub captures: Vec<Symbol>,
-    pub code_captures: HashSet<Symbol>,
+    pub code_captures: Vec<Symbol>,
+    pub literal_captures: Vec<Literal>,
     pub arity: Arity,
     pub body: Expression,
 }
@@ -661,11 +662,14 @@ impl Function {
     pub fn new(args: &[Symbol], arity: &Arity, expression: &Expression) -> Self {
         let mut captures = HashSet::new();
         code_captures(expression, &mut captures);
+        let mut lits = BTreeSet::new();
+        literal_captures(expression, &mut lits);
         Function {
             code_ref: next_code_id(),
             args: args.to_vec(),
             captures: Vec::new(),
-            code_captures: captures,
+            code_captures: captures.into_iter().collect::<Vec<_>>(),
+            literal_captures: lits.into_iter().collect(),
             arity: arity.clone(),
             body: expression.clone(),
         }
@@ -699,6 +703,42 @@ fn code_captures(expression: &Expression, captures: &mut HashSet<Symbol> ) {
         _ => {}
     }
 }
+
+fn literal_captures(expression: &Expression, captures: &mut BTreeSet<Literal>) {
+    match expression {
+        Expression::Cond(_, cond) => {
+            literal_captures(&cond.pred, captures);
+            literal_captures(&cond.if_true, captures);
+            literal_captures(&cond.if_false, captures);
+        },
+        Expression::App(_, expressions) => {
+            for e in expressions {
+                literal_captures(e, captures);
+            }
+        },
+        Expression::Function(function) => {
+            for lit in &function.literal_captures {
+                captures.insert(lit.clone());
+            }
+        },
+        Expression::Where(_, expression, bindings) => {
+            literal_captures(expression, captures);
+            for b in bindings {
+                literal_captures(&b.body, captures);
+            }
+        },
+        Expression::Literal(_, lit) => {
+            match lit {
+                Literal::Bytearray(_) | Literal::String(_) | Literal::Symbol(_) => {
+                    captures.insert(lit.clone());
+                }
+                _ => {}
+            }
+        }
+        _ => {}
+    }
+}
+
 
 
 pub fn next_code_id() -> Symbol {

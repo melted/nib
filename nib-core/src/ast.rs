@@ -499,7 +499,7 @@ pub struct Cond {
     pub on_false: Box<ExpressionNode>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub enum Literal {
     Nil,
     Bool(bool),
@@ -509,6 +509,16 @@ pub enum Literal {
     String(String),
     Symbol(Symbol),
     Bytearray(Vec<u8>),
+}
+
+impl Eq for Literal {
+
+}
+
+impl Ord for Literal {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.partial_cmp(other).unwrap_or(std::cmp::Ordering::Less)
+    }
 }
 
 impl Display for Literal {
