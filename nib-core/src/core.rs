@@ -621,21 +621,22 @@ impl Display for Module {
 pub struct Binding {
     pub id: Node,
     pub binder: Binder,
-    pub name: Option<Name>,
     pub body: Expression,
 }
 
 impl Binding {
     pub fn make(id: Node, binder: Binder, body: Expression) -> Self {
-        let name = match &binder {
-            Binder::Public(name) | Binder::Local(name) => Some(name.clone()),
-            Binder::Unbound => None,
-        };
         Binding {
             id,
             binder,
-            name,
             body,
+        }
+    }
+
+    pub fn name(&self) -> Option<Name> {
+        match &self.binder {
+            Binder::Local(n) | Binder::Public(n) => Some(n.clone()),
+            Binder::Unbound => None
         }
     }
 }
@@ -662,7 +663,7 @@ impl Function {
     pub fn new(args: &[Symbol], arity: &Arity, expression: &Expression) -> Self {
         let mut captures = HashSet::new();
         code_captures(expression, &mut captures);
-        let mut lits = BTreeSet::new();
+        let mut lits = HashSet::new();
         literal_captures(expression, &mut lits);
         Function {
             code_ref: next_code_id(),
@@ -704,7 +705,7 @@ fn code_captures(expression: &Expression, captures: &mut HashSet<Symbol> ) {
     }
 }
 
-fn literal_captures(expression: &Expression, captures: &mut BTreeSet<Literal>) {
+fn literal_captures(expression: &Expression, captures: &mut HashSet<Literal>) {
     match expression {
         Expression::Cond(_, cond) => {
             literal_captures(&cond.pred, captures);
@@ -729,7 +730,7 @@ fn literal_captures(expression: &Expression, captures: &mut BTreeSet<Literal>) {
         },
         Expression::Literal(_, lit) => {
             match lit {
-                Literal::Bytearray(_) | Literal::String(_) | Literal::Symbol(_) => {
+                Literal::Bytearray(_) | Literal::String(_) => {
                     captures.insert(lit.clone());
                 }
                 _ => {}
@@ -961,7 +962,7 @@ pub fn rename(expr: &Expression, old_name: &Symbol, new_name: &Symbol) -> Expres
                 let mut new_binding = b.clone();
                 new_binding.body = new_body;
                 new_defs.push(new_binding);
-                if let Some(Name::Plain(x)) = &b.name
+                if let Some(Name::Plain(x)) = &b.name()
                     && old_name == x
                 {
                     shadowed = true;

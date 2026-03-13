@@ -2,7 +2,7 @@ use crate::{
     common::{Metadata, Name, Node, Symbol},
     parser::lexer,
 };
-use std::{collections::HashSet, fmt::Display};
+use std::{collections::HashSet, fmt::Display, hash::{Hash, Hasher}};
 
 #[derive(Debug, Clone)]
 pub struct Module {
@@ -499,7 +499,7 @@ pub struct Cond {
     pub on_false: Box<ExpressionNode>,
 }
 
-#[derive(Debug, Clone, PartialEq, PartialOrd)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Literal {
     Nil,
     Bool(bool),
@@ -511,13 +511,20 @@ pub enum Literal {
     Bytearray(Vec<u8>),
 }
 
-impl Eq for Literal {
+impl Eq for Literal {}
 
-}
-
-impl Ord for Literal {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.partial_cmp(other).unwrap_or(std::cmp::Ordering::Less)
+impl Hash for Literal {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        match self {
+            Literal::Nil => 0.hash(state),
+            Literal::Bool(b) => b.hash(state),
+            Literal::Integer(i) => i.hash(state),
+            Literal::Real(r) => r.to_bits().hash(state),
+            Literal::Char(c) => c.hash(state),
+            Literal::String(s) => s.hash(state),
+            Literal::Symbol(global_symbol) => global_symbol.hash(state),
+            Literal::Bytearray(items) => items.hash(state),
+        }
     }
 }
 

@@ -167,6 +167,9 @@ pub const INSTR_JNNEG_IMM8: u8 = 93;
 pub const INSTR_JFALSE_IMM8: u8 = 94;
 pub const INSTR_JNFALSE_IMM8: u8 = 95;
 
+// Symbol
+pub const INSTR_MAKE_SYMBOL: u8 = 100;
+
 // Type
 pub const INSTR_TYPE: u8 = 101;
 pub const INSTR_SET_TYPE: u8 = 102;

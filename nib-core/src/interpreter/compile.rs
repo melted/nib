@@ -1,24 +1,18 @@
 use symbol_table::static_symbol;
 
 use crate::ast::Literal;
-use crate::common::{Metadata, Name};
+use crate::common::{Metadata, Name, sym, symbol_id};
 use crate::common::{Result, Symbol};
 use crate::core::{Binder, Binding, Cond, Expression, Function};
 use crate::interpreter::bytecode::{
-    INSTR_ALLOC_ARRAY, INSTR_ALLOC_CLOSURE, INSTR_ALLOC_FLOAT, INSTR_ALLOC_TABLE, INSTR_ARRAY_SET,
-    INSTR_CALL, INSTR_CALL_TAIL, INSTR_DROP, INSTR_DUP, INSTR_GET_LOCAL, INSTR_GLOBAL_ENV,
-    INSTR_IS_TABLE, INSTR_JFALSE, INSTR_JFALSE_IMM8, INSTR_JNEG, INSTR_JNEG_IMM8, INSTR_JNFALSE,
-    INSTR_JNFALSE_IMM8, INSTR_JNNEG, INSTR_JNNEG_IMM8, INSTR_JNPOS, INSTR_JNPOS_IMM8, INSTR_JPOS,
-    INSTR_JPOS_IMM8, INSTR_JUMP, INSTR_JUMP_IMM8, INSTR_JZ, INSTR_JZ_IMM8, INSTR_LOAD_BYTES_IMM,
-    INSTR_LOAD_IMM8, INSTR_LOAD_IMM16, INSTR_LOAD_IMM32, INSTR_LOAD_IMM64, INSTR_PUSH_FALSE,
-    INSTR_PUSH_LAST_SMALL, INSTR_PUSH_MINUS_ONE, INSTR_PUSH_NIL, INSTR_PUSH_TRUE, INSTR_RETURN,
-    INSTR_SET_LOCAL, INSTR_SET_TYPE, INSTR_STACK_LOAD, INSTR_TABLE_GET, INSTR_TABLE_SET,
+    INSTR_ALLOC_ARRAY, INSTR_ALLOC_CLOSURE, INSTR_ALLOC_FLOAT, INSTR_ALLOC_TABLE, INSTR_ARRAY_SET, INSTR_CALL, INSTR_CALL_TAIL, INSTR_DROP, INSTR_DUP, INSTR_GET_LOCAL, INSTR_GLOBAL_ENV, INSTR_IS_TABLE, INSTR_JFALSE, INSTR_JFALSE_IMM8, INSTR_JNEG, INSTR_JNEG_IMM8, INSTR_JNFALSE, INSTR_JNFALSE_IMM8, INSTR_JNNEG, INSTR_JNNEG_IMM8, INSTR_JNPOS, INSTR_JNPOS_IMM8, INSTR_JPOS, INSTR_JPOS_IMM8, INSTR_JUMP, INSTR_JUMP_IMM8, INSTR_JZ, INSTR_JZ_IMM8, INSTR_LOAD_BYTES_IMM, INSTR_LOAD_IMM8, INSTR_LOAD_IMM16, INSTR_LOAD_IMM32, INSTR_LOAD_IMM64, INSTR_MAKE_SYMBOL, INSTR_PUSH_FALSE, INSTR_PUSH_LAST_SMALL, INSTR_PUSH_MINUS_ONE, INSTR_PUSH_NIL, INSTR_PUSH_TRUE, INSTR_RETURN, INSTR_SET_LOCAL, INSTR_SET_TYPE, INSTR_STACK_LOAD, INSTR_TABLE_GET, INSTR_TABLE_SET
 };
 use crate::interpreter::heap::{Value, ValueRepr};
 use crate::interpreter::prims::is_bytecode_primitive;
 use crate::interpreter::stack_return;
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::mem;
+use std::sync::LazyLock;
 
 pub fn compile(from: crate::core::Module) -> Result<Module> {
     let module = Module::new();
@@ -42,8 +36,6 @@ pub struct Module {
     pub byte_code: Vec<u8>,
     /// Size of local environment
     pub local_env_size: usize,
-    /// A list of symbol literals that should be put into the local environment.
-    pub want_symbols: HashMap<Symbol, usize>,
     /// Byte arrays to be put on the heap and made available in the local env
     pub data: HashMap<Vec<u8>, usize>,
 }
@@ -60,7 +52,6 @@ impl Module {
             metadata: None,
             byte_code: Vec::new(),
             local_env_size: 0,
-            want_symbols: HashMap::new(),
             data: HashMap::new(),
         }
     }
@@ -152,6 +143,7 @@ pub(super) struct Compilation {
     /// first usize is where the lambdas environment is in the local environment and the
     /// second is the offset in the lambda's environment
     fixups_needed: HashMap<Symbol, Vec<(usize, usize)>>,
+    data_symbols: HashMap<Vec<u8>, Symbol>,
     is_tail: bool,
 }
 
@@ -172,6 +164,7 @@ impl Compilation {
             input: CompilationInput::Nothing,
             future_bindings: HashSet::new(),
             fixups_needed: HashMap::new(),
+            data_symbols: HashMap::new(),
             is_tail: true,
         }
     }
@@ -344,29 +337,46 @@ impl Compilation {
                 code.push(INSTR_TABLE_GET);
                 code.push(INSTR_SET_TYPE);
             }
-            Literal::Symbol(global_symbol) => {
-                let s = self.get_symbol_slot(global_symbol);
-                get_local(s, code);
+            Literal::Symbol(sym) => {
+                self.get_symbol(sym, code);
             }
-            Literal::Bytearray(items) => {
-                self.compile_bytes(items, code);
+            Literal::Bytearray(data) => {
+                let sym = self.get_data_symbol(data);
+                self.set_data_slot(&sym, data);
+                self.get_variable(&sym, code);
             }
         }
         Ok(())
     }
 
+    fn get_all_captures(&mut self, lambda: &Function) -> Vec<Symbol> {
+        let mut captures = Vec::new();
+        captures.extend(lambda.captures.clone());
+        captures.extend(lambda.code_captures.clone());
+        for lit in &lambda.literal_captures {
+            captures.push(self.get_literal_symbol(lit));
+        }
+        captures
+    }
+
     fn compile_function(&mut self, lambda: &Function, code: &mut Vec<u8>) -> Result<()> {
+        // Make sure these exist outside the function before capture 
+        for lit in &lambda.literal_captures {
+            let _ = self.get_literal_symbol(lit);
+        }
         self.contexts.push(Context::new());
         for (i, arg) in lambda.args.iter().enumerate() {
             self.current_context().stack_vars.push((*arg, i + 1));
         }
-        let arg_end = lambda.args.len() + 1;
-        for (i, cap) in lambda.captures.iter().enumerate() {
-            self.current_context().stack_vars.push((*cap, i + arg_end));
+        let captures = self.get_all_captures(lambda);
+        for (i, cap) in captures.iter().enumerate() {
+            self.current_context().local_vars.push((*cap, i));
+            self.current_context().used_locs.insert(i);
         }
         let mut fun_code = Vec::new();
         self.compile_expression(&lambda.body, &mut fun_code)?;
         fun_code.push(INSTR_RETURN);
+        let env_size = self.current_context().max_var;
         self.contexts.pop();
         let (arity, vararg) = match lambda.arity {
             crate::core::Arity::Fixed(n) => (Value::integer(n as i64), Value::bool(false)),
@@ -376,11 +386,12 @@ impl Compilation {
         };
         load_constant(&vararg, code);
         load_constant_int(arity.get_integer(), code);
-        load_constant_int( lambda.captures.len() as i64, code);
+        load_constant_int( env_size as i64, code);
         code.push(INSTR_ALLOC_ARRAY);
         let env_local = self.current_context().env_location();
         set_local(env_local, code);
-        for (i, c) in lambda.captures.iter().enumerate() {
+
+        for (i, c) in captures.iter().enumerate() {
             if self.future_bindings.contains(c) {
                 let addr = (env_local, i);
                 self.fixups_needed.entry(*c).and_modify(|v| v.push(addr)).or_insert(vec![addr]);
@@ -392,7 +403,7 @@ impl Compilation {
             }
         }
         get_local(env_local, code);
-        self.set_bytecode_slot(&lambda.code_ref, &fun_code);
+        self.set_data_slot(&lambda.code_ref, &fun_code);
         self.get_variable(&lambda.code_ref, code);
         code.push(INSTR_ALLOC_CLOSURE);
         Ok(())
@@ -454,7 +465,6 @@ impl Compilation {
         let mut old_fixups = HashMap::new();
         let mut old_future_bindings = self.future_bindings.clone();
         let mut old_used_vars = self.current_context().used_locs.clone();
-        let mut old_free_vars = self.current_context().free_locs.clone();
         mem::swap(&mut old_fixups, &mut self.fixups_needed);
         let is_tail = self.is_tail;
         self.collect_binding_names(bindings);
@@ -463,10 +473,12 @@ impl Compilation {
         }
         self.is_tail = is_tail;
         self.compile_expression(exp, code)?;
+        let to_free = self.current_context().used_locs.difference(&old_used_vars).copied().collect::<Vec<_>>();
+        for v in to_free {
+            self.current_context().free_location(v);
+        }
         mem::swap(&mut old_fixups, &mut self.fixups_needed);
         mem::swap(&mut old_future_bindings, &mut self.future_bindings);
-        mem::swap(&mut old_used_vars, &mut self.current_context().used_locs);
-        mem::swap(&mut old_free_vars, &mut self.current_context().free_locs);
         Ok(())
     }
 
@@ -474,24 +486,35 @@ impl Compilation {
         push_bytes(data, code);
     }
 
-    fn set_bytecode_slot(&mut self, sym: &Symbol, data: &[u8]) {
+    fn set_data_slot(&mut self, sym: &Symbol, data: &[u8]) {
         let b = self.base_context().local_var(sym);
         self.module.data.insert(data.to_vec(), b);
     }
 
-    fn get_symbol_slot(&mut self, sym: &Symbol) -> usize {
-        if let Some(loc) = self.module.want_symbols.get(sym) {
-            *loc
+    fn get_data_symbol(&mut self, data:&[u8]) -> Symbol {
+        if let Some(sym) = self.data_symbols.get(data) {
+            *sym
         } else {
-            let v = self.current_context().fresh_env_location();
-            self.module.want_symbols.insert(*sym, v);
-            v
+            let sym = next_lit_id();
+            self.data_symbols.insert(data.to_vec(), sym);
+            sym
         }
     }
 
+
     fn get_symbol(&mut self, sym: &Symbol, code: &mut Vec<u8>) {
-        let sym_addr = self.get_symbol_slot(sym);
-        get_local(sym_addr, code);
+        load_constant_int(symbol_id(sym) as i64, code);
+        code.push(INSTR_MAKE_SYMBOL);
+    }
+
+    fn get_literal_symbol(&mut self, lit: &Literal) -> Symbol {
+        match lit {
+            Literal::Bytearray(c) => self.get_data_symbol(c), 
+            Literal::String(s) => self.get_data_symbol(s.as_bytes()),
+            _ => {
+                panic!("Invalid literal in get_literal_symbol");
+            }
+        }
     }
 
     fn get_global_name(&mut self, sym: &Symbol, code: &mut Vec<u8>) {
@@ -636,5 +659,13 @@ fn short_jump_op(op: u8) -> u8 {
         INSTR_JPOS => INSTR_JPOS_IMM8,
         INSTR_JZ => INSTR_JZ_IMM8,
         _ => op,
+    }
+}
+
+pub fn next_lit_id() -> Symbol {
+    unsafe {
+        static mut LOCAL_VAL: LazyLock<u32> = LazyLock::new(|| 0);
+        *LOCAL_VAL += 1;
+        sym(&format!("$lit{}", *LOCAL_VAL))
     }
 }

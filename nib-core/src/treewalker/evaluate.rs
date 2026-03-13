@@ -116,9 +116,9 @@ impl Runtime {
     fn add_binding(&mut self, eval_status: &mut EvalStatus, binding: &Binding) {
         eval_status
             .work_stack
-            .push(EvalStep::Bind(binding.name.clone(), binding.binder.clone()));
+            .push(EvalStep::Bind(binding.name(), binding.binder.clone()));
         eval_status.work_stack.push(EvalStep::Expression(
-                    binding.name.clone(),
+                    binding.name(),
                     binding.body.clone(),
                 ));
     }

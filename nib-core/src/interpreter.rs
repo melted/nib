@@ -14,7 +14,7 @@ use libffi::low::CodePtr;
 use symbol_table::static_symbol;
 
 use crate::ast;
-use crate::common::{Error, Name, Result, Signature, Symbol, sym, symbol_id};
+use crate::common::{Error, Name, Result, Signature, Symbol, get_symbol, sym, symbol_id};
 use crate::core::{desugar, desugar_expression};
 use crate::interpreter::bytecode::*;
 use crate::interpreter::compile::{Module, compile, compile_expression};
@@ -102,7 +102,7 @@ impl Options {
     fn new() -> Self {
         Options {
             output_core: false,
-            trace: false,
+            trace: true,
         }
     }
 }
@@ -173,9 +173,6 @@ impl Runtime {
 
     pub fn make_local_env(&mut self, module: &compile::Module) -> Value {
         let array = Array::make(self, module.local_env_size);
-        for (sym, &idx) in &module.want_symbols {
-            array.set(idx, Value::symbol(sym));
-        }
         for (blob, &idx) in &module.data {
             let bytes = Bytes::with(self, &blob);
             array.set(idx, Value::from(bytes));
@@ -343,6 +340,10 @@ impl Runtime {
     fn step(&mut self) -> Result<bool> {
         let code = self.code.get_bytes();
         let instr = code.at(self.ip);
+        if self.options.trace {
+            dbg!(instr, self.ip);
+            dbg!(&self.stack, &self.call_stack);
+        }
         self.ip += 1;
         match instr {
             INSTR_PUSH_ZERO..=INSTR_PUSH_LAST_SMALL => self.op_push_small(instr),
@@ -371,6 +372,7 @@ impl Runtime {
             INSTR_ROT => self.op_rot(),
             INSTR_DROP_FRAME => self.op_drop_frame(),
             INSTR_STACK_LIFT => self.op_stack_lift(),
+            INSTR_MAKE_SYMBOL => self.op_make_symbol(),
             INSTR_TYPE => self.op_type(),
             INSTR_SET_TYPE => self.op_set_type(),
             INSTR_ALLOC_FLOAT..=INSTR_ALLOC_CLOSURE => self.op_alloc(instr),
@@ -724,13 +726,6 @@ impl Runtime {
             let elems = self.stack.slice_mut(args, 0);
             elems.rotate_right(extra_args + 1);
         }
-        let mut env_size = 0;
-        if closure.env().is_array() {
-            env_size = closure.env().get_array().size();
-            for v in closure.env().get_array().values() {
-                self.stack_push(*v);
-            }
-        }
         match closure.get_tag() {
             TYPE_BYTECODE => {
                 if op == INSTR_CALL || extra_args > 0 || self.call_stack.is_empty() {
@@ -740,14 +735,17 @@ impl Runtime {
                         Value::from(self.code),
                         Value::integer(self.ip as i64),
                         Value::integer(self.stack.base as i64),
+                        self.local_env
                     ];
                     self.call_stack.base = self.call_stack.top;
                     self.call_stack.pushv(&frame);
-                    self.stack.base = self.stack.top() - args - env_size;
+                    self.stack.base = self.stack.top() - args;
                 }
                 self.code = closure.code_value();
                 self.ip = 0;
+                self.local_env = closure.env();
             }
+
             TYPE_EXTERN => {
                 let fun_ptr: *const () = closure.code_value().get_cpointer();
                 unsafe {
@@ -784,11 +782,13 @@ impl Runtime {
             self.stack.dip(cc.get_cc_args());
             self.op_call(INSTR_CALL_TAIL)
         } else {
+            let old_env = self.call_stack.pop();
             let old_base = self.call_stack.pop().get_integer() as usize;
             let ip = self.call_stack.pop().get_integer() as usize;
             let code = self.call_stack.pop();
             self.code = code;
             self.ip = ip;
+            self.local_env = old_env;
             self.stack.set_top(self.stack.base);
             self.stack.base = old_base;
             self.stack.push(cc);
@@ -1045,6 +1045,13 @@ impl Runtime {
         Ok(false)
     }
 
+    fn op_make_symbol(&mut self) -> Result<bool> {
+        let id = self.stack.pop().get_integer() as u32;
+        let val = Value::symbol(&get_symbol(id));
+        self.stack_push(val);
+        Ok(false)
+    }
+
     fn op_array_get(&mut self) -> Result<bool> {
         let obj = self.stack.pop();
         let pos = self.stack.pop();
@@ -1120,6 +1127,7 @@ impl Runtime {
     }
 
     fn op_get_local(&mut self) -> Result<bool> {
+        dbg!(&self.local_env);
         let index = self.stack.pop().get_integer() as usize;
         let val = self.local_env.get_array().at(index);
         self.stack_push(val);
@@ -1127,6 +1135,7 @@ impl Runtime {
     }
 
     fn op_set_local(&mut self) -> Result<bool> {
+        dbg!(&self.local_env);
         let index = self.stack.pop().get_integer() as usize;
         let val = self.stack.pop();
         self.local_env.get_array().set(index, val);
