@@ -7,7 +7,8 @@ use crate::{
 use std::{
     collections::{BTreeSet, HashMap, HashSet},
     fmt::Display,
-    mem, sync::LazyLock
+    mem,
+    sync::LazyLock,
 };
 
 mod tests;
@@ -97,7 +98,11 @@ impl DesugarState {
         let binder = self.desugar_binding_name(&ast_binding.name, is_local)?;
         self.metadata.last_id += 1;
         let result = self.desugar_funclauses(self.metadata.last_id, &ast_binding.clauses)?;
-        let bind = Binding::make(ast_binding.id, binder, Expression::Function(Box::new(result)));
+        let bind = Binding::make(
+            ast_binding.id,
+            binder,
+            Expression::Function(Box::new(result)),
+        );
         self.bindings.push(bind);
         Ok(())
     }
@@ -140,14 +145,16 @@ impl DesugarState {
                     var_exp.push(var(&v));
                     var_syms.push(replaced[&v].clone());
                 }
-                let on_fail = app(&[var(&sym("_prim_panic")), literal(&Literal::String("Failure to match irrefutable varbinding".to_string()))]);
-                let (is_irrefutable, pexpr) =self.build_pattern_expression(&parts, &app(&var_exp), &on_fail)?;
+                let on_fail = app(&[
+                    var(&sym("_prim_panic")),
+                    literal(&Literal::String(
+                        "Failure to match irrefutable varbinding".to_string(),
+                    )),
+                ]);
+                let (is_irrefutable, pexpr) =
+                    self.build_pattern_expression(&parts, &app(&var_exp), &on_fail)?;
                 let nam_arr = self.next_local();
-                let binding = Binding::make(
-                    ast_binding.id,
-                    Binder::Local(nam_arr.clone()),
-                    pexpr,
-                );
+                let binding = Binding::make(ast_binding.id, Binder::Local(nam_arr.clone()), pexpr);
                 self.bindings.push(binding);
                 for (i, k) in var_syms.iter().enumerate() {
                     let rhs = Expression::App(
@@ -330,16 +337,16 @@ impl DesugarState {
         }
     }
 
-
     fn set_captured_vars(&self, function: &mut Function) -> Result<()> {
         let free = free_vars(function)?;
-        let current_locals = self.current_bindings.iter().filter_map(|b| {
-            match b {
-                Binder::Local(l) => Some(Symbol::from(l)),
-                _ => None
-            }
+        let current_locals = self.current_bindings.iter().filter_map(|b| match b {
+            Binder::Local(l) => Some(Symbol::from(l)),
+            _ => None,
         });
-        function.captures = free.intersection(&current_locals.collect()).copied().collect();
+        function.captures = free
+            .intersection(&current_locals.collect())
+            .copied()
+            .collect();
         Ok(())
     }
 
@@ -411,7 +418,12 @@ impl DesugarState {
         self.build_pattern_expression(&all_parts, &exp, on_fail)
     }
 
-    fn build_pattern_expression(&mut self, all_parts:&[PatternParts], base: &Expression, on_fail:&Expression) -> Result<(bool, Expression)> {
+    fn build_pattern_expression(
+        &mut self,
+        all_parts: &[PatternParts],
+        base: &Expression,
+        on_fail: &Expression,
+    ) -> Result<(bool, Expression)> {
         let mut exp = base.clone();
         let is_irrefutable = all_parts
             .iter()
@@ -427,11 +439,8 @@ impl DesugarState {
                         // creating a binding.
                         exp = rename(&exp, var, v);
                     } else {
-                        let binding = Binding::make(
-                            0,
-                            Binder::Local(Name::sym(var)),
-                            expression.clone()
-                        );
+                        let binding =
+                            Binding::make(0, Binder::Local(Name::sym(var)), expression.clone());
                         match &mut exp {
                             Expression::Where(n, expr, binds) => {
                                 binds.insert(0, binding);
@@ -463,7 +472,7 @@ impl DesugarState {
             Pattern::Var(old) => {
                 let n = Symbol::from(format!("$z{}", counter));
                 *counter += 1;
-                
+
                 replacements.insert(n, old.clone());
                 p.pattern = Pattern::Var(Name::Plain(n))
             }
@@ -626,17 +635,13 @@ pub struct Binding {
 
 impl Binding {
     pub fn make(id: Node, binder: Binder, body: Expression) -> Self {
-        Binding {
-            id,
-            binder,
-            body,
-        }
+        Binding { id, binder, body }
     }
 
     pub fn name(&self) -> Option<Name> {
         match &self.binder {
             Binder::Local(n) | Binder::Public(n) => Some(n.clone()),
-            Binder::Unbound => None
+            Binder::Unbound => None,
         }
     }
 }
@@ -677,30 +682,30 @@ impl Function {
     }
 }
 
-fn code_captures(expression: &Expression, captures: &mut HashSet<Symbol> ) {
+fn code_captures(expression: &Expression, captures: &mut HashSet<Symbol>) {
     match expression {
         Expression::Cond(_, cond) => {
             code_captures(&cond.pred, captures);
             code_captures(&cond.if_true, captures);
             code_captures(&cond.if_false, captures);
-        },
+        }
         Expression::App(_, expressions) => {
             for e in expressions {
                 code_captures(e, captures);
             }
-        },
+        }
         Expression::Function(function) => {
             captures.insert(function.code_ref);
             for c in &function.code_captures {
                 captures.insert(*c);
             }
-        },
+        }
         Expression::Where(_, expression, bindings) => {
             code_captures(expression, captures);
             for b in bindings {
                 code_captures(&b.body, captures);
             }
-        },
+        }
         _ => {}
     }
 }
@@ -711,36 +716,32 @@ fn literal_captures(expression: &Expression, captures: &mut HashSet<Literal>) {
             literal_captures(&cond.pred, captures);
             literal_captures(&cond.if_true, captures);
             literal_captures(&cond.if_false, captures);
-        },
+        }
         Expression::App(_, expressions) => {
             for e in expressions {
                 literal_captures(e, captures);
             }
-        },
+        }
         Expression::Function(function) => {
             for lit in &function.literal_captures {
                 captures.insert(lit.clone());
             }
-        },
+        }
         Expression::Where(_, expression, bindings) => {
             literal_captures(expression, captures);
             for b in bindings {
                 literal_captures(&b.body, captures);
             }
-        },
-        Expression::Literal(_, lit) => {
-            match lit {
-                Literal::Bytearray(_) | Literal::String(_) => {
-                    captures.insert(lit.clone());
-                }
-                _ => {}
-            }
         }
+        Expression::Literal(_, lit) => match lit {
+            Literal::Bytearray(_) | Literal::String(_) => {
+                captures.insert(lit.clone());
+            }
+            _ => {}
+        },
         _ => {}
     }
 }
-
-
 
 pub fn next_code_id() -> Symbol {
     unsafe {
@@ -875,7 +876,7 @@ fn app(exps: &[Expression]) -> Expression {
     Expression::App(0, exps.to_vec())
 }
 
-fn fun(f : Function) -> Expression {
+fn fun(f: Function) -> Expression {
     Expression::Function(Box::new(f))
 }
 
@@ -921,7 +922,6 @@ impl Arity {
     }
 }
 
-
 pub fn rename(expr: &Expression, old_name: &Symbol, new_name: &Symbol) -> Expression {
     match expr {
         Expression::Var(n, v) if v == old_name => Expression::Var(*n, *new_name),
@@ -946,7 +946,8 @@ pub fn rename(expr: &Expression, old_name: &Symbol, new_name: &Symbol) -> Expres
             } else {
                 old_function.body.clone()
             };
-            let mut new_function = Function::new(&old_function.args, &old_function.arity, &new_body);
+            let mut new_function =
+                Function::new(&old_function.args, &old_function.arity, &new_body);
             new_function.captures = old_function.captures.clone();
             fun(new_function)
         }

@@ -1,6 +1,12 @@
 use core::slice;
 use std::{
-    collections::{HashMap, HashSet}, env, ffi::c_void, fmt::{Debug, Display}, hash::{DefaultHasher, Hash, Hasher}, ptr::copy_nonoverlapping, slice::{from_raw_parts, from_raw_parts_mut}
+    collections::{HashMap, HashSet},
+    env,
+    ffi::c_void,
+    fmt::{Debug, Display},
+    hash::{DefaultHasher, Hash, Hasher},
+    ptr::copy_nonoverlapping,
+    slice::{from_raw_parts, from_raw_parts_mut},
 };
 
 use region::Allocation;

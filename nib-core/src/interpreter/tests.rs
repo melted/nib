@@ -135,7 +135,6 @@ fn add_numbers() -> Result<()> {
     Ok(())
 }
 
-
 #[test]
 fn run_literal_expression_integer() -> Result<()> {
     let mut rt = Runtime::new();
@@ -143,7 +142,6 @@ fn run_literal_expression_integer() -> Result<()> {
     assert_eq!(val, Value::integer(1));
     Ok(())
 }
-
 
 #[test]
 fn run_literal_expression_bytes() -> Result<()> {
@@ -153,7 +151,6 @@ fn run_literal_expression_bytes() -> Result<()> {
     Ok(())
 }
 
-
 #[test]
 fn run_literal_expression_string() -> Result<()> {
     let mut rt = Runtime::new();
@@ -162,7 +159,6 @@ fn run_literal_expression_string() -> Result<()> {
     Ok(())
 }
 
-
 #[test]
 fn run_literal_expression_symbol() -> Result<()> {
     let mut rt = Runtime::new();
@@ -170,7 +166,6 @@ fn run_literal_expression_symbol() -> Result<()> {
     assert_eq!(val.get_symbol(), sym("hej"));
     Ok(())
 }
-
 
 #[test]
 fn run_array_expression() -> Result<()> {
@@ -183,7 +178,6 @@ fn run_array_expression() -> Result<()> {
     Ok(())
 }
 
-
 #[test]
 fn run_lambda_expression() -> Result<()> {
     let mut rt = Runtime::new();
@@ -191,7 +185,6 @@ fn run_lambda_expression() -> Result<()> {
     dbg!(val);
     Ok(())
 }
-
 
 #[test]
 fn run_lambda_app_expression() -> Result<()> {
@@ -201,7 +194,6 @@ fn run_lambda_app_expression() -> Result<()> {
     Ok(())
 }
 
-
 #[test]
 fn run_lambda_app_args_expression() -> Result<()> {
     let mut rt = Runtime::new();
@@ -210,7 +202,6 @@ fn run_lambda_app_args_expression() -> Result<()> {
     Ok(())
 }
 
-
 #[test]
 fn run_lambda_app_multiple_args_expression() -> Result<()> {
     let mut rt = Runtime::new();
@@ -218,7 +209,6 @@ fn run_lambda_app_multiple_args_expression() -> Result<()> {
     assert_eq!(val.get_integer(), 9);
     Ok(())
 }
-
 
 #[test]
 fn run_simple_binding() -> Result<()> {
@@ -229,7 +219,6 @@ fn run_simple_binding() -> Result<()> {
     Ok(())
 }
 
-
 #[test]
 fn run_compute_binding() -> Result<()> {
     let mut rt = Runtime::new();
@@ -238,7 +227,6 @@ fn run_compute_binding() -> Result<()> {
     assert_eq!(val.get_integer(), 15);
     Ok(())
 }
-
 
 #[test]
 fn run_globalref_binding() -> Result<()> {
@@ -249,7 +237,6 @@ fn run_globalref_binding() -> Result<()> {
     Ok(())
 }
 
-
 #[test]
 fn run_fun_binding() -> Result<()> {
     let mut rt = Runtime::new();
@@ -258,7 +245,6 @@ fn run_fun_binding() -> Result<()> {
     assert_eq!(val.is_closure(), true);
     Ok(())
 }
-
 
 #[test]
 fn run_fun_clauses_binding() -> Result<()> {
@@ -271,7 +257,6 @@ fn run_fun_clauses_binding() -> Result<()> {
     assert_eq!(val.is_closure(), true);
     Ok(())
 }
-
 
 #[test]
 fn run_fun_clauses_app_binding() -> Result<()> {

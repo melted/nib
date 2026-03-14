@@ -2,7 +2,11 @@ use crate::{
     common::{Metadata, Name, Node, Symbol},
     parser::lexer,
 };
-use std::{collections::HashSet, fmt::Display, hash::{Hash, Hasher}};
+use std::{
+    collections::HashSet,
+    fmt::Display,
+    hash::{Hash, Hasher},
+};
 
 #[derive(Debug, Clone)]
 pub struct Module {

@@ -216,17 +216,14 @@ impl<'a> ParserState<'a> {
     }
 
     pub(super) fn parse_implicit_lambda_expression(&mut self) -> Result<ExpressionNode> {
-        let implicits = [
-            sym("a"),
-            sym("b"),
-            sym("c"),
-            sym("d"),
-        ];
+        let implicits = [sym("a"), sym("b"), sym("c"), sym("d")];
         self.expect(TokenValue::LeftBrace)?;
         let expr = self.parse_expression()?;
         self.expect(TokenValue::RightBrace)?;
         let free_vars = expr.expr.free_vars();
-        let used_implicits = implicits.iter().filter(|&n| free_vars.contains(&Name::from(*n)));
+        let used_implicits = implicits
+            .iter()
+            .filter(|&n| free_vars.contains(&Name::from(*n)));
         let mut pats: Vec<PatternNode> = used_implicits
             .map(|n| self.var_pattern(Name::Plain(*n)))
             .collect();

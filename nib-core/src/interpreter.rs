@@ -739,7 +739,7 @@ impl Runtime {
                         Value::from(self.code),
                         Value::integer(self.ip as i64),
                         Value::integer(self.stack.base as i64),
-                        self.local_env
+                        self.local_env,
                     ];
                     self.call_stack.base = self.call_stack.top;
                     self.call_stack.pushv(&frame);
@@ -775,7 +775,7 @@ impl Runtime {
 
     fn op_return(&mut self) -> Result<bool> {
         if self.call_stack.is_empty() {
-            return Ok(true)
+            return Ok(true);
         }
         let cc = if self.stack.top() > 0 {
             self.stack.pop()

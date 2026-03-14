@@ -50,16 +50,17 @@ impl Runtime {
 
     fn update_closures(&mut self, env: &mut Environment, name: &Symbol) {
         if let Some(val) = self.lookup(env, name)
-            && let Some(closures) = self.closures_to_check.get(name) {
-                for c in closures {
-                    if let Value::Closure(closure) = c {
-                        let mut cl = closure.borrow_mut();
-                        let cl_env = &mut cl.env;
-                        cl_env.remove(name);
-                        cl_env.add(name, &val);
-                    }
+            && let Some(closures) = self.closures_to_check.get(name)
+        {
+            for c in closures {
+                if let Value::Closure(closure) = c {
+                    let mut cl = closure.borrow_mut();
+                    let cl_env = &mut cl.env;
+                    cl_env.remove(name);
+                    cl_env.add(name, &val);
                 }
             }
+        }
     }
 
     fn evaluate_literal(&self, literal: &Literal) -> Result<Value> {
@@ -117,10 +118,9 @@ impl Runtime {
         eval_status
             .work_stack
             .push(EvalStep::Bind(binding.name(), binding.binder.clone()));
-        eval_status.work_stack.push(EvalStep::Expression(
-                    binding.name(),
-                    binding.body.clone(),
-                ));
+        eval_status
+            .work_stack
+            .push(EvalStep::Expression(binding.name(), binding.body.clone()));
     }
 
     fn eval(&mut self, eval_status: &mut EvalStatus, env: &mut Environment) -> Result<()> {
@@ -219,7 +219,7 @@ impl Runtime {
             Expression::Var(_, var) => {
                 let v = if let Some(val) = self.lookup(env, &var) {
                     val
-                }else {
+                } else {
                     Value::Undefined(var)
                 };
                 eval_status.value_stack.push(v);
@@ -250,7 +250,6 @@ impl Runtime {
                 free_vars_expression(&fun.body, &mut free, &mut locals);
                 let closure = self.evaluate_lambda(&binding_name, &fun, &free, env)?;
                 eval_status.value_stack.push(closure);
-
             }
             Expression::Where(_, exp, binds) => {
                 let mut prev_cc = HashMap::new();
@@ -294,9 +293,7 @@ impl Runtime {
                                 cc.push(new_closure.clone());
                             }
                         }
-                        eval_status
-                            .value_stack
-                            .push(new_closure);
+                        eval_status.value_stack.push(new_closure);
                         return Ok(());
                     }
                     let env = closure.env.clone();
@@ -405,7 +402,7 @@ pub(super) enum EvalStep {
     Select(Box<EvalStep>, Box<EvalStep>),
     Value(Value),
     Apply(Option<Name>, usize),
-    Bind(Option<Name>, Binder)
+    Bind(Option<Name>, Binder),
 }
 
 #[derive(Debug, Clone, PartialEq)]

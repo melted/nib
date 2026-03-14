@@ -5,7 +5,15 @@ use crate::common::{Location, Metadata, Name, sym, symbol_id};
 use crate::common::{Result, Symbol};
 use crate::core::{Binder, Binding, Cond, Expression, Function};
 use crate::interpreter::bytecode::{
-    INSTR_ALLOC_ARRAY, INSTR_ALLOC_CLOSURE, INSTR_ALLOC_FLOAT, INSTR_ALLOC_TABLE, INSTR_ARRAY_SET, INSTR_CALL, INSTR_CALL_TAIL, INSTR_DROP, INSTR_DUP, INSTR_GET_LOCAL, INSTR_GLOBAL_ENV, INSTR_IS_TABLE, INSTR_JFALSE, INSTR_JFALSE_IMM8, INSTR_JNEG, INSTR_JNEG_IMM8, INSTR_JNFALSE, INSTR_JNFALSE_IMM8, INSTR_JNNEG, INSTR_JNNEG_IMM8, INSTR_JNPOS, INSTR_JNPOS_IMM8, INSTR_JPOS, INSTR_JPOS_IMM8, INSTR_JUMP, INSTR_JUMP_IMM8, INSTR_JZ, INSTR_JZ_IMM8, INSTR_LOAD_BYTES_IMM, INSTR_LOAD_IMM8, INSTR_LOAD_IMM16, INSTR_LOAD_IMM32, INSTR_LOAD_IMM64, INSTR_MAKE_SYMBOL, INSTR_PUSH_FALSE, INSTR_PUSH_LAST_SMALL, INSTR_PUSH_MINUS_ONE, INSTR_PUSH_NIL, INSTR_PUSH_TRUE, INSTR_RETURN, INSTR_SET_LOCAL, INSTR_SET_TYPE, INSTR_STACK_LOAD, INSTR_TABLE_GET, INSTR_TABLE_SET
+    INSTR_ALLOC_ARRAY, INSTR_ALLOC_CLOSURE, INSTR_ALLOC_FLOAT, INSTR_ALLOC_TABLE, INSTR_ARRAY_SET,
+    INSTR_CALL, INSTR_CALL_TAIL, INSTR_DROP, INSTR_DUP, INSTR_GET_LOCAL, INSTR_GLOBAL_ENV,
+    INSTR_IS_TABLE, INSTR_JFALSE, INSTR_JFALSE_IMM8, INSTR_JNEG, INSTR_JNEG_IMM8, INSTR_JNFALSE,
+    INSTR_JNFALSE_IMM8, INSTR_JNNEG, INSTR_JNNEG_IMM8, INSTR_JNPOS, INSTR_JNPOS_IMM8, INSTR_JPOS,
+    INSTR_JPOS_IMM8, INSTR_JUMP, INSTR_JUMP_IMM8, INSTR_JZ, INSTR_JZ_IMM8, INSTR_LOAD_BYTES_IMM,
+    INSTR_LOAD_IMM8, INSTR_LOAD_IMM16, INSTR_LOAD_IMM32, INSTR_LOAD_IMM64, INSTR_MAKE_SYMBOL,
+    INSTR_PUSH_FALSE, INSTR_PUSH_LAST_SMALL, INSTR_PUSH_MINUS_ONE, INSTR_PUSH_NIL, INSTR_PUSH_TRUE,
+    INSTR_RETURN, INSTR_SET_LOCAL, INSTR_SET_TYPE, INSTR_STACK_LOAD, INSTR_TABLE_GET,
+    INSTR_TABLE_SET,
 };
 use crate::interpreter::heap::{Value, ValueRepr};
 use crate::interpreter::prims::is_bytecode_primitive;
@@ -68,12 +76,12 @@ pub(super) struct Context {
 
 impl Context {
     fn new() -> Self {
-        Context { 
+        Context {
             local_vars: Vec::new(),
             stack_vars: Vec::new(),
             max_var: 0,
             used_locs: HashSet::new(),
-            free_locs: HashSet::new()
+            free_locs: HashSet::new(),
         }
     }
 
@@ -91,7 +99,6 @@ impl Context {
         VarLocation::Global
     }
 
-    
     fn local_var(&mut self, sym: &Symbol) -> usize {
         for (var, loc) in self.local_vars.iter().rev() {
             if var == sym {
@@ -127,7 +134,6 @@ impl Context {
     }
 }
 
-
 /// State held during compilation. Everything that can be discarded when finished
 /// goes here.
 #[derive(Debug, Clone)]
@@ -139,7 +145,7 @@ pub(super) struct Compilation {
     /// Future bindings in this scope, so we can bind to them instead of trying to import a
     ///  global of the same name.
     future_bindings: HashSet<Symbol>,
-    /// This is requested fixups for bindings not yet in scope when a lambda was defined, the 
+    /// This is requested fixups for bindings not yet in scope when a lambda was defined, the
     /// first usize is where the lambdas environment is in the local environment and the
     /// second is the offset in the lambda's environment
     fixups_needed: HashMap<Symbol, Vec<(usize, usize)>>,
@@ -154,7 +160,6 @@ pub enum CompilationInput {
     Bindings(Vec<Binding>),
     Expression(Expression),
 }
-
 
 impl Compilation {
     pub(super) fn new() -> Self {
@@ -194,7 +199,12 @@ impl Compilation {
                     self.compile_binding(&b, true, &mut code)?;
                 }
                 if !self.fixups_needed.is_empty() {
-                    let f : Vec<Symbol> = self.fixups_needed.iter().map(|fix| fix.0).copied().collect();
+                    let f: Vec<Symbol> = self
+                        .fixups_needed
+                        .iter()
+                        .map(|fix| fix.0)
+                        .copied()
+                        .collect();
                     return self.error(&format!("Missing definition of `{:?}`", f));
                 }
                 // Return nothing
@@ -219,7 +229,9 @@ impl Compilation {
         self.is_tail = true;
         let binding_name = self.get_binding_name(&binding.binder);
         let global = matches!(&binding.binder, Binder::Public(_));
-        if let Some(n) = &binding_name && !global {
+        if let Some(n) = &binding_name
+            && !global
+        {
             let l = self.current_context().local_var(&n.top());
         }
         self.compile_expression(&binding.body, code)?;
@@ -367,14 +379,14 @@ impl Compilation {
     }
 
     fn compile_function(&mut self, lambda: &Function, code: &mut Vec<u8>) -> Result<()> {
-        // Make sure these exist outside the function before capture 
+        // Make sure these exist outside the function before capture
         for lit in &lambda.literal_captures {
             let _ = self.get_literal_symbol(lit);
         }
         for c in &lambda.code_captures {
             let _ = self.current_context().local_var(c);
         }
-        let mut  old_future_bindings = HashSet::new();
+        let mut old_future_bindings = HashSet::new();
         self.contexts.push(Context::new());
         mem::swap(&mut old_future_bindings, &mut self.future_bindings);
         for (i, arg) in lambda.args.iter().enumerate() {
@@ -384,7 +396,7 @@ impl Compilation {
         let mut addrs = Vec::new();
         for cap in captures.iter() {
             let addr = self.current_context().local_var(cap);
-            addrs.push((*cap, addr));   
+            addrs.push((*cap, addr));
         }
         let mut fun_code = Vec::new();
         self.compile_expression(&lambda.body, &mut fun_code)?;
@@ -400,7 +412,7 @@ impl Compilation {
         };
         load_constant(&vararg, code);
         load_constant_int(arity.get_integer(), code);
-        load_constant_int( env_size as i64, code);
+        load_constant_int(env_size as i64, code);
         code.push(INSTR_ALLOC_ARRAY);
         let env_local = self.current_context().env_location();
         set_local(env_local, code);
@@ -408,7 +420,10 @@ impl Compilation {
         for (c, i) in &addrs {
             if self.future_bindings.contains(c) {
                 let addr = (env_local, *i);
-                self.fixups_needed.entry(*c).and_modify(|v| v.push(addr)).or_insert(vec![addr]);
+                self.fixups_needed
+                    .entry(*c)
+                    .and_modify(|v| v.push(addr))
+                    .or_insert(vec![addr]);
             } else {
                 self.get_variable(c, code);
                 load_constant_int(*i as i64, code);
@@ -429,11 +444,7 @@ impl Compilation {
         self.compile_expression(&cond.pred, code)?;
         self.compile_expression(&cond.if_true, &mut if_true_code)?;
         self.compile_expression(&cond.if_false, &mut if_false_code)?;
-        optimized_jump(
-            INSTR_JUMP,
-            if_false_code.len() as i64,
-            &mut if_true_code,
-        );
+        optimized_jump(INSTR_JUMP, if_false_code.len() as i64, &mut if_true_code);
         optimized_jump(INSTR_JFALSE, if_true_code.len() as i64, code);
         code.extend_from_slice(&if_true_code);
         code.extend_from_slice(&if_false_code);
@@ -487,12 +498,22 @@ impl Compilation {
         }
         self.is_tail = is_tail;
         self.compile_expression(exp, code)?;
-        let to_free = self.current_context().used_locs.difference(&old_used_vars).copied().collect::<Vec<_>>();
+        let to_free = self
+            .current_context()
+            .used_locs
+            .difference(&old_used_vars)
+            .copied()
+            .collect::<Vec<_>>();
         for v in to_free {
             self.current_context().free_location(v);
         }
         if !self.fixups_needed.is_empty() {
-            let f : Vec<Symbol> = self.fixups_needed.iter().map(|fix| fix.0).copied().collect();
+            let f: Vec<Symbol> = self
+                .fixups_needed
+                .iter()
+                .map(|fix| fix.0)
+                .copied()
+                .collect();
             return self.error(&format!("Missing definition of `{:?}`", f));
         }
         mem::swap(&mut old_fixups, &mut self.fixups_needed);
@@ -509,7 +530,7 @@ impl Compilation {
         self.module.data.insert(data.to_vec(), b);
     }
 
-    fn get_data_symbol(&mut self, data:&[u8]) -> Symbol {
+    fn get_data_symbol(&mut self, data: &[u8]) -> Symbol {
         if let Some(sym) = self.data_symbols.get(data) {
             *sym
         } else {
@@ -519,7 +540,6 @@ impl Compilation {
         }
     }
 
-
     fn get_symbol(&mut self, sym: &Symbol, code: &mut Vec<u8>) {
         load_constant_int(symbol_id(sym) as i64, code);
         code.push(INSTR_MAKE_SYMBOL);
@@ -527,7 +547,7 @@ impl Compilation {
 
     fn get_literal_symbol(&mut self, lit: &Literal) -> Symbol {
         match lit {
-            Literal::Bytearray(c) => self.get_data_symbol(c), 
+            Literal::Bytearray(c) => self.get_data_symbol(c),
             Literal::String(s) => self.get_data_symbol(s.as_bytes()),
             _ => {
                 panic!("Invalid literal in get_literal_symbol");
@@ -578,7 +598,10 @@ impl Compilation {
     }
 
     fn error<T>(&self, msg: &str) -> Result<T> {
-        Err(crate::common::Error::Runtime { msg: msg.to_owned(), loc: None })
+        Err(crate::common::Error::Runtime {
+            msg: msg.to_owned(),
+            loc: None,
+        })
     }
 }
 
