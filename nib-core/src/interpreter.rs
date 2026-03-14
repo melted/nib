@@ -102,7 +102,7 @@ impl Options {
     fn new() -> Self {
         Options {
             output_core: false,
-            trace: true,
+            trace: false,
         }
     }
 }
@@ -140,6 +140,10 @@ impl Runtime {
     pub fn has_package(&mut self, path: &Path) -> Result<bool> {
         let id = self.package_name(path)?;
         Ok(!self.package_table().get(Value::symbol(&id)).is_nil())
+    }
+
+    pub fn set_tracing(&mut self, tracing: bool) {
+        self.options.trace = tracing;
     }
 
     pub fn package_name(&mut self, path: &Path) -> Result<Symbol> {
@@ -1127,7 +1131,6 @@ impl Runtime {
     }
 
     fn op_get_local(&mut self) -> Result<bool> {
-        dbg!(&self.local_env);
         let index = self.stack.pop().get_integer() as usize;
         let val = self.local_env.get_array().at(index);
         self.stack_push(val);
@@ -1135,7 +1138,6 @@ impl Runtime {
     }
 
     fn op_set_local(&mut self) -> Result<bool> {
-        dbg!(&self.local_env);
         let index = self.stack.pop().get_integer() as usize;
         let val = self.stack.pop();
         self.local_env.get_array().set(index, val);
