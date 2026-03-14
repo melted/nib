@@ -291,3 +291,16 @@ fn run_local_clauses_app_binding() -> Result<()> {
     assert_eq!(val.get_integer(), 120);
     Ok(())
 }
+
+#[test]
+fn load_prelude() -> Result<()> {
+    let mut rt = Runtime::new();
+    rt.set_output_core(true);
+//    rt.set_tracing(true);
+    let prelude_code = include_str!("../../lib/prelude.nib");
+    rt.add_code(
+        "test",
+        prelude_code,
+    )?;
+    Ok(())
+}
