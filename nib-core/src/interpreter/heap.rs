@@ -762,7 +762,7 @@ fn display_complex_object(
             seen.insert(*value);
             let closure = value.get_closure();
             let code = closure.get_code();
-            let arity = closure.num_args();
+            let arity = closure.min_args();
             let vararg = closure.vararg();
             let env = closure.env();
             if debug {
@@ -1186,7 +1186,7 @@ impl Debug for Closure {
             self.ptr,
             self.get_code(),
             self.env().get_array().size(),
-            self.num_args(),
+            self.min_args(),
             self.vararg()
         )
     }
@@ -1331,7 +1331,8 @@ impl Closure {
         }
     }
 
-    pub fn num_args(&self) -> usize {
-        get_value(self.ptr, 3).get_integer() as usize
+    pub fn min_args(&self) -> usize {
+        let v = if self.vararg().is_some() { 1 } else { 0 };
+        (get_value(self.ptr, 3).get_integer() - 1) as usize
     }
 }

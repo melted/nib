@@ -99,13 +99,17 @@ impl Context {
         VarLocation::Global
     }
 
-    fn local_var(&mut self, sym: &Symbol) -> usize {
+    fn local_var(&mut self, sym: &Symbol, fresh:bool) -> usize {
         for (var, loc) in self.local_vars.iter().rev() {
             if var == sym {
                 return *loc;
             }
         }
-        let nvar = self.env_location();
+        let nvar = if fresh {
+            self.fresh_env_location()
+        } else {
+            self.env_location()
+        };
         self.local_vars.push((*sym, nvar));
         nvar
     }
@@ -150,6 +154,7 @@ pub(super) struct Compilation {
     /// second is the offset in the lambda's environment
     fixups_needed: HashMap<Symbol, Vec<(usize, usize)>>,
     data_symbols: HashMap<Vec<u8>, Symbol>,
+    data: HashMap<Symbol, (Vec<u8>, usize)>,
     is_tail: bool,
 }
 
@@ -170,6 +175,7 @@ impl Compilation {
             future_bindings: HashSet::new(),
             fixups_needed: HashMap::new(),
             data_symbols: HashMap::new(),
+            data: HashMap::new(),
             is_tail: true,
         }
     }
@@ -232,7 +238,7 @@ impl Compilation {
         if let Some(n) = &binding_name
             && !global
         {
-            let l = self.current_context().local_var(&n.top());
+            let l = self.current_context().local_var(&n.top(), false);
         }
         self.compile_expression(&binding.body, code)?;
         if let Some(name) = binding_name {
@@ -244,7 +250,7 @@ impl Compilation {
                     code.push(INSTR_GLOBAL_ENV);
                     code.push(INSTR_TABLE_SET);
                 } else {
-                    let loc = self.current_context().local_var(&top);
+                    let loc = self.current_context().local_var(&top, false);
                     set_local(loc, code);
                 }
             } else {
@@ -260,7 +266,7 @@ impl Compilation {
                 for s in rest {
                     self.get_symbol(s, code);
                 }
-                load_constant_int((rest.len() + 1) as i64, code);
+                load_constant_int((rest.len() + 2) as i64, code);
                 code.push(INSTR_CALL);
                 code.push(INSTR_TABLE_SET);
             }
@@ -384,7 +390,7 @@ impl Compilation {
             let _ = self.get_literal_symbol(lit);
         }
         for c in &lambda.code_captures {
-            let _ = self.current_context().local_var(c);
+            let _ = self.current_context().local_var(c, true);
         }
         let mut old_future_bindings = HashSet::new();
         self.contexts.push(Context::new());
@@ -395,7 +401,7 @@ impl Compilation {
         let captures = self.get_all_captures(lambda);
         let mut addrs = Vec::new();
         for cap in captures.iter() {
-            let addr = self.current_context().local_var(cap);
+            let addr = self.current_context().local_var(cap, true);
             addrs.push((*cap, addr));
         }
         let mut fun_code = Vec::new();
@@ -526,8 +532,12 @@ impl Compilation {
     }
 
     fn set_data_slot(&mut self, sym: &Symbol, data: &[u8]) {
-        let b = self.base_context().local_var(sym);
-        self.module.data.insert(data.to_vec(), b);
+        if let Some(loc) = self.module.data.get(data).copied() {
+            self.base_context().local_vars.push((*sym, loc));
+        } else {
+            let b = self.base_context().local_var(sym, true);
+            self.module.data.insert(data.to_vec(), b);
+        }
     }
 
     fn get_data_symbol(&mut self, data: &[u8]) -> Symbol {
@@ -562,7 +572,7 @@ impl Compilation {
     }
 
     fn get_local_table(&mut self, sym: &Symbol, code: &mut Vec<u8>) {
-        let h = self.current_context().local_var(sym);
+        let h = self.current_context().local_var(sym, true);
         get_local(h, code);
         code.push(INSTR_DUP);
         code.push(INSTR_IS_TABLE);

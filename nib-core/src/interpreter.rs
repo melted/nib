@@ -347,6 +347,7 @@ impl Runtime {
         if self.options.trace {
             dbg!(instr, self.ip);
             dbg!(&self.stack, &self.call_stack);
+//            dbg!(&self.local_env);
         }
         self.ip += 1;
         match instr {
@@ -704,31 +705,33 @@ impl Runtime {
     fn make_call(&mut self, op: u8, args: usize) -> Result<()> {
         let closure = self.stack.peek(args).get_closure();
         let params = args - 1;
-        if params < closure.num_args() {
+        if params < closure.min_args() {
             // Underapplication, create a partial application
             let cargs = self.stack.take(args);
             let pap = Array::with(self, &cargs);
             self.stack.push(Value::partial_application(pap));
             return Ok(());
         }
-        let extra_args = params - closure.num_args();
+        let extra_args = params - closure.min_args();
         if let Some(i) = closure.vararg() {
-            let varargs = params - (closure.num_args() - 1);
-            let mut var_arg = Array::make(self, varargs);
-            let argv = self.stack.slice_mut(args - 1, 0);
-            var_arg.fill(&argv[i..i + varargs], 0, varargs);
-            if args - 1 > i + varargs {
-                argv.copy_within(i + varargs.., i + 1);
-            }
-            if extra_args > 0 {
+            let mut var_arg = Array::make(self, extra_args);
+            if extra_args == 0 {
+                self.stack.push(Value::from(var_arg));
+                self.stack.dip(args - i);
+            } else {
+                let argv = self.stack.slice_mut(args - 1, 0);
+                var_arg.fill(&argv[i..i + extra_args], 0, extra_args);
+                if args - 1 > i + extra_args {
+                    argv.copy_within(i + extra_args.., i + 1);
+                }
                 argv[args - extra_args..].fill(Value::nil());
+                argv[i] = Value::from(var_arg);
+                self.stack.top -= extra_args;
             }
-            argv[i] = Value::from(var_arg);
-            self.stack.top -= extra_args;
         } else if extra_args > 0 {
             self.stack_push(Value::call_continuation(extra_args));
             let elems = self.stack.slice_mut(args, 0);
-            elems.rotate_right(extra_args + 1);
+            elems.rotate_right(extra_args);
         }
         match closure.get_tag() {
             TYPE_BYTECODE => {
