@@ -364,14 +364,18 @@ impl Compilation {
         for lit in &lambda.literal_captures {
             let _ = self.get_literal_symbol(lit);
         }
+        for c in &lambda.code_captures {
+            let _ = self.current_context().local_var(c);
+        }
         self.contexts.push(Context::new());
         for (i, arg) in lambda.args.iter().enumerate() {
             self.current_context().stack_vars.push((*arg, i + 1));
         }
         let captures = self.get_all_captures(lambda);
-        for (i, cap) in captures.iter().enumerate() {
-            self.current_context().local_vars.push((*cap, i));
-            self.current_context().used_locs.insert(i);
+        let mut addrs = Vec::new();
+        for cap in captures.iter() {
+            let addr = self.current_context().local_var(cap);
+            addrs.push((*cap, addr));   
         }
         let mut fun_code = Vec::new();
         self.compile_expression(&lambda.body, &mut fun_code)?;
@@ -391,13 +395,13 @@ impl Compilation {
         let env_local = self.current_context().env_location();
         set_local(env_local, code);
 
-        for (i, c) in captures.iter().enumerate() {
+        for (c, i) in &addrs {
             if self.future_bindings.contains(c) {
-                let addr = (env_local, i);
+                let addr = (env_local, *i);
                 self.fixups_needed.entry(*c).and_modify(|v| v.push(addr)).or_insert(vec![addr]);
             } else {
                 self.get_variable(c, code);
-                load_constant_int(i as i64, code);
+                load_constant_int(*i as i64, code);
                 get_local(env_local, code);
                 code.push(INSTR_ARRAY_SET);
             }
