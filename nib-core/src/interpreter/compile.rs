@@ -1,7 +1,7 @@
 use symbol_table::static_symbol;
 
 use crate::ast::Literal;
-use crate::common::{Metadata, Name, sym, symbol_id};
+use crate::common::{Location, Metadata, Name, sym, symbol_id};
 use crate::common::{Result, Symbol};
 use crate::core::{Binder, Binding, Cond, Expression, Function};
 use crate::interpreter::bytecode::{
@@ -193,6 +193,10 @@ impl Compilation {
                 for b in bindings {
                     self.compile_binding(&b, true, &mut code)?;
                 }
+                if !self.fixups_needed.is_empty() {
+                    let f : Vec<Symbol> = self.fixups_needed.iter().map(|fix| fix.0).copied().collect();
+                    return self.error(&format!("Missing definition of `{:?}`", f));
+                }
                 // Return nothing
                 push_nil(&mut code);
             }
@@ -215,6 +219,9 @@ impl Compilation {
         self.is_tail = true;
         let binding_name = self.get_binding_name(&binding.binder);
         let global = matches!(&binding.binder, Binder::Public(_));
+        if let Some(n) = &binding_name && !global {
+            let l = self.current_context().local_var(&n.top());
+        }
         self.compile_expression(&binding.body, code)?;
         if let Some(name) = binding_name {
             let top = name.top();
@@ -367,7 +374,9 @@ impl Compilation {
         for c in &lambda.code_captures {
             let _ = self.current_context().local_var(c);
         }
+        let mut  old_future_bindings = HashSet::new();
         self.contexts.push(Context::new());
+        mem::swap(&mut old_future_bindings, &mut self.future_bindings);
         for (i, arg) in lambda.args.iter().enumerate() {
             self.current_context().stack_vars.push((*arg, i + 1));
         }
@@ -382,6 +391,7 @@ impl Compilation {
         fun_code.push(INSTR_RETURN);
         let env_size = self.current_context().max_var;
         self.contexts.pop();
+        mem::swap(&mut old_future_bindings, &mut self.future_bindings);
         let (arity, vararg) = match lambda.arity {
             crate::core::Arity::Fixed(n) => (Value::integer(n as i64), Value::bool(false)),
             crate::core::Arity::VarArg(n, i) => {
@@ -468,7 +478,7 @@ impl Compilation {
     ) -> Result<()> {
         let mut old_fixups = HashMap::new();
         let mut old_future_bindings = self.future_bindings.clone();
-        let mut old_used_vars = self.current_context().used_locs.clone();
+        let old_used_vars = self.current_context().used_locs.clone();
         mem::swap(&mut old_fixups, &mut self.fixups_needed);
         let is_tail = self.is_tail;
         self.collect_binding_names(bindings);
@@ -480,6 +490,10 @@ impl Compilation {
         let to_free = self.current_context().used_locs.difference(&old_used_vars).copied().collect::<Vec<_>>();
         for v in to_free {
             self.current_context().free_location(v);
+        }
+        if !self.fixups_needed.is_empty() {
+            let f : Vec<Symbol> = self.fixups_needed.iter().map(|fix| fix.0).copied().collect();
+            return self.error(&format!("Missing definition of `{:?}`", f));
         }
         mem::swap(&mut old_fixups, &mut self.fixups_needed);
         mem::swap(&mut old_future_bindings, &mut self.future_bindings);
@@ -561,6 +575,10 @@ impl Compilation {
 
     fn base_context(&mut self) -> &mut Context {
         self.contexts.get_mut(0).unwrap()
+    }
+
+    fn error<T>(&self, msg: &str) -> Result<T> {
+        Err(crate::common::Error::Runtime { msg: msg.to_owned(), loc: None })
     }
 }
 
