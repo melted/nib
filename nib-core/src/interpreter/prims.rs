@@ -188,7 +188,7 @@ impl Runtime {
 fn prim_get_path(rt: &mut Runtime) -> Result<()> {
     let vals = rt.stack.take(rt.frame_args as usize);
     let start = vals[1];
-    let projection= &vals[2..];
+    let projection = &vals[2..];
     if projection.iter().any(|v| !v.is_symbol()) {
         return rt.error("prim_get_path: All trailing arguments must be symbols");
     }
@@ -226,7 +226,7 @@ fn prim_print_representation(rt: &mut Runtime) -> Result<()> {
 fn prim_project(rt: &mut Runtime) -> Result<()> {
     let vals = rt.stack.take(rt.frame_args as usize);
     let start = vals[1];
-    let projection= &vals[2..];
+    let projection = &vals[2..];
     if let Some(method) = rt.find_overload(&start, &static_symbol!("project")) {
         rt.call_function(&method, &vals[1..]).map(|_| ())?;
     } else {
@@ -243,7 +243,6 @@ fn prim_project(rt: &mut Runtime) -> Result<()> {
 
 fn prim_array_make(rt: &mut Runtime) -> Result<()> {
     let args = rt.frame_args;
-    dbg!(rt.stack);
     let vals = rt.stack.take(args as usize);
     let arr = Array::with(rt, &vals[1..]);
     rt.stack_push(Value::from(arr));
@@ -273,7 +272,7 @@ fn prim_array_slice(rt: &mut Runtime) -> Result<()> {
     let content = arr.values();
     let offset = offset.get_integer() as usize;
     let size = size.get_integer() as usize;
-    let out = Array::with(rt, &content[offset..offset+size]);
+    let out = Array::with(rt, &content[offset..offset + size]);
     rt.stack_push(Value::from(out));
     Ok(())
 }
@@ -305,7 +304,10 @@ fn prim_match(rt: &mut Runtime) -> Result<()> {
 fn prim_string_print(rt: &mut Runtime) -> Result<()> {
     let val = rt.stack.pop();
     let _ = rt.stack.pop(); // pop closure
-    print!("{}", val);
+    ensure_type(&val, ValueRepr::Bytes)?;
+    let bytes = val.get_bytes();
+    let slice = bytes.get_slice();
+    print!("{}", String::from_utf8_lossy(slice));
     rt.stack_push(Value::nil());
     Ok(())
 }
@@ -350,7 +352,7 @@ fn prim_symbol_make(rt: &mut Runtime) -> Result<()> {
 
 fn prim_bytes_make(rt: &mut Runtime) -> Result<()> {
     let vals = rt.stack.take(rt.frame_args as usize);
-    let args= &vals[1..];
+    let args = &vals[1..];
     let mut bytes = Vec::new();
     for v in args {
         let n = v.get_integer();

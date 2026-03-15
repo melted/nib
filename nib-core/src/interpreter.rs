@@ -349,7 +349,7 @@ impl Runtime {
         if self.options.trace {
             dbg!(instr, self.ip);
             dbg!(&self.stack, &self.call_stack);
-//            dbg!(&self.local_env);
+            //            dbg!(&self.local_env);
         }
         self.ip += 1;
         match instr {
@@ -1158,9 +1158,9 @@ impl Runtime {
         self.stack_push(index);
         Ok(false)
     }
-    
+
     fn op_arg_count(&mut self) -> Result<bool> {
-        let index = Value::integer(self.frame_args);
+        let index = Value::integer(self.stack.current_frame() as i64);
         self.stack_push(index);
         Ok(false)
     }

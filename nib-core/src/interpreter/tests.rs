@@ -303,7 +303,7 @@ fn table_binding() -> Result<()> {
     Ok(())
 }
 
-#[ignore = "fails"]
+//#[ignore = "fails"]
 #[test]
 fn local_table_binding() -> Result<()> {
     let mut rt = Runtime::new();
@@ -315,16 +315,23 @@ fn local_table_binding() -> Result<()> {
     Ok(())
 }
 
-#[ignore = "fails"]
 #[test]
 fn load_prelude() -> Result<()> {
     let mut rt = Runtime::new();
     rt.set_output_core(true);
     rt.set_tracing(true);
     let prelude_code = include_str!("../../lib/prelude.nib");
-    rt.add_code(
-        "test",
-        prelude_code,
-    )?;
+    rt.add_code("test", prelude_code)?;
+    Ok(())
+}
+
+#[test]
+fn printing_string() -> Result<()> {
+    let mut rt = Runtime::new();
+    rt.set_output_core(true);
+    rt.set_tracing(true);
+    //   let prelude_code = include_str!("../../lib/prelude.nib");
+    //   rt.add_code("prelude", prelude_code)?;
+    rt.add_code("test", "_ = _prim_string_print \"hej\"")?;
     Ok(())
 }
