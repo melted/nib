@@ -316,12 +316,12 @@ impl Runtime {
                 let ret = match code.borrow().deref() {
                     Code::Nib(lam) => {
                         if let Arity::VarArg(i, n) = lam.arity {
-                            let num = args.len() - i as usize;
+                            let num = args.len() - (i - 1) as usize;
                             let array = {
                                 let vars = args.drain((i as usize)..(i as usize + num));
                                 Value::new_array(vars.as_slice())
                             };
-                            args.insert(i as usize, array);
+                            args.insert(n as usize, array);
                         }
                         for (v, i) in args.iter().zip(lam.args.iter()) {
                             env.add(i, v);

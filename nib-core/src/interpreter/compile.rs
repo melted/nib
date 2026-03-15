@@ -3,17 +3,9 @@ use symbol_table::static_symbol;
 use crate::ast::Literal;
 use crate::common::{Location, Metadata, Name, sym, symbol_id};
 use crate::common::{Result, Symbol};
-use crate::core::{Binder, Binding, Cond, Expression, Function};
+use crate::core::{Arity, Binder, Binding, Cond, Expression, Function};
 use crate::interpreter::bytecode::{
-    INSTR_ALLOC_ARRAY, INSTR_ALLOC_CLOSURE, INSTR_ALLOC_FLOAT, INSTR_ALLOC_TABLE, INSTR_ARRAY_SET,
-    INSTR_CALL, INSTR_CALL_TAIL, INSTR_DROP, INSTR_DUP, INSTR_GET_LOCAL, INSTR_GLOBAL_ENV,
-    INSTR_IS_TABLE, INSTR_JFALSE, INSTR_JFALSE_IMM8, INSTR_JNEG, INSTR_JNEG_IMM8, INSTR_JNFALSE,
-    INSTR_JNFALSE_IMM8, INSTR_JNNEG, INSTR_JNNEG_IMM8, INSTR_JNPOS, INSTR_JNPOS_IMM8, INSTR_JPOS,
-    INSTR_JPOS_IMM8, INSTR_JUMP, INSTR_JUMP_IMM8, INSTR_JZ, INSTR_JZ_IMM8, INSTR_LOAD_BYTES_IMM,
-    INSTR_LOAD_IMM8, INSTR_LOAD_IMM16, INSTR_LOAD_IMM32, INSTR_LOAD_IMM64, INSTR_MAKE_SYMBOL,
-    INSTR_PUSH_FALSE, INSTR_PUSH_LAST_SMALL, INSTR_PUSH_MINUS_ONE, INSTR_PUSH_NIL, INSTR_PUSH_TRUE,
-    INSTR_RETURN, INSTR_SET_LOCAL, INSTR_SET_TYPE, INSTR_STACK_LOAD, INSTR_TABLE_GET,
-    INSTR_TABLE_SET,
+    INSTR_ADD, INSTR_ALLOC_ARRAY, INSTR_ALLOC_CLOSURE, INSTR_ALLOC_FLOAT, INSTR_ALLOC_TABLE, INSTR_ARG_COUNT, INSTR_ARRAY_SET, INSTR_CALL, INSTR_CALL_TAIL, INSTR_DROP, INSTR_DUP, INSTR_GET_ARG, INSTR_GET_LOCAL, INSTR_GLOBAL_ENV, INSTR_IS_TABLE, INSTR_JFALSE, INSTR_JFALSE_IMM8, INSTR_JNEG, INSTR_JNEG_IMM8, INSTR_JNFALSE, INSTR_JNFALSE_IMM8, INSTR_JNNEG, INSTR_JNNEG_IMM8, INSTR_JNPOS, INSTR_JNPOS_IMM8, INSTR_JPOS, INSTR_JPOS_IMM8, INSTR_JUMP, INSTR_JUMP_IMM8, INSTR_JZ, INSTR_JZ_IMM8, INSTR_LOAD_BYTES_IMM, INSTR_LOAD_IMM8, INSTR_LOAD_IMM16, INSTR_LOAD_IMM32, INSTR_LOAD_IMM64, INSTR_MAKE_SYMBOL, INSTR_PUSH_FALSE, INSTR_PUSH_LAST_SMALL, INSTR_PUSH_MINUS_ONE, INSTR_PUSH_NIL, INSTR_PUSH_TRUE, INSTR_RETURN, INSTR_SET_LOCAL, INSTR_SET_TYPE, INSTR_STACK_ARRAY, INSTR_STACK_FRAME, INSTR_STACK_LOAD, INSTR_SUB, INSTR_TABLE_GET, INSTR_TABLE_SET
 };
 use crate::interpreter::heap::{Value, ValueRepr};
 use crate::interpreter::prims::is_bytecode_primitive;
@@ -68,7 +60,7 @@ impl Module {
 #[derive(Debug, Clone)]
 pub(super) struct Context {
     pub local_vars: Vec<(Symbol, usize)>,
-    pub stack_vars: Vec<(Symbol, usize)>,
+    pub stack_vars: Vec<(Symbol, i64)>,
     pub max_var: usize,
     pub used_locs: HashSet<usize>,
     pub free_locs: HashSet<usize>,
@@ -88,7 +80,7 @@ impl Context {
     fn lookup_var(&self, var: &Symbol) -> VarLocation {
         for (sym, loc) in &self.stack_vars {
             if var == sym {
-                return VarLocation::Stack(*loc);
+                return VarLocation::Arg(*loc);
             }
         }
         for (sym, loc) in self.local_vars.iter().rev() {
@@ -293,6 +285,11 @@ impl Compilation {
         self.get_global_name(&get_path, code);
     }
 
+    fn compile_array_slice(&mut self, code: &mut Vec<u8>) {
+        let get_path = static_symbol!("_prim_array_slice");
+        self.get_global_name(&get_path, code);
+    }
+
     fn check_fixups(&mut self, name: &Symbol, code: &mut Vec<u8>) {
         if let Some(fixups) = self.fixups_needed.remove(name) {
             self.get_variable(name, code);
@@ -395,8 +392,33 @@ impl Compilation {
         let mut old_future_bindings = HashSet::new();
         self.contexts.push(Context::new());
         mem::swap(&mut old_future_bindings, &mut self.future_bindings);
-        for (i, arg) in lambda.args.iter().enumerate() {
-            self.current_context().stack_vars.push((*arg, i + 1));
+        match &lambda.arity {
+            Arity::Fixed(n) => {
+                for (i, arg) in lambda.args.iter().enumerate() {
+                    self.current_context().stack_vars.push((*arg, (i + 1) as i64));
+                }
+            }
+            Arity::VarArg(n, idx) => {
+                for (i, arg) in lambda.args.iter().enumerate() {
+                    if i < *idx as usize {
+                        self.current_context().stack_vars.push((*arg, (i + 1) as i64));
+                    } else if i > *idx as usize {
+                        self.current_context().stack_vars.push((*arg, (i as i64) - (*n as i64)));
+                    } else if i == *idx as usize {
+                        let varargs = self.current_context().local_var(arg, true);
+                        self.compile_array_slice(code);
+                        code.push(INSTR_STACK_ARRAY);
+                        load_constant_int(*idx as i64, code);
+                        code.push(INSTR_STACK_FRAME);
+                        code.push(INSTR_ADD);
+                        code.push(INSTR_ARG_COUNT);
+                        load_constant_int((n-1) as i64, code);
+                        code.push(INSTR_SUB);
+                        code.push(INSTR_CALL);
+                        set_local(varargs, code);
+                    }
+                }
+            }
         }
         let captures = self.get_all_captures(lambda);
         let mut addrs = Vec::new();
@@ -586,6 +608,10 @@ impl Compilation {
     fn get_variable(&mut self, var: &Symbol, code: &mut Vec<u8>) {
         let loc = self.current_context().lookup_var(var);
         match loc {
+            VarLocation::Arg(i) => {
+                load_constant_int(i, code);
+                code.push(INSTR_GET_ARG);
+            }
             VarLocation::Stack(s) => {
                 load_constant_int(s as i64, code);
                 code.push(INSTR_STACK_LOAD);
@@ -616,6 +642,7 @@ impl Compilation {
 }
 
 enum VarLocation {
+    Arg(i64),
     Stack(usize),
     Env(usize),
     Global,

@@ -1324,7 +1324,7 @@ impl Closure {
 
     pub fn vararg(&self) -> Option<usize> {
         let val = get_value(self.ptr, 4);
-        if val.is_immediate_integer() {
+        if !val.is_bool() {
             Some(val.get_integer() as usize)
         } else {
             None
@@ -1332,7 +1332,7 @@ impl Closure {
     }
 
     pub fn min_args(&self) -> usize {
-        let v = if self.vararg().is_some() { 1 } else { 0 };
-        (get_value(self.ptr, 3).get_integer() - 1) as usize
+        let v = if self.is_vararg() { 1 } else { 0 };
+        (get_value(self.ptr, 3).get_integer() - v) as usize
     }
 }

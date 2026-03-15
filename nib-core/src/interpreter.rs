@@ -42,6 +42,7 @@ pub struct Runtime {
     call_stack: Stack,
     code: Value,
     ip: usize,
+    frame_args: i64,
     ffi_signatures: Vec<Signature>,
     options: Options,
 }
@@ -118,6 +119,7 @@ impl Runtime {
             call_stack: Stack::new(Value::nil()), // Dummy stack
             code: Value::nil(),
             ip: 0,
+            frame_args: 0,
             ffi_signatures: Vec::new(),
             options: Options::new(),
         };
@@ -394,6 +396,10 @@ impl Runtime {
             INSTR_SET_LOCAL => self.op_set_local(),
             INSTR_GLOBAL_ENV => self.op_global_env(),
             INSTR_IS_INTEGER..=INSTR_IS_IMMEDIATE => self.op_type_pred(instr),
+            INSTR_GET_ARG => self.op_get_arg(),
+            INSTR_STACK_ARRAY => self.op_stack_array(),
+            INSTR_STACK_FRAME => self.op_stack_frame(),
+            INSTR_ARG_COUNT => self.op_arg_count(),
             INSTR_PUSH_MINUS_ONE..=INSTR_PUSH_TRUE => self.op_push_const(instr),
             _ => self.error(&format!("unimplemented opcode: {}", instr)),
         }
@@ -713,26 +719,13 @@ impl Runtime {
             return Ok(());
         }
         let extra_args = params - closure.min_args();
-        if let Some(i) = closure.vararg() {
-            let mut var_arg = Array::make(self, extra_args);
-            if extra_args == 0 {
-                self.stack.push(Value::from(var_arg));
-                self.stack.dip(args - i);
-            } else {
-                let argv = self.stack.slice_mut(args - 1, 0);
-                var_arg.fill(&argv[i..i + extra_args], 0, extra_args);
-                if args - 1 > i + extra_args {
-                    argv.copy_within(i + extra_args.., i + 1);
-                }
-                argv[args - extra_args..].fill(Value::nil());
-                argv[i] = Value::from(var_arg);
-                self.stack.top -= extra_args;
-            }
-        } else if extra_args > 0 {
+        if !closure.is_vararg() && extra_args > 0 {
             self.stack_push(Value::call_continuation(extra_args));
             let elems = self.stack.slice_mut(args, 0);
             elems.rotate_right(extra_args);
         }
+        let old_frame_args = self.frame_args;
+        self.frame_args = args as i64;
         match closure.get_tag() {
             TYPE_BYTECODE => {
                 if op == INSTR_CALL || extra_args > 0 || self.call_stack.is_empty() {
@@ -759,6 +752,7 @@ impl Runtime {
                     let fun: PrimFn = mem::transmute(fun_ptr);
                     fun(self)?;
                 }
+                self.frame_args = old_frame_args;
             }
             TYPE_FOREIGN => {
                 let ffi_array = closure.code_value().get_array();
@@ -768,6 +762,7 @@ impl Runtime {
                 let argv = self.stack.take(args);
                 let ret = call_foreign_function(self, &CodePtr(code_ptr), signature, &argv[1..])?;
                 self.stack_push(ret);
+                self.frame_args = old_frame_args;
             }
             _ => {
                 return self.error("Core code not supported in bytecode interpreter");
@@ -796,6 +791,7 @@ impl Runtime {
             self.code = code;
             self.ip = ip;
             self.local_env = old_env;
+            self.frame_args = self.stack.base as i64 - old_base as i64;
             self.stack.set_top(self.stack.base);
             self.stack.base = old_base;
             self.stack.push(cc);
@@ -1147,6 +1143,33 @@ impl Runtime {
         Ok(false)
     }
 
+    fn op_get_arg(&mut self) -> Result<bool> {
+        let arg = self.stack.pop().get_integer();
+        let index = if arg < 0 {
+            self.stack.load_arg((self.frame_args + arg) as usize);
+        } else {
+            self.stack.load_arg(arg as usize);
+        };
+        Ok(false)
+    }
+
+    fn op_stack_frame(&mut self) -> Result<bool> {
+        let index = Value::integer(self.stack.base as i64);
+        self.stack_push(index);
+        Ok(false)
+    }
+    
+    fn op_arg_count(&mut self) -> Result<bool> {
+        let index = Value::integer(self.frame_args);
+        self.stack_push(index);
+        Ok(false)
+    }
+
+    fn op_stack_array(&mut self) -> Result<bool> {
+        self.stack_push(self.stack.as_value());
+        Ok(false)
+    }
+
     fn op_global_env(&mut self) -> Result<bool> {
         self.stack_push(self.global_env);
         Ok(false)
@@ -1236,7 +1259,7 @@ impl Stack {
     pub(super) fn take(&mut self, n: usize) -> Vec<Value> {
         let mut v = Vec::new();
         let slice = &self.array.values()[self.top - n..self.top];
-        v.clone_from_slice(slice);
+        v.extend_from_slice(slice);
         self.top -= n;
         v
     }

@@ -47,6 +47,7 @@ impl Runtime {
         self.register_primitive("_prim_project", prim_project, Arity::VarArg(2, 1));
         self.register_primitive("_prim_array_make", prim_array_make, Arity::VarArg(1, 0));
         self.register_primitive("_prim_array_match", prim_array_match, Arity::Fixed(1));
+        self.register_primitive("_prim_array_slice", prim_array_slice, Arity::Fixed(3));
         self.register_primitive("_prim_match", prim_match, Arity::Fixed(1));
         self.register_primitive("_prim_string_print", prim_string_print, Arity::Fixed(1));
         self.register_primitive("_prim_to_string", prim_to_string, Arity::Fixed(1));
@@ -185,19 +186,16 @@ impl Runtime {
 }
 
 fn prim_get_path(rt: &mut Runtime) -> Result<()> {
-    let path = rt.stack.pop();
-    let first = rt.stack.pop();
-    let _ = rt.stack.pop(); // pop closure
-    ensure_type(&path, ValueRepr::Array)?;
-    let arr = path.get_array();
-    let syms = arr.values();
-    if syms.iter().any(|v| !v.is_symbol()) {
+    let vals = rt.stack.take(rt.frame_args as usize);
+    let start = vals[1];
+    let projection= &vals[2..];
+    if projection.iter().any(|v| !v.is_symbol()) {
         return rt.error("prim_get_path: All trailing arguments must be symbols");
     }
-    let symbols: Vec<_> = syms.iter().map(|v| v.get_symbol()).collect();
-    let initial = match first.get_repr() {
+    let symbols: Vec<_> = projection.iter().map(|v| v.get_symbol()).collect();
+    let initial = match start.get_repr() {
         ValueRepr::Symbol => {
-            let symbol = first.get_symbol();
+            let symbol = start.get_symbol();
             let val = rt.get_global(&symbol);
             if !val.is_table() {
                 let new_val = Value::from(Table::make(rt));
@@ -207,7 +205,7 @@ fn prim_get_path(rt: &mut Runtime) -> Result<()> {
                 val
             }
         }
-        ValueRepr::Table => first,
+        ValueRepr::Table => start,
         _ => {
             return rt.error("prim_get_path: First argument must be table or symbol");
         }
@@ -226,16 +224,14 @@ fn prim_print_representation(rt: &mut Runtime) -> Result<()> {
 }
 
 fn prim_project(rt: &mut Runtime) -> Result<()> {
-    let projection = rt.stack.pop().get_array();
-    let start = rt.stack.pop();
-    let _ = rt.stack.pop(); // pop closure
+    let vals = rt.stack.take(rt.frame_args as usize);
+    let start = vals[1];
+    let projection= &vals[2..];
     if let Some(method) = rt.find_overload(&start, &static_symbol!("project")) {
-        let mut args = vec![start];
-        args.extend_from_slice(projection.values());
-        rt.call_function(&method, &args).map(|_| ())?;
+        rt.call_function(&method, &vals[1..]).map(|_| ())?;
     } else {
         let mut current = start;
-        for s in projection.values() {
+        for s in projection.iter() {
             ensure_type(&current, ValueRepr::Table)?;
             ensure_type(s, ValueRepr::Symbol)?;
             current = current.get_table().get(*s);
@@ -246,9 +242,11 @@ fn prim_project(rt: &mut Runtime) -> Result<()> {
 }
 
 fn prim_array_make(rt: &mut Runtime) -> Result<()> {
-    let args = rt.stack.pop();
-    let _ = rt.stack.pop(); // pop closure
-    rt.stack_push(args);
+    let args = rt.frame_args;
+    dbg!(rt.stack);
+    let vals = rt.stack.take(args as usize);
+    let arr = Array::with(rt, &vals[1..]);
+    rt.stack_push(Value::from(arr));
     Ok(())
 }
 
@@ -260,6 +258,23 @@ fn prim_array_match(rt: &mut Runtime) -> Result<()> {
     } else {
         rt.stack.push(Value::bool(false));
     }
+    Ok(())
+}
+
+fn prim_array_slice(rt: &mut Runtime) -> Result<()> {
+    let size = rt.stack.pop();
+    let offset = rt.stack.pop();
+    let array = rt.stack.pop();
+    let _ = rt.stack.pop(); // pop closure
+    ensure_type(&size, ValueRepr::Integer)?;
+    ensure_type(&offset, ValueRepr::Integer)?;
+    ensure_type(&array, ValueRepr::Array)?;
+    let arr = array.get_array();
+    let content = arr.values();
+    let offset = offset.get_integer() as usize;
+    let size = size.get_integer() as usize;
+    let out = Array::with(rt, &content[offset..offset+size]);
+    rt.stack_push(Value::from(out));
     Ok(())
 }
 
@@ -334,11 +349,10 @@ fn prim_symbol_make(rt: &mut Runtime) -> Result<()> {
 }
 
 fn prim_bytes_make(rt: &mut Runtime) -> Result<()> {
-    let vals = rt.stack.pop();
-    let _ = rt.stack.pop(); // pop closure
-    let array = vals.get_array();
+    let vals = rt.stack.take(rt.frame_args as usize);
+    let args= &vals[1..];
     let mut bytes = Vec::new();
-    for v in array.values() {
+    for v in args {
         let n = v.get_integer();
         if !(0..=255).contains(&n) {
             return rt.error("bytes_make: value out of range for byte");

@@ -603,7 +603,7 @@ pub fn get_arity(patterns: &[PatternNode]) -> Arity {
     }
     let len = patterns.len() as u32;
     if vararg {
-        Arity::VarArg(len - 1, index as u32)
+        Arity::VarArg(len, index as u32)
     } else {
         Arity::Fixed(len)
     }
