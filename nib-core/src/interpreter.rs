@@ -163,6 +163,7 @@ impl Runtime {
         self.local_env = self.make_local_env(&bytecode);
         let bc = Bytes::with(self, &bytecode.byte_code);
         self.code = Value::from(bc);
+        self.ip = 0;
         self.run()
     }
 
@@ -328,7 +329,7 @@ impl Runtime {
     pub fn get_type_id(&self, val: &Value) -> Result<Symbol> {
         let tt = self.get_type_table(val)?.get_table();
         let tid = tt.get(Value::symbol(&sym("type_id")));
-        if !val.is_symbol() {
+        if !tid.is_symbol() {
             return self.error("Type table has no type_id");
         }
         Ok(tid.get_symbol())
@@ -392,6 +393,7 @@ impl Runtime {
             INSTR_TABLE_GET => self.op_table_get(),
             INSTR_TABLE_SET => self.op_table_set(),
             INSTR_TABLE_SIZE => self.op_table_size(),
+            INSTR_TABLE_DELETE => self.op_table_delete(),
             INSTR_GET_LOCAL => self.op_get_local(),
             INSTR_SET_LOCAL => self.op_set_local(),
             INSTR_GLOBAL_ENV => self.op_global_env(),
@@ -1122,6 +1124,13 @@ impl Runtime {
         let obj = self.stack.pop();
         let val = Value::integer(obj.get_table().size() as i64);
         self.stack_push(val);
+        Ok(false)
+    }
+
+    fn op_table_delete(&mut self) -> Result<bool> {
+        let obj = self.stack.pop();
+        let sym = self.stack.pop();
+        obj.get_table().delete(sym);
         Ok(false)
     }
 

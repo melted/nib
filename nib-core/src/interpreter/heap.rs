@@ -916,6 +916,7 @@ impl Table {
     pub fn make(rt: &mut Runtime) -> Self {
         let header = ObjectHeader::make(rt, 32, ValueRepr::Table);
         let mut me = Table { ptr: header };
+        me.set_type_table(Value::nil());
         me.clear(rt);
         me
     }

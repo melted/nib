@@ -315,8 +315,12 @@ fn prim_string_print(rt: &mut Runtime) -> Result<()> {
 fn prim_to_string(rt: &mut Runtime) -> Result<()> {
     let val = rt.stack.pop();
     let _ = rt.stack.pop(); // pop closure
-    let str = format!("{}", val);
-    let out = rt.make_string(&str);
+    let out = if rt.is_type(&val, &sym("string"))? {
+        val
+    } else {
+        let str = format!("{}", val);
+        rt.make_string(&str)
+    };
     rt.stack_push(out);
     Ok(())
 }

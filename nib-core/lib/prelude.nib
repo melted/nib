@@ -171,11 +171,11 @@ string.size = _prim_bytes_size
 string.concat x y = cc where
                         cc = bytes.concat x y
                         _ = set_type cc string
+string.substring = _prim_string_substring
 
 to_string = _prim_to_string
 
 a ++ b = (type a).concat a b
-
 
 ffi.int8 = #cint8
 ffi.int16 = #cint16
