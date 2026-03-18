@@ -302,7 +302,6 @@ fn table_binding() -> Result<()> {
     Ok(())
 }
 
-//#[ignore = "fails"]
 #[test]
 fn local_table_binding() -> Result<()> {
     let mut rt = Runtime::new();
@@ -340,3 +339,14 @@ fn printing_with_prelude() -> Result<()> {
     Ok(())
 }
 
+#[test]
+fn test_external_file() -> Result<()> {
+    let mut rt = Runtime::new();
+    rt.set_output_core(true);
+    let prelude_code = include_str!("../../lib/prelude.nib");
+    let test_code = include_str!("../../testdata/type_pattern.nib");
+    rt.add_code("prelude", prelude_code)?;
+    rt.set_tracing(true);
+    rt.add_code("test", test_code)?;
+    Ok(())
+}

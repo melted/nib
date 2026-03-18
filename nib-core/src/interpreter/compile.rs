@@ -214,8 +214,6 @@ impl Compilation {
                         .collect();
                     return self.error(&format!("Missing definition of `{:?}`", f));
                 }
-                // Return nothing
-                push_nil(&mut code);
             }
             CompilationInput::Expression(expression) => {
                 self.compile_expression(&expression, &mut code)?;
@@ -615,9 +613,11 @@ impl Compilation {
         code.push(INSTR_DUP);
         code.push(INSTR_IS_TABLE);
         let mut create_table_code = Vec::new();
+        create_table_code.push(INSTR_DROP);
         create_table_code.push(INSTR_ALLOC_TABLE);
+        create_table_code.push(INSTR_DUP);
         set_local(h, &mut create_table_code);
-        optimized_jump(INSTR_JFALSE, (create_table_code.len() + 1) as i64, code);
+        optimized_jump(INSTR_JNFALSE, (create_table_code.len()) as i64, code);
         code.extend_from_slice(&create_table_code);
     }
 

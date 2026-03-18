@@ -50,6 +50,7 @@ pub struct Runtime {
 pub struct Options {
     output_core: bool,
     trace: bool,
+    log_missing_keys: bool
 }
 
 const DEFAULT_HEAP_SIZE: usize = 1000000;
@@ -104,6 +105,7 @@ impl Options {
         Options {
             output_core: false,
             trace: false,
+            log_missing_keys: true
         }
     }
 }
@@ -146,6 +148,10 @@ impl Runtime {
 
     pub fn set_tracing(&mut self, tracing: bool) {
         self.options.trace = tracing;
+    }
+
+    pub fn set_log_missing_keys(&mut self, log: bool) {
+        self.options.log_missing_keys = log;
     }
 
     pub fn package_name(&mut self, path: &Path) -> Result<Symbol> {
@@ -1108,6 +1114,9 @@ impl Runtime {
         let obj = self.stack.pop();
         let sym = self.stack.pop();
         let val = obj.get_table().get(sym);
+        if self.options.log_missing_keys && val.is_nil() {
+            return self.error(&format!("op_table_get: no `{}` key", sym));
+        }
         self.stack_push(val);
         Ok(false)
     }
@@ -1128,8 +1137,8 @@ impl Runtime {
     }
 
     fn op_table_delete(&mut self) -> Result<bool> {
-        let obj = self.stack.pop();
         let sym = self.stack.pop();
+        let obj = self.stack.pop();
         obj.get_table().delete(sym);
         Ok(false)
     }
@@ -1269,6 +1278,9 @@ impl Stack {
         let mut v = Vec::new();
         let slice = &self.array.values()[self.top - n..self.top];
         v.extend_from_slice(slice);
+        for v in &mut self.array.values_mut()[self.top - n..self.top] {
+            *v = Value::nil();
+        }
         self.top -= n;
         v
     }

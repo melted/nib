@@ -1,11 +1,11 @@
 // The default library for Nib
 
 /// Abort immediately with an error value. The value will be converted to a string.
-panic = _prim_panic
+panic v = _prim_panic v
 
 /// Exit with an exit code, the argument must be an integer. Only the lower 32 bits of the
 /// argument will be used.
-exit = _prim_exit
+exit c = _prim_exit c
 
 /// Add two numbers
 a + b = _prim_add a b
@@ -47,11 +47,11 @@ not false = true
 not _ = false
 
 // bitops
-bit_and = _prim_bitand
-bit_or = _prim_bitor
-bit_xor = _prim_bitxor
-bit_not = _prim_bitnot
-bit_shift = _prim_bitshift
+bit_and a b = _prim_bitand a b
+bit_or a b = _prim_bitor a b
+bit_xor a b = _prim_bitxor a b
+bit_not a = _prim_bitnot a
+bit_shift a b = _prim_bitshift a b
 
 // some arithmetic
 max x y = x > y => x; y
@@ -71,12 +71,12 @@ begin ... last = last
 /// is returned.
 a & b = b
 const a b = a
-apply = _prim_apply
+apply f xs = _prim_apply f xs
 
 // types
 
 
-type = _prim_type
+type v = _prim_type v
 
 make_type type_sym name = new where
                                 new = table.create
@@ -84,7 +84,7 @@ make_type type_sym name = new where
                                 _ = table.set global type_sym new
 
 type_name v = (type v).type_id
-set_type = _prim_type_set
+set_type v t = _prim_type_set v t
 
 // IO
 print a = _prim_string_print (_prim_to_string a)
@@ -115,14 +115,14 @@ println a =  print a & print "\n"
 
 // Table functions
 table.set tab key value = _prim_table_set value key tab
-table.size = _prim_table_size
-table.keys = _prim_table_keys
+table.size t = _prim_table_size t
+table.keys t = _prim_table_keys t
 
 // Array functions
 array.ref arr pos = _prim_array_ref pos arr 
 array.set arr pos val = _prim_array_set val pos arr
-array.size = _prim_array_size
-array.create = _prim_array_create
+array.size arr = _prim_array_size arr
+array.create size = _prim_array_create size
 array.for_each f arr = iter 0 where
                             len = array.size arr
                             iter n | n == len = ()
@@ -148,10 +148,10 @@ array.concat x y = merged where
 array.match v | type v == array = v
 array.match _ = false
 
-bytes.create = _prim_bytes_create
+bytes.create sz = _prim_bytes_create sz
 bytes.ref arr pos = _prim_bytes_ref pos arr
 bytes.set arr pos val = _prim_bytes_set val pos arr
-bytes.size = _prim_bytes_size
+bytes.size b = _prim_bytes_size b
 bytes.concat x y = merged where
                         xs = bytes.size x
                         ys = bytes.size y
@@ -164,16 +164,16 @@ bytes.concat x y = merged where
                                     where _ = bytes.set merged n (bytes.ref y (n - xs))
                         _ = go 0
 
-string.create = _prim_bytes_create
+string.create sz = _prim_bytes_create sz
 string.ref = bytes.ref
 string.set = bytes.set
-string.size = _prim_bytes_size
+string.size str = _prim_bytes_size str
 string.concat x y = cc where
                         cc = bytes.concat x y
                         _ = set_type cc string
 string.substring = _prim_string_substring
 
-to_string = _prim_to_string
+to_string v = _prim_to_string v
 
 a ++ b = (type a).concat a b
 
