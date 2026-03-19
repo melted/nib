@@ -5,7 +5,7 @@ use crate::{
     common::{Error, Metadata, Name, Node, Result, Symbol, sym},
 };
 use std::{
-    collections::{BTreeSet, HashMap, HashSet},
+    collections::{BTreeSet, HashMap, HashSet, btree_map::Keys},
     fmt::Display,
     mem,
     sync::LazyLock,
@@ -154,7 +154,9 @@ impl DesugarState {
                 let (is_irrefutable, pexpr) =
                     self.build_pattern_expression(&parts, &app(&var_exp), &on_fail)?;
                 let nam_arr = self.next_local();
-                let binding = Binding::make(ast_binding.id, Binder::Local(nam_arr.clone()), pexpr);
+                let local_bind = Binder::Local(nam_arr.clone());
+                self.current_bindings.insert(local_bind.clone());
+                let binding = Binding::make(ast_binding.id, local_bind, pexpr);
                 self.bindings.push(binding);
                 for (i, k) in var_syms.iter().enumerate() {
                     let rhs = Expression::App(
@@ -364,6 +366,9 @@ impl DesugarState {
         let mut old_current_bindings = self.current_bindings.clone();
         self.current_bindings
             .extend(args.iter().map(|a| Binder::Local(Name::from(*a))));
+        for i in 0..clauses.len() {
+            self.current_bindings.insert(Binder::Local(Name::Plain(local(i))));
+        }
         for (i, c) in clauses.iter().enumerate() {
             let fail_exp = if i + 1 < clauses.len() {
                 app(&[var(&local(i + 1)), nil()])
