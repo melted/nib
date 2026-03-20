@@ -146,7 +146,8 @@ pub const INSTR_LOAD_IMM16: u8 = 74;
 pub const INSTR_LOAD_IMM32: u8 = 75;
 pub const INSTR_LOAD_IMM64: u8 = 76;
 pub const INSTR_LOAD_BYTES_IMM: u8 = 77;
-pub const INSTR_ROT: u8 = 78;
+pub const INSTR_LOAD_BYTES8: u8 = 78;
+pub const INSTR_ROT: u8 = 79;
 
 // Branches
 pub const INSTR_JUMP: u8 = 80;

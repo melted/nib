@@ -380,6 +380,7 @@ impl Runtime {
             INSTR_STACK_STORE => self.op_put(),
             INSTR_LOAD_IMM8..=INSTR_LOAD_IMM64 => self.op_load_imm(instr),
             INSTR_LOAD_BYTES_IMM => self.op_load_bytes(),
+            INSTR_LOAD_BYTES8 => self.op_load_8bytes(),
             INSTR_DUP => self.op_dup(),
             INSTR_SWAP => self.op_swap(),
             INSTR_DROP => self.op_drop(),
@@ -510,10 +511,7 @@ impl Runtime {
     fn op_negate(&mut self) -> Result<bool> {
         let val = self.stack.pop();
         let res = if val.is_immediate_integer() {
-            const MSB: u64 = 1 << 63;
-            Value {
-                val: val.val.bitxor(MSB),
-            }
+            Value::integer(-val.get_integer())
         } else if val.is_float() {
             let f = -val.get_float();
             Value::alloc_float(self, f)
@@ -738,7 +736,7 @@ impl Runtime {
             TYPE_BYTECODE => {
                 if op == INSTR_CALL || extra_args > 0 || self.call_stack.is_empty() {
                     // Not a tail call, set up a new frame
-                    self.ensure_call_stack(3);
+                    self.ensure_call_stack(4);
                     let frame = vec![
                         Value::from(self.code),
                         Value::integer(self.ip as i64),
@@ -860,7 +858,7 @@ impl Runtime {
 
     fn op_push_small(&mut self, op: u8) -> Result<bool> {
         let val = op as i64;
-        self.stack.push(Value::integer(val));
+        self.stack_push(Value::integer(val));
         Ok(false)
     }
 
@@ -911,6 +909,16 @@ impl Runtime {
         let res = Value::from(Bytes::with(self, bytes));
         self.stack_push(res);
         self.ip += 4 + size;
+        Ok(false)
+    }
+
+    fn op_load_8bytes(&mut self) -> Result<bool> {
+        let bytes = self.code.get_bytes();
+        let code = bytes.get_slice();
+        let qword = &code[self.ip..self.ip + 8];
+        let res = Value::from(Bytes::with(self, qword));
+        self.stack_push(res);
+        self.ip += 8;
         Ok(false)
     }
 

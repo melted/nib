@@ -23,7 +23,7 @@ impl Runtime {
         self.register_primitive("_prim_foreign_sym", prim_foreign_sym, Arity::Fixed(2));
         self.register_primitive("_prim_foreign_import", prim_foreign_import, Arity::Fixed(4));
         self.register_primitive("_prim_peek", prim_peek, Arity::Fixed(2));
-        self.register_primitive("_prim_poke", prim_peek, Arity::Fixed(3));
+        self.register_primitive("_prim_poke", prim_poke, Arity::Fixed(3));
         Ok(())
     }
 
@@ -213,7 +213,9 @@ fn get_ffi_type(rt: &Runtime, arg: &Value) -> Result<(Type, CType)> {
     }
 }
 
-pub fn get_arg(rt: &Runtime, val: &Value, ctype: &CType) -> Result<Arg> {
+
+
+pub fn get_arg(rt: &Runtime, val: &Value, ctype: &CType, ptrs:&mut Vec<*mut c_void>) -> Result<Arg> {
     match ctype {
         CType::Int8 => Ok(arg(&i8::try_from(val.get_integer())?)),
         CType::Int16 => Ok(arg(&i16::try_from(val.get_integer())?)),
@@ -227,7 +229,7 @@ pub fn get_arg(rt: &Runtime, val: &Value, ctype: &CType) -> Result<Arg> {
         CType::Float64 => Ok(arg(&val.get_float())),
         CType::Pointer => {
             let p = val.get_pointer::<c_void>();
-            Ok(arg(&p))
+            Ok(arg(&usize::try_from(p.addr()).unwrap()))
         }
         CType::Void => rt.error("Can't use void type in argument list"),
     }
@@ -240,8 +242,12 @@ pub fn call_foreign_function(
     args: &[Value],
 ) -> Result<Value> {
     let mut cargs = Vec::new();
+    let mut argvals: Vec<ArgVal> = Vec::new(); // HACK
     for (a, t) in args.iter().zip(&signature.arg_types) {
-        cargs.push(get_arg(rt, a, t)?);
+        argvals.push(ArgVal::new(t, a)?);
+    }
+    for av in &argvals {
+        cargs.push(av.arg());
     }
     let ret = match signature.ret_type {
         CType::Void => {
@@ -266,4 +272,86 @@ pub fn call_foreign_function(
         }
     };
     Ok(ret)
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum ArgVal {
+    Int8(i8),
+    Int16(i16),
+    Int32(i32),
+    Int64(i64),
+    UInt8(u8),
+    UInt16(u16),
+    UInt32(u32),
+    UInt64(u64),
+    Float32(f32),
+    Float64(f64),
+    Pointer(*mut c_void),
+    Void,
+}
+
+impl ArgVal {
+    pub fn new(ctype: &CType, val:&Value) -> Result<Self> {
+        match ctype {
+            CType::Int8 => Ok(ArgVal::Int8(i8::try_from(val.get_integer())?)),
+            CType::Int16 => Ok(ArgVal::Int16(i16::try_from(val.get_integer())?)),
+            CType::Int32 => Ok(ArgVal::Int32(i32::try_from(val.get_integer())?)),
+            CType::Int64 => {
+                if val.is_immediate_integer() {
+                    Ok(ArgVal::Int64(i64::from(val.get_integer())))
+                } else if val.is_bytearray() {
+                    let bytes = val.get_bytes();
+                    let slice = bytes.get_slice();
+                    if slice.len() == 8 {
+                        let n = i64::from_le_bytes(slice.try_into().unwrap());
+                        Ok(ArgVal::Int64(n))
+                    } else {
+                        Err(crate::common::Error::runtime_error("Need 8 bytes to make int64"))
+                    }
+                } else {
+                    Err(crate::common::Error::runtime_error("Not convertible to int64"))
+                }
+            },
+            CType::UInt8 => Ok(ArgVal::UInt8(u8::try_from(val.get_integer())?)),
+            CType::UInt16 => Ok(ArgVal::UInt16(u16::try_from(val.get_integer())?)),
+            CType::UInt32 => Ok(ArgVal::UInt32(u32::try_from(val.get_integer())?)),
+            CType::UInt64 => {
+                if val.is_immediate_integer() {
+                    Ok(ArgVal::UInt64(u64::try_from(val.get_integer())?))
+                } else if val.is_bytearray() {
+                    let bytes = val.get_bytes();
+                    let slice = bytes.get_slice();
+                    if slice.len() == 8 {
+                        let n = u64::from_le_bytes(slice.try_into().unwrap());
+                        Ok(ArgVal::UInt64(n))
+                    } else {
+                        Err(crate::common::Error::runtime_error("Need 8 bytes to make uint64"))
+                    }
+                } else {
+                    Err(crate::common::Error::runtime_error("Not convertible to uint64"))
+                }
+            },
+            CType::Float32 => Ok(ArgVal::Float32(val.get_float() as f32)),
+            CType::Float64 => Ok(ArgVal::Float64(val.get_float())),
+            CType::Pointer => Ok(ArgVal::Pointer(val.get_pointer::<c_void>())),
+            CType::Void => Ok(ArgVal::Void),
+        }
+    }
+
+    fn arg(&self) -> Arg {
+        match self {
+            ArgVal::Int8(v) => arg(v),
+            ArgVal::Int16(v) => arg(v),
+            ArgVal::Int32(v) => arg(v),
+            ArgVal::Int64(v) => arg(v),
+            ArgVal::UInt8(v) => arg(v),
+            ArgVal::UInt16(v) => arg(v),
+            ArgVal::UInt32(v) => arg(v),
+            ArgVal::UInt64(v) => arg(v),
+            ArgVal::Float32(v) => arg(v),
+            ArgVal::Float64(v) => arg(v),
+            ArgVal::Pointer(v) => arg(v),
+            ArgVal::Void => todo!(),
+        }
+    }
 }
