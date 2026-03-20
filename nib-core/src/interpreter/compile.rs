@@ -517,7 +517,7 @@ impl Compilation {
             }
             None => {
                 load_constant_int(exps.len() as i64, code);
-                code.push(if is_tail { INSTR_CALL_TAIL } else { INSTR_CALL });
+                code.push(if is_tail { INSTR_CALL } else { INSTR_CALL });
             }
         }
         Ok(())

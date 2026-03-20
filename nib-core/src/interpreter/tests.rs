@@ -344,7 +344,7 @@ fn test_external_file() -> Result<()> {
     let mut rt = Runtime::new();
     rt.set_output_core(true);
     let prelude_code = include_str!("../../lib/prelude.nib");
-    let test_code = include_str!("../../testdata/type_pattern.nib");
+    let test_code = include_str!("../../testdata/factorial.nib");
     rt.add_code("prelude", prelude_code)?;
     rt.set_tracing(true);
     rt.add_code("test", test_code)?;
