@@ -689,7 +689,7 @@ impl Runtime {
 
     fn op_call(&mut self, op: u8) -> Result<bool> {
         let count = self.stack.pop();
-        let args = match count.get_immediate_repr() {
+        let mut args = match count.get_immediate_repr() {
             ValueRepr::Integer => count.get_integer() as usize,
             ValueRepr::CallContinuation => count.get_cc_args(),
             _ => return self.error("call arg size must be integer or call continuation"),
@@ -700,9 +700,12 @@ impl Runtime {
             ValueRepr::PartialApplication => {
                 let pap_array = fun.get_array();
                 let pap = pap_array.values();
-                self.stack.lift(args - 1, pap.len());
+                self.stack.lift(args - 1, pap.len()-1);
                 let room = self.stack.slice_mut(pap.len(), args - 1);
+                dbg!(&room, &pap, args);
                 room.copy_from_slice(pap);
+                args += pap.len() - 1;
+                dbg!(&room, args);
             }
             _ => {
                 if let Some(method) = self.find_overload(&fun, &static_symbol!("__call")) {

@@ -887,8 +887,9 @@ impl Array {
     }
 
     pub fn set_as_partial_application(&mut self) -> Value {
-        let mut header = unsafe { *(self.ptr) };
-        header.repr = ValueRepr::PartialApplication;
+        unsafe { 
+            (*self.ptr).repr = ValueRepr::PartialApplication;
+        };
         Value::with_tag(self.ptr, OBJECT_TAG)
     }
 }
