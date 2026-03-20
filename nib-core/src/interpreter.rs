@@ -562,6 +562,8 @@ impl Runtime {
                 let order = left.get_bool().cmp(&right.get_bool());
                 ordering_to_int(order)
             }
+            (ValueRepr::Bool, _) if !equalcheck => 0,
+            (_, ValueRepr::Bool) if !equalcheck => 0,
             (ValueRepr::Nil, ValueRepr::Nil) => 0,
             (ValueRepr::Symbol, ValueRepr::Symbol) if equalcheck => {
                 if left.get_symbol() == right.get_symbol() {

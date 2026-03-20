@@ -344,7 +344,6 @@ impl DesugarState {
 
     fn set_captured_vars(&self, function: &mut Function, locals:&mut HashSet<Symbol>) -> Result<()> {
         let free = free_vars(function)?;
-        dbg!(&free, &locals);
         function.captures = free
             .intersection(&locals)
             .copied()

@@ -22,6 +22,10 @@ struct Options {
     #[arg(long)]
     update: bool,
 
+    /// Use bytecode backend
+    #[arg(long)]
+    bytecode: bool,
+
     /// The nibble executable to use
     #[arg(long)]
     nibble_path: Option<PathBuf>,
@@ -97,6 +101,9 @@ fn run_test(opts: &Options, nib_path: &PathBuf, test: &PathBuf) -> io::Result<bo
     command.arg(test.as_os_str());
     if meta.tags.contains("no_prelude") {
         command.arg("--no-prelude");
+    }
+    if opts.bytecode {
+        command.arg("--bytecode");
     }
     let out = command.output()?;
     let out_str = str::from_utf8(&out.stdout).map_err(io::Error::other)?;
