@@ -50,7 +50,8 @@ pub struct Runtime {
 pub struct Options {
     output_core: bool,
     trace: bool,
-    log_missing_keys: bool
+    log_missing_keys: bool,
+    trace_gc: bool
 }
 
 const DEFAULT_HEAP_SIZE: usize = 1000000;
@@ -105,7 +106,8 @@ impl Options {
         Options {
             output_core: false,
             trace: false,
-            log_missing_keys: true
+            log_missing_keys: true,
+            trace_gc: true,
         }
     }
 }
@@ -152,6 +154,10 @@ impl Runtime {
 
     pub fn set_log_missing_keys(&mut self, log: bool) {
         self.options.log_missing_keys = log;
+    }
+
+    pub fn set_trace_gc(&mut self, trace: bool) {
+        self.options.trace_gc = trace;
     }
 
     pub fn package_name(&mut self, path: &Path) -> Result<Symbol> {
@@ -731,10 +737,8 @@ impl Runtime {
         if !closure.is_vararg() && extra_args > 0 {
             let cc = Value::call_continuation(extra_args);
             self.stack_push(cc);
-            dbg!(&self.stack, cc.val);
             let elems = self.stack.slice_mut(args+1, 0);
             elems.rotate_right(extra_args+1);
-            dbg!(&self.stack);
         }
         let old_frame_args = self.frame_args;
         self.frame_args = args as i64;
@@ -798,7 +802,6 @@ impl Runtime {
         self.frame_args = self.stack.base as i64 - old_base as i64;
         self.stack.set_top(self.stack.base);
         self.stack.base = old_base;
-        dbg!(&self.stack);
         if self.stack.top > 0 && self.stack.peek(1).is_call_continuation() {
             let cc = self.stack.pop();
             let args = cc.get_cc_args();
@@ -807,7 +810,6 @@ impl Runtime {
             self.stack_push(ret);
             self.stack.pushv(&argv);
             self.stack_push(Value::integer((args+1) as i64));
-            dbg!(&self.stack);
             return self.op_call(INSTR_CALL)
         }
         self.stack_push(ret);
@@ -1340,9 +1342,7 @@ impl Stack {
     pub(super) fn dip(&mut self, i: usize) {
         let val = self.pop();
         self.lift(i, 1);
-        dbg!(&self);
         self.array.set(self.top - i, val);
-        dbg!(&self);
     }
 
     pub(super) fn peek(&self, i: usize) -> Value {
