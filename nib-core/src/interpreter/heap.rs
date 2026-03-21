@@ -419,7 +419,7 @@ impl Value {
 
     pub fn call_continuation(args: usize) -> Self {
         Value {
-            val: (args as u64) << 8 | CC_STAG,
+            val: ((args as u64) << 8) | CC_STAG,
         }
     }
 

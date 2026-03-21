@@ -339,6 +339,8 @@ fn printing_with_prelude() -> Result<()> {
     Ok(())
 }
 
+
+#[ignore="for manual use"]
 #[test]
 fn test_external_file() -> Result<()> {
     let mut rt = Runtime::new();
@@ -348,5 +350,34 @@ fn test_external_file() -> Result<()> {
     rt.add_code("prelude", prelude_code)?;
     rt.set_tracing(true);
     rt.add_code("test", test_code)?;
+    Ok(())
+}
+
+#[test]
+fn partial_application() -> Result<()> {
+    let mut rt = Runtime::new();
+    rt.set_output_core(true);
+    rt.set_tracing(true);
+    rt.add_code("test", "
+    add a b c = _prim_add a (_prim_add b c)
+    add5 = add 5
+    res = add5 4 3
+    ")?;
+    let val = rt.get_global(&sym("res"));
+    assert_eq!(val.get_integer(), 12);
+    Ok(())
+}
+
+#[test]
+fn over_application() -> Result<()> {
+    let mut rt = Runtime::new();
+    rt.set_output_core(true);
+//    rt.set_tracing(true);
+    rt.add_code("test", "
+    add x = { _prim_add a x }
+    res = add 5 7
+    ")?;
+    let val = rt.get_global(&sym("res"));
+    assert_eq!(val.get_integer(), 12);
     Ok(())
 }

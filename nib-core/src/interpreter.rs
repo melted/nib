@@ -702,10 +702,8 @@ impl Runtime {
                 let pap = pap_array.values();
                 self.stack.lift(args - 1, pap.len()-1);
                 let room = self.stack.slice_mut(pap.len(), args - 1);
-                dbg!(&room, &pap, args);
                 room.copy_from_slice(pap);
                 args += pap.len() - 1;
-                dbg!(&room, args);
             }
             _ => {
                 if let Some(method) = self.find_overload(&fun, &static_symbol!("__call")) {
@@ -731,9 +729,12 @@ impl Runtime {
         }
         let extra_args = params - closure.min_args();
         if !closure.is_vararg() && extra_args > 0 {
-            self.stack_push(Value::call_continuation(extra_args));
-            let elems = self.stack.slice_mut(args, 0);
-            elems.rotate_right(extra_args);
+            let cc = Value::call_continuation(extra_args);
+            self.stack_push(cc);
+            dbg!(&self.stack, cc.val);
+            let elems = self.stack.slice_mut(args+1, 0);
+            elems.rotate_right(extra_args+1);
+            dbg!(&self.stack);
         }
         let old_frame_args = self.frame_args;
         self.frame_args = args as i64;
@@ -750,8 +751,8 @@ impl Runtime {
                     ];
                     self.call_stack.base = self.call_stack.top;
                     self.call_stack.pushv(&frame);
-                    self.stack.base = self.stack.top() - args;
                 }
+                self.stack.base = self.stack.top() - (args - extra_args);
                 self.code = closure.code_value();
                 self.ip = 0;
                 self.local_env = closure.env();
@@ -786,28 +787,31 @@ impl Runtime {
         if self.call_stack.is_empty() {
             return Ok(true);
         }
-        let cc = if self.stack.top() > 0 {
-            self.stack.pop()
-        } else {
-            Value::nil()
-        };
-        if cc.is_call_continuation() {
-            self.stack.dip(cc.get_cc_args());
-            self.op_call(INSTR_CALL_TAIL)
-        } else {
-            let old_env = self.call_stack.pop();
-            let old_base = self.call_stack.pop().get_integer() as usize;
-            let ip = self.call_stack.pop().get_integer() as usize;
-            let code = self.call_stack.pop();
-            self.code = code;
-            self.ip = ip;
-            self.local_env = old_env;
-            self.frame_args = self.stack.base as i64 - old_base as i64;
-            self.stack.set_top(self.stack.base);
-            self.stack.base = old_base;
-            self.stack.push(cc);
-            Ok(false)
+        let ret = self.stack.pop();
+        let old_env = self.call_stack.pop();
+        let old_base = self.call_stack.pop().get_integer() as usize;
+        let ip = self.call_stack.pop().get_integer() as usize;
+        let code = self.call_stack.pop();
+        self.code = code;
+        self.ip = ip;
+        self.local_env = old_env;
+        self.frame_args = self.stack.base as i64 - old_base as i64;
+        self.stack.set_top(self.stack.base);
+        self.stack.base = old_base;
+        dbg!(&self.stack);
+        if self.stack.top > 0 && self.stack.peek(1).is_call_continuation() {
+            let cc = self.stack.pop();
+            let args = cc.get_cc_args();
+            let argv = self.stack.take(args);
+            self.ensure_stack(args+2);
+            self.stack_push(ret);
+            self.stack.pushv(&argv);
+            self.stack_push(Value::integer((args+1) as i64));
+            dbg!(&self.stack);
+            return self.op_call(INSTR_CALL)
         }
+        self.stack_push(ret);
+        Ok(false)
     }
 
     fn op_jump(&mut self, op: u8) -> Result<bool> {
@@ -1336,7 +1340,9 @@ impl Stack {
     pub(super) fn dip(&mut self, i: usize) {
         let val = self.pop();
         self.lift(i, 1);
+        dbg!(&self);
         self.array.set(self.top - i, val);
+        dbg!(&self);
     }
 
     pub(super) fn peek(&self, i: usize) -> Value {
@@ -1371,14 +1377,11 @@ impl Stack {
     }
 
     pub(super) fn lift(&mut self, elems: usize, dist: usize) {
+        let v = self.take(elems);
         for i in 0..elems {
-            let from = self.array.at(self.top - i);
-            self.array.set(self.top - i + dist, from);
+            self.push(Value::nil());
         }
-        for i in elems..elems + dist {
-            self.array.set(self.top - i, Value::nil());
-        }
-        self.top += dist;
+        self.pushv(&v);
     }
 }
 
