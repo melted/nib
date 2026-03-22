@@ -67,7 +67,7 @@ fn create_space() {
 #[test]
 fn make_heap() {
     let mut runtime = Runtime::new();
-    let array = Array::make(&mut runtime, 5);
+    let mut array = Array::make(&mut runtime, 5);
     array.set(2, Value::integer(4));
     let val = array.at(2);
     assert_eq!(val.get_integer(), 4);
@@ -348,7 +348,7 @@ fn test_external_file() -> Result<()> {
     let prelude_code = include_str!("../../lib/prelude.nib");
     let test_code = include_str!("../../../nib-test/benchmarks/fib.nib");
     rt.add_code("prelude", prelude_code)?;
-//    rt.set_tracing(true);
+    rt.set_tracing(true);
     rt.add_code("test", test_code)?;
     Ok(())
 }

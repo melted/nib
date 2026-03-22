@@ -107,7 +107,7 @@ impl Options {
             output_core: false,
             trace: false,
             log_missing_keys: true,
-            trace_gc: true,
+            trace_gc: false,
         }
     }
 }
@@ -191,7 +191,7 @@ impl Runtime {
     }
 
     pub fn make_local_env(&mut self, module: &compile::Module) -> Value {
-        let array = Array::make(self, module.local_env_size);
+        let mut array = Array::make(self, module.local_env_size);
         for (blob, &idx) in &module.data {
             let bytes = Bytes::with(self, &blob);
             array.set(idx, Value::from(bytes));
@@ -796,6 +796,7 @@ impl Runtime {
         let old_base = self.call_stack.pop().get_integer() as usize;
         let ip = self.call_stack.pop().get_integer() as usize;
         let code = self.call_stack.pop();
+
         self.code = code;
         self.ip = ip;
         self.local_env = old_env;

@@ -1,6 +1,6 @@
 use core::slice;
 use std::{
-    collections::{HashMap, HashSet},
+    collections::{HashMap, HashSet, binary_heap},
     env,
     ffi::c_void,
     fmt::{Debug, Display},
@@ -8,7 +8,6 @@ use std::{
     ptr::copy_nonoverlapping,
     slice::{from_raw_parts, from_raw_parts_mut},
 };
-
 use region::Allocation;
 
 use crate::{
@@ -60,6 +59,9 @@ impl Runtime {
             let base_ptr: *mut T = self.heap.from_space.alloc.as_mut_ptr();
             let top_ptr = base_ptr.byte_add(self.heap.from_space.top);
             self.heap.from_space.top += aligned_size;
+            if self.options.trace_gc {
+                println!("allocating {} bytes, aligned to {}, at {:x}", size, aligned_size, top_ptr.addr());
+            }
             top_ptr
         }
     }
@@ -76,6 +78,9 @@ impl Runtime {
                 object: alloc,
             },
         );
+        if self.options.trace_gc {
+            println!("allocated big object: {} bytes at {:x}", size, ptr.addr());
+        }
         ptr
     }
 
@@ -89,6 +94,9 @@ impl Runtime {
             self.heap.to_space = Space::new(new_size);
         }
 
+        if self.options.trace_gc {
+            println!("collecting: new_size={}", new_size);
+        }
         unsafe {
             self.copy_live();
         }
@@ -123,6 +131,8 @@ impl Runtime {
         self.stack.array = new_stack.get_array();
         let new_call_stack = self.copy_object(self.call_stack.as_value());
         self.call_stack.array = new_call_stack.get_array();
+        let new_code = self.copy_object(self.code);
+        self.code = new_code;
     }
 
     fn trace_object(&mut self, obj: *mut ObjectHeader) -> usize {
@@ -131,30 +141,38 @@ impl Runtime {
             let size = (*obj).size as usize;
             match repr {
                 ValueRepr::Array | ValueRepr::PartialApplication => {
-                    let arr = Array { ptr: obj };
-                    self.copy_object(arr.type_table());
-                    for v in arr.values() {
-                        self.copy_object(*v);
+                    let mut arr = Array { ptr: obj };
+                    let tt = self.copy_object(arr.type_table());
+                    arr.set_type_table(tt);
+                    for v in arr.values_mut() {
+                        let nv = self.copy_object(*v);
+                        *v = nv;
                     }
                 }
                 ValueRepr::Bytes => {
-                    let bytes = Bytes { ptr: obj };
-                    self.copy_object(bytes.type_table());
+                    let mut bytes = Bytes { ptr: obj };
+                    let tt = self.copy_object(bytes.type_table());
+                    bytes.set_type_table(tt);
                 }
                 ValueRepr::Closure => {
-                    let closure = Closure { ptr: obj };
-                    self.copy_object(closure.type_table());
-                    self.copy_object(get_value(obj, 1));
-                    self.copy_object(closure.env());
+                    let mut closure = Closure { ptr: obj };
+                    let tt = self.copy_object(closure.type_table());
+                    let code = self.copy_object(get_value(obj, 1));
+                    let env = self.copy_object(closure.env());
+                    closure.set_type_table(tt);
+                    set_value(obj, 1, code);
+                    set_value(obj, 2, env);
                 }
                 ValueRepr::Table => {
-                    let table = Table { ptr: obj };
-                    self.copy_object(table.type_table());
-                    self.copy_object(Value::from(table.storage()));
+                    let mut table = Table { ptr: obj };
+                    let tt = self.copy_object(table.type_table());
+                    let storage = self.copy_object(get_value(obj, 2));
+                    table.set_type_table(tt);
+                    set_value(obj, 2, storage);
                 }
                 _ => {}
             }
-            size
+            align_int(size, 8)
         }
     }
 
@@ -165,21 +183,31 @@ impl Runtime {
 
         unsafe {
             let obj = value.get_object();
-            if (*obj).flags & BIG_OBJECT_FLAG == BIG_OBJECT_FLAG {
+            if self.heap.to_space.contains(obj) {
+                return value;
+            }
+            if (*obj).is_big_object() {
                 if let Some(big_obj) = self.heap.big_objects.get_mut(&obj.addr()) {
                     big_obj.count += 1;
                 }
+                let size = self.trace_object(obj);
+                if self.options.trace_gc {
+                    println!("traced big object {:x} size={}", obj.addr(), size);
+                }
                 return value;
             }
-            if (*obj).flags & FORWARD_FLAG == FORWARD_FLAG {
+            if (*obj).is_forward() {
                 return get_value(obj, 0);
             }
             let tag = value.get_tag();
             let size = (*obj).size as usize;
             let dst = self.heap.to_space.get_object_at(self.heap.to_space.top);
-            copy_nonoverlapping(obj, dst, size);
+            if self.options.trace_gc {
+                println!("copying {} bytes from {:x} to {:x}", size, obj.addr(), dst.addr());
+            }
+            copy_nonoverlapping(obj, dst, size/8);
             self.heap.to_space.top += align_int(size, 8);
-            (*obj).flags &= FORWARD_FLAG;
+            (*obj).flags |= FORWARD_FLAG;
             let new_value = Value::with_tag(dst, tag);
             set_value(obj, 0, new_value);
             new_value
@@ -189,7 +217,8 @@ impl Runtime {
 
 impl Space {
     pub(super) fn new(size: usize) -> Self {
-        let Ok(alloc) = region::alloc(size, region::Protection::READ_WRITE_EXECUTE) else {
+        let padded = align_int(size, 4096);
+        let Ok(alloc) = region::alloc(padded, region::Protection::READ_WRITE_EXECUTE) else {
             panic!("Couldn't allocate {size} bytes!");
         };
         Space {
@@ -201,6 +230,10 @@ impl Space {
 
     pub(super) fn get_object_at(&mut self, pos: usize) -> *mut ObjectHeader {
         unsafe { self.alloc.as_mut_ptr::<ObjectHeader>().byte_add(pos) }
+    }
+
+    pub fn contains(&self, ptr: *mut ObjectHeader) -> bool {
+        self.alloc.as_range().contains(&ptr.addr())
     }
 }
 
@@ -231,15 +264,12 @@ impl ObjectHeader {
     pub(super) fn is_forward(&self) -> bool {
         (self.flags & FORWARD_FLAG) == FORWARD_FLAG
     }
-}
 
-pub(super) fn forward(from: *mut ObjectHeader, to: *mut ObjectHeader) {
-    unsafe {
-        (*from).flags &= FORWARD_FLAG;
-        let next = from.add(1) as *mut *mut ObjectHeader;
-        *next = to;
+    pub(super) fn is_big_object(&self) -> bool {
+        (self.flags & BIG_OBJECT_FLAG) == BIG_OBJECT_FLAG
     }
 }
+
 
 const CELL_SIZE: usize = size_of::<Value>();
 
@@ -543,7 +573,7 @@ impl Value {
 
     pub fn is_immediate(&self) -> bool {
         let tag = self.val & TAG_MASK;
-        tag == INT_TAG || tag == PTR_TAG || tag == SMALL_TAG
+        tag == INT_TAG || tag == PTR_TAG || tag == SMALL_TAG || tag == SYM_TAG
     }
 
     pub fn get_integer(&self) -> i64 {
@@ -816,7 +846,7 @@ impl Display for Array {
 impl Array {
     pub fn make(rt: &mut Runtime, size: usize) -> Self {
         let header = ObjectHeader::make(rt, ((size + 2) * CELL_SIZE) as u32, ValueRepr::Array);
-        let me = Array { ptr: header };
+        let mut me = Array { ptr: header };
         me.set_type_table(Value::nil());
         for i in 0..size {
             me.set(i, Value::nil());
@@ -830,7 +860,7 @@ impl Array {
             ((values.len() + 2) * CELL_SIZE) as u32,
             ValueRepr::Array,
         );
-        let me = Array { ptr: header };
+        let mut me = Array { ptr: header };
         me.set_type_table(Value::nil());
         let src = values.as_ptr();
         let dst: *mut Value = get_object_ptr(header, 1);
@@ -848,7 +878,7 @@ impl Array {
         unsafe { (*self.ptr).size as usize / CELL_SIZE - 2 }
     }
 
-    pub fn set(&self, index: usize, value: Value) {
+    pub fn set(&mut self, index: usize, value: Value) {
         set_value(self.ptr, index + 1, value);
     }
 
@@ -873,7 +903,7 @@ impl Array {
     }
 
     pub fn clone(&self, rt: &mut Runtime) -> Value {
-        let new = Array::with(rt, self.values());
+        let mut new = Array::with(rt, self.values());
         new.set_type_table(self.type_table());
         Value::from(new)
     }
@@ -882,7 +912,7 @@ impl Array {
         get_value(self.ptr, 0)
     }
 
-    pub fn set_type_table(&self, value: Value) {
+    pub fn set_type_table(&mut self, value: Value) {
         set_value(self.ptr, 0, value);
     }
 
@@ -925,12 +955,12 @@ impl Table {
     fn resize(&mut self, rt: &mut Runtime) {
         let new_size = self.capacity() * 2;
         let storage = self.storage();
-        let new_storage = Array::make(rt, new_size * 2);
+        let mut new_storage = Array::make(rt, new_size * 2);
         for i in 0..self.capacity() {
             let key = storage.at(i * 2);
             if Self::valid_key(key) {
                 let value = storage.at(i * 2 + 1);
-                Self::store(&new_storage, key, value);
+                Self::store(&mut new_storage, key, value);
             }
         }
         set_value(self.ptr, 2, Value::from(new_storage));
@@ -951,13 +981,12 @@ impl Table {
         if 4 * self.size() > 3 * self.capacity() {
             self.resize(rt);
         }
-        let storage = self.storage();
         let new_size = self.size() + 1;
         set_value(self.ptr, 1, Value::integer(new_size as i64));
-        Self::store(&storage, key, value);
+        Self::store(&mut self.storage(), key, value);
     }
 
-    fn store(storage: &Array, key: Value, value: Value) -> usize {
+    fn store(storage: &mut Array, key: Value, value: Value) -> usize {
         let hash_index = 2 * (key.hash() % (storage.size() / 2));
         let mut offset: usize = 0;
         let size = storage.size();
@@ -1016,7 +1045,7 @@ impl Table {
     }
 
     pub fn keys(&self, rt: &mut Runtime) -> Value {
-        let keys = Array::make(rt, self.size());
+        let mut keys = Array::make(rt, self.size());
         let mut key_index = 0;
         let storage = self.storage();
         for i in 0..self.capacity() {
@@ -1055,7 +1084,7 @@ impl Table {
         get_value(self.ptr, 0)
     }
 
-    pub fn set_type_table(&self, value: Value) {
+    pub fn set_type_table(&mut self, value: Value) {
         set_value(self.ptr, 0, value);
     }
 }
@@ -1088,7 +1117,7 @@ impl Display for Bytes {
 impl Bytes {
     pub fn make(rt: &mut Runtime, size: usize, v: u8) -> Self {
         let header = ObjectHeader::make(rt, (size + 2 * CELL_SIZE) as u32, ValueRepr::Bytes);
-        let me = Bytes { ptr: header };
+        let mut me = Bytes { ptr: header };
         me.set_type_table(Value::nil());
         for i in 0..size {
             me.set(i, v);
@@ -1098,7 +1127,7 @@ impl Bytes {
 
     pub fn with(rt: &mut Runtime, bytes: &[u8]) -> Self {
         let header = ObjectHeader::make(rt, (bytes.len() + 2 * CELL_SIZE) as u32, ValueRepr::Bytes);
-        let me = Bytes { ptr: header };
+        let mut me = Bytes { ptr: header };
         let from = bytes.as_ptr();
         let to = get_object_ptr::<u8>(me.ptr, CELL_SIZE);
         me.set_type_table(Value::nil());
@@ -1115,7 +1144,7 @@ impl Bytes {
         }
     }
 
-    pub fn set(&self, index: usize, value: u8) {
+    pub fn set(&mut self, index: usize, value: u8) {
         unsafe {
             let ptr = get_object_ptr(self.ptr, CELL_SIZE + index);
             *ptr = value
@@ -1144,7 +1173,7 @@ impl Bytes {
         get_value(self.ptr, 0)
     }
 
-    pub fn set_type_table(&self, value: Value) {
+    pub fn set_type_table(&mut self, value: Value) {
         set_value(self.ptr, 0, value);
     }
 }
@@ -1283,7 +1312,7 @@ impl Closure {
             }
             Code::Foreign(foreign) => {
                 self.set_tag(TYPE_FOREIGN);
-                let array = Array::make(rt, 2);
+                let mut array = Array::make(rt, 2);
                 array.set(0, Value::cpointer(foreign.code));
                 array.set(1, Value::integer(foreign.signature_handle as i64));
                 set_value(self.ptr, 1, Value::from(array));

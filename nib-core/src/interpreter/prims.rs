@@ -140,7 +140,7 @@ impl Runtime {
     }
 
     pub fn make_string(&mut self, s: &str) -> Value {
-        let b = Bytes::with(self, s.as_bytes());
+        let mut b = Bytes::with(self, s.as_bytes());
         let type_table = self
             .get_module_path(&[static_symbol!("string")], self.global_env)
             .unwrap_or(Value::nil());
@@ -423,7 +423,7 @@ fn prim_string_unpack(rt: &mut Runtime) -> Result<()> {
     let msg = rt.stack.pop();
     let _ = rt.stack.pop(); // pop closure
     let str = rt.get_string(&msg)?;
-    let arr = Array::make(rt, str.len());
+    let mut arr = Array::make(rt, str.len());
     for (i, ch) in str.chars().enumerate() {
         arr.set(i, Value::char(ch));
     }
