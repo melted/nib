@@ -294,8 +294,6 @@ fn run_local_clauses_app_binding() -> Result<()> {
 #[test]
 fn table_binding() -> Result<()> {
     let mut rt = Runtime::new();
-    rt.set_output_core(true);
-    rt.set_tracing(true);
     rt.add_code("test", "test.a.b = 1")?;
     let val = rt.get_global(&sym("test"));
     assert_eq!(val.is_table(), true);
@@ -305,8 +303,6 @@ fn table_binding() -> Result<()> {
 #[test]
 fn local_table_binding() -> Result<()> {
     let mut rt = Runtime::new();
-    rt.set_output_core(true);
-    rt.set_tracing(true);
     rt.add_code("test", "local.test.a.b = 1\nres = test")?;
     let val = rt.get_global(&sym("res"));
     assert_eq!(val.is_table(), true);
@@ -316,8 +312,6 @@ fn local_table_binding() -> Result<()> {
 #[test]
 fn load_prelude() -> Result<()> {
     let mut rt = Runtime::new();
-    rt.set_output_core(true);
-    rt.set_tracing(true);
     let prelude_code = include_str!("../../lib/prelude.nib");
     rt.add_code("test", prelude_code)?;
     Ok(())

@@ -205,8 +205,9 @@ impl Runtime {
             if self.options.trace_gc {
                 println!("copying {} bytes from {:x} to {:x}", size, obj.addr(), dst.addr());
             }
-            copy_nonoverlapping(obj, dst, size/8);
-            self.heap.to_space.top += align_int(size, 8);
+            let copy_size = align_int(size, 8);
+            copy_nonoverlapping(obj, dst, copy_size/size_of::<ObjectHeader>());
+            self.heap.to_space.top += copy_size;
             (*obj).flags |= FORWARD_FLAG;
             let new_value = Value::with_tag(dst, tag);
             set_value(obj, 0, new_value);
