@@ -1,11 +1,20 @@
 use symbol_table::static_symbol;
 
 use crate::ast::Literal;
-use crate::common::{Location, Metadata, Name, sym, symbol_id};
+use crate::common::{Metadata, Name, sym, symbol_id};
 use crate::common::{Result, Symbol};
 use crate::core::{Arity, Binder, Binding, Cond, Expression, Function};
 use crate::interpreter::bytecode::{
-    INSTR_ADD, INSTR_ALLOC_ARRAY, INSTR_ALLOC_CLOSURE, INSTR_ALLOC_FLOAT, INSTR_ALLOC_TABLE, INSTR_ARG_COUNT, INSTR_ARRAY_SET, INSTR_CALL, INSTR_CALL_TAIL, INSTR_DROP, INSTR_DUP, INSTR_GET_ARG, INSTR_GET_LOCAL, INSTR_GLOBAL_ENV, INSTR_IS_TABLE, INSTR_JFALSE, INSTR_JFALSE_IMM8, INSTR_JNEG, INSTR_JNEG_IMM8, INSTR_JNFALSE, INSTR_JNFALSE_IMM8, INSTR_JNNEG, INSTR_JNNEG_IMM8, INSTR_JNPOS, INSTR_JNPOS_IMM8, INSTR_JPOS, INSTR_JPOS_IMM8, INSTR_JUMP, INSTR_JUMP_IMM8, INSTR_JZ, INSTR_JZ_IMM8, INSTR_LOAD_BYTES_IMM, INSTR_LOAD_BYTES8, INSTR_LOAD_IMM8, INSTR_LOAD_IMM16, INSTR_LOAD_IMM32, INSTR_LOAD_IMM64, INSTR_MAKE_SYMBOL, INSTR_PUSH_FALSE, INSTR_PUSH_LAST_SMALL, INSTR_PUSH_MINUS_ONE, INSTR_PUSH_NIL, INSTR_PUSH_TRUE, INSTR_RETURN, INSTR_SET_LOCAL, INSTR_SET_TYPE, INSTR_STACK_ARRAY, INSTR_STACK_FRAME, INSTR_STACK_LOAD, INSTR_SUB, INSTR_TABLE_GET, INSTR_TABLE_SET
+    INSTR_ADD, INSTR_ALLOC_ARRAY, INSTR_ALLOC_CLOSURE, INSTR_ALLOC_FLOAT, INSTR_ALLOC_TABLE,
+    INSTR_ARG_COUNT, INSTR_ARRAY_SET, INSTR_CALL, INSTR_CALL_TAIL, INSTR_DROP, INSTR_DUP,
+    INSTR_GET_ARG, INSTR_GET_LOCAL, INSTR_GLOBAL_ENV, INSTR_IS_TABLE, INSTR_JFALSE,
+    INSTR_JFALSE_IMM8, INSTR_JNEG, INSTR_JNEG_IMM8, INSTR_JNFALSE, INSTR_JNFALSE_IMM8, INSTR_JNNEG,
+    INSTR_JNNEG_IMM8, INSTR_JNPOS, INSTR_JNPOS_IMM8, INSTR_JPOS, INSTR_JPOS_IMM8, INSTR_JUMP,
+    INSTR_JUMP_IMM8, INSTR_JZ, INSTR_JZ_IMM8, INSTR_LOAD_BYTES_IMM, INSTR_LOAD_BYTES8,
+    INSTR_LOAD_IMM8, INSTR_LOAD_IMM16, INSTR_LOAD_IMM32, INSTR_LOAD_IMM64, INSTR_MAKE_SYMBOL,
+    INSTR_PUSH_FALSE, INSTR_PUSH_LAST_SMALL, INSTR_PUSH_MINUS_ONE, INSTR_PUSH_NIL, INSTR_PUSH_TRUE,
+    INSTR_RETURN, INSTR_SET_LOCAL, INSTR_SET_TYPE, INSTR_STACK_ARRAY, INSTR_STACK_FRAME,
+    INSTR_STACK_LOAD, INSTR_SUB, INSTR_TABLE_GET, INSTR_TABLE_SET,
 };
 use crate::interpreter::heap::{Value, ValueRepr};
 use crate::interpreter::prims::is_bytecode_primitive;
@@ -147,7 +156,6 @@ pub(super) struct Compilation {
     fixups_needed: HashMap<Symbol, Vec<(usize, usize)>>,
     data_symbols: HashMap<Vec<u8>, Symbol>,
     data: HashMap<Symbol, (Vec<u8>, usize)>,
-    is_tail: bool,
 }
 
 #[derive(Debug, Default, Clone)]
@@ -168,7 +176,6 @@ impl Compilation {
             fixups_needed: HashMap::new(),
             data_symbols: HashMap::new(),
             data: HashMap::new(),
-            is_tail: true,
         }
     }
 
@@ -222,7 +229,6 @@ impl Compilation {
         top_level: bool,
         code: &mut Vec<u8>,
     ) -> Result<()> {
-        self.is_tail = true;
         let binding_name = self.get_binding_name(&binding.binder);
         let global = matches!(&binding.binder, Binder::Public(_));
         if let Some(n) = &binding_name
@@ -303,11 +309,8 @@ impl Compilation {
 
     fn collect_binding_names(&mut self, bindings: &[Binding]) {
         for b in bindings {
-            match &b.binder {
-                Binder::Local(name) => {
-                    self.future_bindings.insert(name.top());
-                }
-                _ => {}
+            if let Binder::Local(name) = &b.binder {
+                self.future_bindings.insert(name.top());
             }
         }
     }
@@ -433,6 +436,10 @@ impl Compilation {
         }
         let mut fun_code = Vec::new();
         self.compile_expression(&lambda.body, &mut fun_code)?;
+        if let Some(op) = fun_code.last_mut()
+            && *op == INSTR_CALL {
+                *op = INSTR_CALL_TAIL;
+            }
         fun_code.push(INSTR_RETURN);
         let env_size = self.current_context().max_var;
         self.contexts.pop();
@@ -485,8 +492,6 @@ impl Compilation {
     }
 
     fn compile_application(&mut self, exps: &[Expression], code: &mut Vec<u8>) -> Result<()> {
-        let is_tail = self.is_tail;
-        self.is_tail = false;
         let callee = &exps[0];
         let bytecode_prim = if let Expression::Var(_, sym) = callee {
             is_bytecode_primitive(sym)
@@ -508,7 +513,7 @@ impl Compilation {
             }
             None => {
                 load_constant_int(exps.len() as i64, code);
-                code.push(if is_tail { INSTR_CALL } else { INSTR_CALL });
+                code.push(INSTR_CALL);
             }
         }
         Ok(())
@@ -524,12 +529,10 @@ impl Compilation {
         let mut old_future_bindings = self.future_bindings.clone();
         let old_used_vars = self.current_context().used_locs.clone();
         mem::swap(&mut old_fixups, &mut self.fixups_needed);
-        let is_tail = self.is_tail;
         self.collect_binding_names(bindings);
         for b in bindings {
             self.compile_binding(b, false, code)?;
         }
-        self.is_tail = is_tail;
         self.compile_expression(exp, code)?;
         let to_free = self
             .current_context()

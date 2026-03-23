@@ -5,7 +5,7 @@ use crate::{
     common::{Error, Metadata, Name, Node, Result, Symbol, sym},
 };
 use std::{
-    collections::{BTreeSet, HashMap, HashSet, btree_map::Keys},
+    collections::{BTreeSet, HashMap, HashSet},
     fmt::Display,
     mem,
     sync::LazyLock,
@@ -139,7 +139,7 @@ impl DesugarState {
             _ => {
                 let mut replaced = HashMap::new();
                 let mut counter = 0;
-                let p = Self::pattern_with_plain_vars(&pat, &mut counter, &mut replaced);
+                let p = Self::pattern_with_plain_vars(pat, &mut counter, &mut replaced);
                 let parts = self.desugar_arg_pattern(&p, &rhs)?;
                 let vars = p.bound_vars().into_iter().map(|n| (&n).into());
                 let mut var_exp = vec![var(&sym("_prim_array_make"))];
@@ -342,12 +342,13 @@ impl DesugarState {
         }
     }
 
-    fn set_captured_vars(&self, function: &mut Function, locals:&mut HashSet<Symbol>) -> Result<()> {
+    fn set_captured_vars(
+        &self,
+        function: &mut Function,
+        locals: &mut HashSet<Symbol>,
+    ) -> Result<()> {
         let free = free_vars(function)?;
-        function.captures = free
-            .intersection(&locals)
-            .copied()
-            .collect();
+        function.captures = free.intersection(locals).copied().collect();
         Ok(())
     }
 
@@ -366,7 +367,8 @@ impl DesugarState {
         self.current_bindings
             .extend(args.iter().map(|a| Binder::Local(Name::from(*a))));
         for i in 0..clauses.len() {
-            self.current_bindings.insert(Binder::Local(Name::Plain(local(i))));
+            self.current_bindings
+                .insert(Binder::Local(Name::Plain(local(i))));
         }
         for (i, c) in clauses.iter().enumerate() {
             let fail_exp = if i + 1 < clauses.len() {
@@ -376,7 +378,7 @@ impl DesugarState {
             };
             let (is_irrefutable, next_exp) = self.desugar_funclause(c, &args, &fail_exp)?;
             if let Some(e) = &mut exp {
-                let mut function = Function::new(&[sym("$_")], &Arity::Fixed(1), &next_exp);
+                let function = Function::new(&[sym("$_")], &Arity::Fixed(1), &next_exp);
                 let name = Name::from(local(i));
                 self.current_bindings.insert(Binder::Local(name.clone()));
                 let bind = Binding::make(0, Binder::Local(name), fun(function));
@@ -508,50 +510,55 @@ impl DesugarState {
         p
     }
 
-    fn calculate_captures(&mut self, bindings:&mut [Binding]) {
+    fn calculate_captures(&mut self, bindings: &mut [Binding]) {
         let mut locals = HashSet::new();
         self.calculate_captures_bindings(bindings, &mut locals);
     }
 
-    fn calculate_captures_bindings(&mut self, bindings:&mut [Binding],  locals: &mut HashSet<Symbol>) {
+    fn calculate_captures_bindings(
+        &mut self,
+        bindings: &mut [Binding],
+        locals: &mut HashSet<Symbol>,
+    ) {
         for b in bindings {
-            match &b.binder {
-                Binder::Local(name) => {
-                    locals.insert(name.top());
-                }
-                _ => {}
+            if let Binder::Local(name) = &b.binder {
+                locals.insert(name.top());
             }
             self.calculate_captures_expression(&mut b.body, locals);
         }
     }
 
-    fn calculate_captures_expression(&mut self, expr: &mut Expression, locals: &mut HashSet<Symbol>) {
+    fn calculate_captures_expression(
+        &mut self,
+        expr: &mut Expression,
+        locals: &mut HashSet<Symbol>,
+    ) {
         match expr {
-            Expression::Literal(_, literal) => {},
-            Expression::Var(_, global_symbol) => {},
+            Expression::Literal(_, literal) => {}
+            Expression::Var(_, global_symbol) => {}
             Expression::Cond(_, cond) => {
                 self.calculate_captures_expression(&mut cond.pred, locals);
                 self.calculate_captures_expression(&mut cond.if_false, locals);
                 self.calculate_captures_expression(&mut cond.if_true, locals);
-            },
+            }
             Expression::App(_, expressions) => {
                 for e in expressions {
                     self.calculate_captures_expression(e, locals);
                 }
-            },
+            }
             Expression::Function(function) => {
                 self.set_captured_vars(function, locals).unwrap();
                 let old_locals = locals.clone();
                 locals.extend(function.args.iter());
                 self.calculate_captures_expression(&mut function.body, locals);
                 *locals = old_locals;
-            },
+            }
             Expression::Where(_, expression, bindings) => {
                 let old_locals = locals.clone();
                 self.calculate_captures_bindings(bindings, locals);
                 self.calculate_captures_expression(expression, locals);
                 *locals = old_locals;
-            },
+            }
         }
     }
 
@@ -688,7 +695,11 @@ impl Binding {
         if let (Some(Name::Plain(s)), Expression::Function(fun)) = (binder.name(), &mut expr) {
             fun.name = Some(s);
         }
-        Binding { id, binder, body: expr }
+        Binding {
+            id,
+            binder,
+            body: expr,
+        }
     }
 
     pub fn name(&self) -> Option<Name> {

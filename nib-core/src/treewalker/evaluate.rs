@@ -248,7 +248,7 @@ impl Runtime {
                 let mut free = HashSet::new();
                 let mut locals = HashMap::new();
                 free_vars_expression(&fun.body, &mut free, &mut locals);
-                let closure = self.evaluate_lambda(&binding_name, &fun, &free, env)?;
+                let closure = self.evaluate_lambda(binding_name, &fun, &free, env)?;
                 eval_status.value_stack.push(closure);
             }
             Expression::Where(_, exp, binds) => {

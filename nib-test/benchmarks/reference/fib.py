@@ -9,7 +9,7 @@ def fast_fib(n):
         if n == 1: return b
         return go(b, a+b, n - 1)
     return go(0,1,n)
-
-print(fib(25))
+ 
+print(fib(30))
 print(fast_fib(60))
 print(fib(20) == fast_fib(20)) 

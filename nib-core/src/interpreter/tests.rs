@@ -333,16 +333,15 @@ fn printing_with_prelude() -> Result<()> {
     Ok(())
 }
 
-
-#[ignore="for manual use"]
+#[ignore = "for manual use"]
 #[test]
 fn test_external_file() -> Result<()> {
     let mut rt = Runtime::new();
     rt.set_output_core(true);
     let prelude_code = include_str!("../../lib/prelude.nib");
-    let test_code = include_str!("../../../nib-test/benchmarks/fib.nib");
+    let test_code = include_str!("../../../nib-core/testdata/bell.nib");
     rt.add_code("prelude", prelude_code)?;
-    rt.set_tracing(true);
+    //rt.set_tracing(true);
     rt.add_code("test", test_code)?;
     Ok(())
 }
@@ -350,11 +349,14 @@ fn test_external_file() -> Result<()> {
 #[test]
 fn partial_application() -> Result<()> {
     let mut rt = Runtime::new();
-    rt.add_code("test", "
+    rt.add_code(
+        "test",
+        "
     add a b c = _prim_add a (_prim_add b c)
     add5 = add 5
     res = add5 4 3
-    ")?;
+    ",
+    )?;
     let val = rt.get_global(&sym("res"));
     assert_eq!(val.get_integer(), 12);
     Ok(())
@@ -363,10 +365,13 @@ fn partial_application() -> Result<()> {
 #[test]
 fn over_application() -> Result<()> {
     let mut rt = Runtime::new();
-    rt.add_code("test", "
+    rt.add_code(
+        "test",
+        "
     add x = { _prim_add a x }
     res = add 5 7
-    ")?;
+    ",
+    )?;
     let val = rt.get_global(&sym("res"));
     assert_eq!(val.get_integer(), 12);
     Ok(())

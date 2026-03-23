@@ -7,7 +7,7 @@ use std::cmp::Ordering;
 use std::ffi::c_void;
 use std::fs::read_to_string;
 use std::mem;
-use std::ops::{BitXor, Shl, Shr};
+use std::ops::{Shl, Shr};
 use std::path::Path;
 
 use libffi::low::CodePtr;
@@ -51,7 +51,7 @@ pub struct Options {
     output_core: bool,
     trace: bool,
     log_missing_keys: bool,
-    trace_gc: bool
+    trace_gc: bool,
 }
 
 const DEFAULT_HEAP_SIZE: usize = 1000000;
@@ -193,7 +193,7 @@ impl Runtime {
     pub fn make_local_env(&mut self, module: &compile::Module) -> Value {
         let mut array = Array::make(self, module.local_env_size);
         for (blob, &idx) in &module.data {
-            let bytes = Bytes::with(self, &blob);
+            let bytes = Bytes::with(self, blob);
             array.set(idx, Value::from(bytes));
         }
         Value::from(array)
@@ -706,7 +706,7 @@ impl Runtime {
             ValueRepr::PartialApplication => {
                 let pap_array = fun.get_array();
                 let pap = pap_array.values();
-                self.stack.lift(args - 1, pap.len()-1);
+                self.stack.lift(args - 1, pap.len() - 1);
                 let room = self.stack.slice_mut(pap.len(), args - 1);
                 room.copy_from_slice(pap);
                 args += pap.len() - 1;
@@ -726,6 +726,7 @@ impl Runtime {
     fn make_call(&mut self, op: u8, args: usize) -> Result<()> {
         let closure = self.stack.peek(args).get_closure();
         let params = args - 1;
+        let first = self.stack.top - args;
         if params < closure.min_args() {
             // Underapplication, create a partial application
             let cargs = self.stack.take(args);
@@ -734,29 +735,35 @@ impl Runtime {
             return Ok(());
         }
         let extra_args = params - closure.min_args();
-        if !closure.is_vararg() && extra_args > 0 {
-            let cc = Value::call_continuation(extra_args);
+        let overapplication = !closure.is_vararg() && extra_args > 0;
+        if overapplication {
+            let cc = Value::call_continuation(extra_args + 1);
             self.stack_push(cc);
-            let elems = self.stack.slice_mut(args+1, 0);
-            elems.rotate_right(extra_args+1);
+            let elems = self.stack.slice_mut(args + 1, 0);
+            elems.rotate_right(extra_args + 1);
         }
         let old_frame_args = self.frame_args;
         self.frame_args = args as i64;
         match closure.get_tag() {
             TYPE_BYTECODE => {
-                if op == INSTR_CALL || extra_args > 0 || self.call_stack.is_empty() {
+                if op == INSTR_CALL {
                     // Not a tail call, set up a new frame
                     self.ensure_call_stack(4);
                     let frame = vec![
-                        Value::from(self.code),
+                        self.code,
                         Value::integer(self.ip as i64),
                         Value::integer(self.stack.base as i64),
                         self.local_env,
                     ];
                     self.call_stack.base = self.call_stack.top;
                     self.call_stack.pushv(&frame);
+                    self.stack.base = self.stack.top() - (args - extra_args);
+                } else {
+                    let stack_array = self.stack.array.values();
+                    let this_call = stack_array[first..self.stack.top].to_vec();
+                    self.stack.set_top(self.stack.base);
+                    self.stack.pushv(&this_call);
                 }
-                self.stack.base = self.stack.top() - (args - extra_args);
                 self.code = closure.code_value();
                 self.ip = 0;
                 self.local_env = closure.env();
@@ -792,26 +799,31 @@ impl Runtime {
             return Ok(true);
         }
         let ret = self.stack.pop();
-        let old_env = self.call_stack.pop();
-        let old_base = self.call_stack.pop().get_integer() as usize;
-        let ip = self.call_stack.pop().get_integer() as usize;
-        let code = self.call_stack.pop();
-
-        self.code = code;
-        self.ip = ip;
-        self.local_env = old_env;
-        self.frame_args = self.stack.base as i64 - old_base as i64;
         self.stack.set_top(self.stack.base);
-        self.stack.base = old_base;
+
         if self.stack.top > 0 && self.stack.peek(1).is_call_continuation() {
             let cc = self.stack.pop();
             let args = cc.get_cc_args();
-            let argv = self.stack.take(args);
-            self.ensure_stack(args+2);
+            let argv = self.stack.take(args - 1);
+            self.ensure_stack(args + 2);
             self.stack_push(ret);
             self.stack.pushv(&argv);
-            self.stack_push(Value::integer((args+1) as i64));
-            return self.op_call(INSTR_CALL)
+            self.stack_push(cc);
+            return self.op_call(INSTR_CALL_TAIL);
+        } else {
+            let old_env = self.call_stack.pop();
+            let old_base = self.call_stack.pop().get_integer() as usize;
+            let ip = self.call_stack.pop().get_integer() as usize;
+            let code = self.call_stack.pop();
+            if self.call_stack.top > 3 {
+                self.call_stack.base -= 4;
+            }
+
+            self.code = code;
+            self.ip = ip;
+            self.local_env = old_env;
+            self.frame_args = self.stack.base as i64 - old_base as i64;
+            self.stack.base = old_base;
         }
         self.stack_push(ret);
         Ok(false)
@@ -1183,7 +1195,7 @@ impl Runtime {
 
     fn op_get_arg(&mut self) -> Result<bool> {
         let arg = self.stack.pop().get_integer();
-        let index = if arg < 0 {
+        if arg < 0 {
             self.stack.load_arg((self.frame_args + arg) as usize);
         } else {
             self.stack.load_arg(arg as usize);
@@ -1381,6 +1393,14 @@ impl Stack {
         let v = self.take(elems);
         for i in 0..elems {
             self.push(Value::nil());
+        }
+        self.pushv(&v);
+    }
+
+    pub(super) fn sink(&mut self, elems: usize, dist: usize) {
+        let v = self.take(elems);
+        for i in 0..elems {
+            self.pop();
         }
         self.pushv(&v);
     }

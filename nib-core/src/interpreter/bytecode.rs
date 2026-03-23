@@ -238,7 +238,6 @@ pub const INSTR_PUSH_TRUE: u8 = 155;
 pub const INSTR_PUSH_ZERO: u8 = 0;
 pub const INSTR_PUSH_LAST_SMALL: u8 = 20;
 
-
 pub(super) fn is_immediate_jump(op: u8) -> bool {
     (INSTR_JUMP_IMM8..=INSTR_JNFALSE_IMM8).contains(&op)
 }

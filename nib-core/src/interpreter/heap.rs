@@ -1,14 +1,13 @@
 use core::slice;
+use region::Allocation;
 use std::{
-    collections::{HashMap, HashSet, binary_heap},
-    env,
+    collections::{HashMap, HashSet},
     ffi::c_void,
     fmt::{Debug, Display},
     hash::{DefaultHasher, Hash, Hasher},
     ptr::copy_nonoverlapping,
     slice::{from_raw_parts, from_raw_parts_mut},
 };
-use region::Allocation;
 
 use crate::{
     ast::Expression,
@@ -60,7 +59,12 @@ impl Runtime {
             let top_ptr = base_ptr.byte_add(self.heap.from_space.top);
             self.heap.from_space.top += aligned_size;
             if self.options.trace_gc {
-                println!("allocating {} bytes, aligned to {}, at {:x}", size, aligned_size, top_ptr.addr());
+                println!(
+                    "allocating {} bytes, aligned to {}, at {:x}",
+                    size,
+                    aligned_size,
+                    top_ptr.addr()
+                );
             }
             top_ptr
         }
@@ -203,10 +207,15 @@ impl Runtime {
             let size = (*obj).size as usize;
             let dst = self.heap.to_space.get_object_at(self.heap.to_space.top);
             if self.options.trace_gc {
-                println!("copying {} bytes from {:x} to {:x}", size, obj.addr(), dst.addr());
+                println!(
+                    "copying {} bytes from {:x} to {:x}",
+                    size,
+                    obj.addr(),
+                    dst.addr()
+                );
             }
             let copy_size = align_int(size, 8);
-            copy_nonoverlapping(obj, dst, copy_size/size_of::<ObjectHeader>());
+            copy_nonoverlapping(obj, dst, copy_size / size_of::<ObjectHeader>());
             self.heap.to_space.top += copy_size;
             (*obj).flags |= FORWARD_FLAG;
             let new_value = Value::with_tag(dst, tag);
@@ -270,7 +279,6 @@ impl ObjectHeader {
         (self.flags & BIG_OBJECT_FLAG) == BIG_OBJECT_FLAG
     }
 }
-
 
 const CELL_SIZE: usize = size_of::<Value>();
 
@@ -918,7 +926,7 @@ impl Array {
     }
 
     pub fn set_as_partial_application(&mut self) -> Value {
-        unsafe { 
+        unsafe {
             (*self.ptr).repr = ValueRepr::PartialApplication;
         };
         Value::with_tag(self.ptr, OBJECT_TAG)
