@@ -1,6 +1,3 @@
-#![allow(unused_variables)]
-#![allow(dead_code)]
-
 //! The byte code and functions to manipulate it.
 
 use std::collections::HashMap;
@@ -34,56 +31,146 @@ impl BytecodeBuilder {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 #[repr(u8)]
 pub enum Instruction {
+    PushZero = 0,
+    PushLastSmall = 20,
+    Nop = 22,
+
+    Gt = 29,
+    GtE = 30,
+    Lt = 31,
+    LtE = 32,
+
     Add = 33,
     Sub = 34,
     Mul = 35,
     Div = 36,
     Mod = 37,
+    Neg = 38,
 
-    Cmp = 40,
-    Eq = 41,
+    Cmp = 39,
+    Eq = 40,
+    NEq = 41, 
 
     BitAnd = 42,
     BitOr = 43,
     BitXor = 44,
-    BitNot = 45,
+    BitShift = 45,
+    BitNot = 46,
 
-    CallExternal = 50,
+    Sin = 47,
+    Cos = 48,
+    Tan = 49,
+    ASin = 50,
+    ACos = 51,
+    ATan = 52,
+    Ceiling = 53,
+    Floor = 54,
+    Round = 55,
+    Log = 56,
+    Exp = 57,
 
-    Project = 60,
-    TableSet = 61,
-    TableDelete = 62,
+    ToInt = 58,
+    ToPtr = 59,
 
-    ArrayRef = 70,
-    ArraySet = 71,
+    Call = 60,
+    TailCall = 61,
 
-    Load = 80,
-    Store = 81,
-    LoadImm8 = 82,
-    LoadImm16 = 83,
-    LoadImm32 = 84,
-    LoadImm64 = 85,
-    BytesImm = 86,
+    Dup = 62,
+    Swap = 63,
+    Drop = 64,
 
-    TailCall = 88,
-    Call = 89,
-    Type = 90,
-    SetType = 91,
-    AllocTable = 95,
-    AllocBytes = 96,
-    AllocArray = 97,
-    AllocSymbol = 98,
-    AllocClosure = 99,
-    Branch = 100,
-    BranchZero = 101,
-    BranchPositive = 102,
-    BranchNegative = 103,
-    BranchNotNegative = 104,
-    BranchNotPositive = 105,
-    BranchFalse = 106,
-    BranchNotFalse = 107,
-    Exit = 127,
-    Invalid = 255,
+    StackStore = 67,
+    StackLoad = 68,
+
+    Load8 = 73,
+    Load16 = 74,
+    Load32 = 75,
+    Load64 = 76,
+    LoadBytes = 77,
+    LoadBytes8 = 78,
+
+    Rot = 79,
+
+    Jump = 80,
+    JumpZ = 81,
+    JumpPos = 82,
+    JumpNeg = 83,
+    JumpNPos = 84,
+    JumpNNeg = 85,
+    JumpFalse = 86,
+    JumpNFalse = 87,
+
+    JumpImm = 88,
+    JumpZImm = 89,
+    JumpPosImm = 90,
+    JumpNegImm = 91,
+    JumpNPosImm = 92,
+    JumpNNegImm = 93,
+    JumpFalseImm = 94,
+    JumpNFalseImm = 95,
+
+    MakeSymbol = 100,
+
+    
+    Type = 101,
+    SetType = 102,
+
+    AllocFloat = 103,
+    AllocTable = 104,
+    AllocBytes = 105,
+    AllocArray = 106,
+    AllocClosure = 107,
+
+    ArrayRef = 108,
+    ArraySet = 109,
+    ArraySize = 110,
+
+    TableGet = 111,
+    TableSet = 112,
+    TableDelete = 113,
+    TableSize = 114,
+
+    ByteGet = 115,
+    ByteSet = 116,
+    ByteSize = 117,
+
+    LocalGet = 118,
+    LocalSet = 119,
+
+    GlobalEnv = 120,
+    Invalid = 121,
+    Halt = 122,
+    Return = 123,
+
+    IsInt = 126,
+    IsChar = 127,
+    IsNil = 128,
+    IsFloat = 129,
+    IsPtr = 130,
+    IsBool = 131,
+    IsSymbol = 132,
+    IsArray = 133,
+    IsBytes = 134,
+    IsTable = 135,
+    IsClosure = 136,
+    IsPap = 137,
+    IsCC = 138,
+    IsObject = 139,
+    IsImmediate = 140,
+
+    GetArg = 141,
+    StackFrame = 142,
+    StackArray = 143,
+    ArgCount = 144,
+
+    PushMinusOne = 152,
+    PushNil = 153,
+    PushFalse = 154,
+    PushTrue = 155,
+}
+
+impl Instruction {
+    
 }
 
 // Comparisons
@@ -112,7 +199,6 @@ pub const INSTR_BITXOR: u8 = 44;
 pub const INSTR_BITSHIFT: u8 = 45;
 pub const INSTR_BITNOT: u8 = 46;
 
-// Float Ops Unimplemented (has prims, so maybe delete)
 pub const INSTR_SIN: u8 = 47;
 pub const INSTR_COS: u8 = 48;
 pub const INSTR_TAN: u8 = 49;
@@ -127,7 +213,7 @@ pub const INSTR_EXP: u8 = 57;
 
 // Conversions
 pub const INSTR_TOINT: u8 = 58;
-pub const INSTR_TOPTR: u8 = 59; // TODO
+pub const INSTR_TOPTR: u8 = 59; // Unused
 
 // Calls
 pub const INSTR_CALL: u8 = 60;
@@ -135,11 +221,11 @@ pub const INSTR_CALL_TAIL: u8 = 61;
 
 // Moves
 pub const INSTR_DUP: u8 = 62;
-pub const INSTR_SWAP: u8 = 63;
+pub const INSTR_SWAP: u8 = 63; // Unused
 pub const INSTR_DROP: u8 = 64;
-pub const INSTR_DROP_FRAME: u8 = 65;
-pub const INSTR_STACK_LIFT: u8 = 66;
-pub const INSTR_STACK_STORE: u8 = 67;
+pub const INSTR_DROP_FRAME: u8 = 65; // Unused
+pub const INSTR_STACK_LIFT: u8 = 66; // Unused
+pub const INSTR_STACK_STORE: u8 = 67; // Unused
 pub const INSTR_STACK_LOAD: u8 = 68;
 pub const INSTR_LOAD_IMM8: u8 = 73;
 pub const INSTR_LOAD_IMM16: u8 = 74;
@@ -147,7 +233,7 @@ pub const INSTR_LOAD_IMM32: u8 = 75;
 pub const INSTR_LOAD_IMM64: u8 = 76;
 pub const INSTR_LOAD_BYTES_IMM: u8 = 77;
 pub const INSTR_LOAD_BYTES8: u8 = 78;
-pub const INSTR_ROT: u8 = 79;
+pub const INSTR_ROT: u8 = 79; // Unused
 
 // Branches
 pub const INSTR_JUMP: u8 = 80;
@@ -160,11 +246,11 @@ pub const INSTR_JFALSE: u8 = 86;
 pub const INSTR_JNFALSE: u8 = 87;
 
 pub const INSTR_JUMP_IMM8: u8 = 88;
-pub const INSTR_JZ_IMM8: u8 = 89;
-pub const INSTR_JPOS_IMM8: u8 = 90;
-pub const INSTR_JNEG_IMM8: u8 = 91;
-pub const INSTR_JNPOS_IMM8: u8 = 92;
-pub const INSTR_JNNEG_IMM8: u8 = 93;
+pub const INSTR_JZ_IMM8: u8 = 89; // Unused
+pub const INSTR_JPOS_IMM8: u8 = 90; // Unused
+pub const INSTR_JNEG_IMM8: u8 = 91; // Unused
+pub const INSTR_JNPOS_IMM8: u8 = 92; // Unused
+pub const INSTR_JNNEG_IMM8: u8 = 93; // Unused
 pub const INSTR_JFALSE_IMM8: u8 = 94;
 pub const INSTR_JNFALSE_IMM8: u8 = 95;
 
@@ -202,12 +288,10 @@ pub const INSTR_BYTES_SIZE: u8 = 117;
 pub const INSTR_GET_LOCAL: u8 = 118;
 pub const INSTR_SET_LOCAL: u8 = 119;
 pub const INSTR_GLOBAL_ENV: u8 = 120;
-pub const INSTR_INVALID: u8 = 121;
-pub const INSTR_HALT: u8 = 122;
+pub const INSTR_INVALID: u8 = 121; // Unused
+pub const INSTR_HALT: u8 = 122; // Unused
 pub const INSTR_NOP: u8 = 22;
 pub const INSTR_RETURN: u8 = 123;
-pub const INSTR_APPLY: u8 = 124; // TODO
-pub const INSTR_APPLY_TAIL: u8 = 125; // TODO
 
 // Fast repr checks
 pub const INSTR_IS_INTEGER: u8 = 126;
@@ -222,9 +306,9 @@ pub const INSTR_IS_BYTES: u8 = 134;
 pub const INSTR_IS_TABLE: u8 = 135;
 pub const INSTR_IS_CLOSURE: u8 = 136;
 pub const INSTR_IS_PAP: u8 = 137;
-pub const INSTR_IS_CALL_CONT: u8 = 138;
-pub const INSTR_IS_OBJECT: u8 = 139;
-pub const INSTR_IS_IMMEDIATE: u8 = 140;
+pub const INSTR_IS_CALL_CONT: u8 = 138; // Unused
+pub const INSTR_IS_OBJECT: u8 = 139; // Unused
+pub const INSTR_IS_IMMEDIATE: u8 = 140; // Unused
 
 pub const INSTR_GET_ARG: u8 = 141;
 pub const INSTR_STACK_FRAME: u8 = 142;

@@ -4,6 +4,7 @@ use crate::{
     ast::{self, ExpressionNode, Literal, Pattern, PatternNode},
     common::{Error, Metadata, Name, Node, Result, Symbol, sym},
 };
+
 use std::{
     collections::{BTreeSet, HashMap, HashSet},
     fmt::Display,

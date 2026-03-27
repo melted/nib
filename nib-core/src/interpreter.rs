@@ -1,6 +1,3 @@
-#![allow(unused_variables)]
-#![allow(dead_code)]
-
 //! Compile code to bytecode then run it
 
 use std::cmp::Ordering;

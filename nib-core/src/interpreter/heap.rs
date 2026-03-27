@@ -1,4 +1,4 @@
-use core::slice;
+
 use region::Allocation;
 use std::{
     collections::{HashMap, HashSet},
@@ -99,27 +99,25 @@ impl Heap {
 
 impl Runtime {
     pub fn allocate<T>(&mut self, size: usize) -> *mut T {
-        unsafe {
-            let aligned_size = align_int(size, 8);
-            self.heap.stats.add_block(aligned_size);
-            if aligned_size > BIG_OBJECT_THRESHOLD {
-                return self.allocate_big_object(aligned_size);
-            }
-            if self.heap.should_collect(aligned_size) {
-                self.collect(aligned_size);
-            }
-            let top_ptr = self.heap.from_space.top_ptr::<T>();
-            self.heap.from_space.top += aligned_size;
-            if self.options.trace_gc_level > 1 {
-                println!(
-                    "allocating {} bytes, aligned to {}, at {:x}",
-                    size,
-                    aligned_size,
-                    top_ptr.addr()
-                );
-            }
-            top_ptr
+        let aligned_size = align_int(size, 8);
+        self.heap.stats.add_block(aligned_size);
+        if aligned_size > BIG_OBJECT_THRESHOLD {
+            return self.allocate_big_object(aligned_size);
         }
+        if self.heap.should_collect(aligned_size) {
+            self.collect(aligned_size);
+        }
+        let top_ptr = self.heap.from_space.top_ptr::<T>();
+        self.heap.from_space.top += aligned_size;
+        if self.options.trace_gc_level > 1 {
+            println!(
+                "allocating {} bytes, aligned to {}, at {:x}",
+                size,
+                aligned_size,
+                top_ptr.addr()
+            );
+        }
+        top_ptr
     }
 
     pub fn allocate_big_object<T>(&mut self, size: usize) -> *mut T {
@@ -973,14 +971,14 @@ impl Array {
     pub fn values(&self) -> &[Value] {
         unsafe {
             let ptr = get_object_ptr(self.ptr, 1) as *const Value;
-            slice::from_raw_parts(ptr, self.size())
+            from_raw_parts(ptr, self.size())
         }
     }
 
     pub fn values_mut(&mut self) -> &mut [Value] {
         unsafe {
             let ptr: *mut Value = get_object_ptr(self.ptr, 1);
-            slice::from_raw_parts_mut(ptr, self.size())
+            from_raw_parts_mut(ptr, self.size())
         }
     }
 

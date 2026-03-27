@@ -1,10 +1,9 @@
-use crate::common::Error;
 use crate::{
     ast::{
         Binding, Declaration, ExpressionNode, FunBinding, ModuleDirective, OpBinding, OpClause,
         Operator, Pattern, PatternNode, UseDirective, VarBinding,
     },
-    common::{Location, Name, Node, Result},
+    common::{Error, Location, Name, Node, Result},
     parser::{
         ParserState,
         lexer::{Token, TokenValue},
