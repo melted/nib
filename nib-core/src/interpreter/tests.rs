@@ -3,7 +3,7 @@ use crate::ast::Module;
 use crate::common::sym;
 use crate::core::desugar;
 use crate::interpreter::Runtime;
-use crate::interpreter::bytecode::INSTR_ADD;
+use crate::interpreter::bytecode::{INSTR_ADD, disassemble};
 use crate::interpreter::compile::Compilation;
 use crate::interpreter::heap::{Bytes, Space};
 use crate::parser::parse_declarations;
@@ -375,5 +375,35 @@ fn over_application() -> Result<()> {
     )?;
     let val = rt.get_global(&sym("res"));
     assert_eq!(val.get_integer(), 12);
+    Ok(())
+}
+
+#[test]
+fn float_literals() -> Result<()> {
+    let mut rt = Runtime::new();
+    rt.add_code(
+        "test",
+        "
+    add x = { _prim_add a x } 1.0
+    res = add 5.0
+    ",
+    )?;
+    let val = rt.get_global(&sym("res"));
+    assert_eq!(val.get_float(), 6.0);
+    Ok(())
+}
+
+
+#[test]
+fn disassemble_instruction() -> Result<()> {
+    let mut rt = Runtime::new();
+    let prelude_code = include_str!("../../lib/prelude.nib");
+    rt.add_code("test", "
+    add x = { _prim_add a x } 1.0
+    res = add 5.0
+    ")?;
+    let bytecode = rt.code.get_bytes();
+    let asm = disassemble(bytecode.get_slice());
+    print!("{}", asm);
     Ok(())
 }

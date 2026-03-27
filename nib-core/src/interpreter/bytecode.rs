@@ -1,6 +1,8 @@
 //! The byte code and functions to manipulate it.
 
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt::Display, mem, usize};
+
+use crate::common::Result;
 
 pub struct BytecodeBuilder {
     pieces: Vec<Vec<u8>>,
@@ -31,7 +33,26 @@ impl BytecodeBuilder {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 #[repr(u8)]
 pub enum Instruction {
-    PushZero = 0,
+    Push0 = 0,
+    Push1 = 1,
+    Push2 = 2,
+    Push3 = 3,
+    Push4 = 4,
+    Push5 = 5,
+    Push6 = 6,
+    Push7 = 7,
+    Push8 = 8,
+    Push9 = 9,
+    Push10 = 10,
+    Push11 = 11,
+    Push12 = 12,
+    Push13 = 13,
+    Push14 = 14,
+    Push15 = 15,
+    Push16 = 16,
+    Push17 = 17,
+    Push18 = 18,
+    Push19 = 19,
     PushLastSmall = 20,
     Nop = 22,
 
@@ -111,7 +132,6 @@ pub enum Instruction {
 
     MakeSymbol = 100,
 
-    
     Type = 101,
     SetType = 102,
 
@@ -170,7 +190,222 @@ pub enum Instruction {
 }
 
 impl Instruction {
-    
+    pub fn trailing_bytes(&self) -> usize {
+        match *self as u8 {
+            INSTR_LOAD_IMM8 => 1,
+            INSTR_LOAD_IMM16 => 2,
+            INSTR_LOAD_IMM32 => 4,
+            INSTR_LOAD_IMM64 => 8,
+            INSTR_LOAD_BYTES8 => 8,
+            INSTR_LOAD_BYTES_IMM => usize::MAX,
+            INSTR_JUMP_IMM8..=INSTR_JNFALSE_IMM8 => 1,
+            _ => 0
+        }
+    }
+}
+
+impl Display for Instruction {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let str = match self {
+            Instruction::Push0 => "push 0",
+            Instruction::Push1 => "push 1",
+            Instruction::Push2 => "push 2",
+            Instruction::Push3 => "push 3",
+            Instruction::Push4 => "push 4",
+            Instruction::Push5 => "push 5",
+            Instruction::Push6 => "push 6",
+            Instruction::Push7 => "push 7",
+            Instruction::Push8 => "push 8",
+            Instruction::Push9 => "push 9",
+            Instruction::Push10 => "push 10",
+            Instruction::Push11 => "push 11",
+            Instruction::Push12 => "push 12",
+            Instruction::Push13 => "push 13",
+            Instruction::Push14 => "push 14",
+            Instruction::Push15 => "push 15",
+            Instruction::Push16 => "push 16",
+            Instruction::Push17 => "push 17",
+            Instruction::Push18 => "push 18",
+            Instruction::Push19 => "push 19",
+            Instruction::PushLastSmall => "push 20",
+            Instruction::Nop => "nop",
+            Instruction::Gt => "gt",
+            Instruction::GtE => "gte",
+            Instruction::Lt => "lt",
+            Instruction::LtE => "lte",
+            Instruction::Add => "add",
+            Instruction::Sub => "sub",
+            Instruction::Mul => "mul",
+            Instruction::Div => "div",
+            Instruction::Mod => "mod",
+            Instruction::Neg => "neg",
+            Instruction::Cmp => "cmp",
+            Instruction::Eq => "eq",
+            Instruction::NEq => "neq",
+            Instruction::BitAnd => "band",
+            Instruction::BitOr => "bor",
+            Instruction::BitXor => "bxor",
+            Instruction::BitShift => "shift",
+            Instruction::BitNot => "bnot",
+            Instruction::Sin => "sin",
+            Instruction::Cos => "cos",
+            Instruction::Tan => "tan",
+            Instruction::ASin => "asin",
+            Instruction::ACos => "acos",
+            Instruction::ATan => "atan",
+            Instruction::Ceiling => "ceiling",
+            Instruction::Floor => "floor",
+            Instruction::Round => "round",
+            Instruction::Log => "log",
+            Instruction::Exp => "exp",
+            Instruction::ToInt => "toint",
+            Instruction::ToPtr => "toptr",
+            Instruction::Call => "call",
+            Instruction::TailCall => "tailcall",
+            Instruction::Dup => "dup",
+            Instruction::Swap => "swap",
+            Instruction::Drop => "drop",
+            Instruction::StackStore => "store",
+            Instruction::StackLoad => "load",
+            Instruction::Load8 => "load8",
+            Instruction::Load16 => "load16",
+            Instruction::Load32 => "load32",
+            Instruction::Load64 => "load64",
+            Instruction::LoadBytes => "loadb",
+            Instruction::LoadBytes8 => "loadb8",
+            Instruction::Rot => "rot",
+            Instruction::Jump => "jmp",
+            Instruction::JumpZ => "jz",
+            Instruction::JumpPos => "jpos",
+            Instruction::JumpNeg => "jneg",
+            Instruction::JumpNPos => "jnpos",
+            Instruction::JumpNNeg => "jnneg",
+            Instruction::JumpFalse => "jfalse",
+            Instruction::JumpNFalse => "jnfalse",
+            Instruction::JumpImm => "jmpi",
+            Instruction::JumpZImm => "jzi",
+            Instruction::JumpPosImm => "jposi",
+            Instruction::JumpNegImm => "jnegi",
+            Instruction::JumpNPosImm => "jnposi",
+            Instruction::JumpNNegImm => "jnposi",
+            Instruction::JumpFalseImm => "jfalsei",
+            Instruction::JumpNFalseImm => "jnfalsei",
+            Instruction::MakeSymbol => "sym",
+            Instruction::Type => "type",
+            Instruction::SetType => "set_type",
+            Instruction::AllocFloat => "alloc_float",
+            Instruction::AllocTable => "alloc_table",
+            Instruction::AllocBytes => "alloc_bytes",
+            Instruction::AllocArray => "alloc_array",
+            Instruction::AllocClosure => "alloc_closure",
+            Instruction::ArrayRef => "array_ref",
+            Instruction::ArraySet => "array_set",
+            Instruction::ArraySize => "array_size",
+            Instruction::TableGet => "table_get",
+            Instruction::TableSet => "table_set",
+            Instruction::TableDelete => "table_delete",
+            Instruction::TableSize => "table_size",
+            Instruction::ByteGet => "bytes_ref",
+            Instruction::ByteSet => "bytes_set",
+            Instruction::ByteSize => "bytes_size",
+            Instruction::LocalGet => "local_get",
+            Instruction::LocalSet => "local_set",
+            Instruction::GlobalEnv => "global_env",
+            Instruction::Invalid => "<invalid>",
+            Instruction::Halt => "halt",
+            Instruction::Return => "return",
+            Instruction::IsInt => "int?",
+            Instruction::IsChar => "char?",
+            Instruction::IsNil => "nil?",
+            Instruction::IsFloat => "float?",
+            Instruction::IsPtr => "ptr?",
+            Instruction::IsBool => "bool?",
+            Instruction::IsSymbol => "symbol?",
+            Instruction::IsArray => "array?",
+            Instruction::IsBytes => "bytes?",
+            Instruction::IsTable => "table?",
+            Instruction::IsClosure => "closure?",
+            Instruction::IsPap => "pap?",
+            Instruction::IsCC => "cc?",
+            Instruction::IsObject => "object?",
+            Instruction::IsImmediate => "immediate?",
+            Instruction::GetArg => "arg",
+            Instruction::StackFrame => "stack_frame",
+            Instruction::StackArray => "stack_array",
+            Instruction::ArgCount => "arg_count",
+            Instruction::PushMinusOne => "push -1",
+            Instruction::PushNil => "push nil",
+            Instruction::PushFalse => "push false",
+            Instruction::PushTrue => "push true",
+        };
+        write!(f, "{}", str)
+    }
+}
+
+
+impl From<u8> for Instruction {
+    fn from(value: u8) -> Self {
+        match value {
+            21 | 23..=28 | 65..=66 | 69..=72 | 96..=99 |
+            124..=125 | 145..=151 | 156.. => Instruction::Invalid,
+            _ => unsafe { mem::transmute(value) } 
+        }
+    }
+}
+
+fn disassemble_instruction(code : &[u8], out : &mut String) -> usize {
+    let op = code[0];
+    let ins = Instruction::from(op);
+    out.push_str(&format!("{}", ins));
+    let num = if op == INSTR_LOAD_BYTES_IMM {
+        let size = u32::from_le_bytes(*code[1..].first_chunk::<4>().unwrap()) as usize;
+        let bytes = &code[5..5+size];
+        out.push_str(&format!("#{}[", size));
+        let mut iter = bytes.iter();
+        if let Some(b) = iter.next() {
+            out.push_str(&format!("{}", b));
+            for b in iter {
+                 out.push_str(&format!(", {}", b));
+            }
+        }
+        out.push_str("]");
+        5+bytes.len()
+    } else {
+        match ins.trailing_bytes() {
+            8 => {
+                let val = u64::from_le_bytes(*code[1..].first_chunk::<8>().unwrap());
+                out.push_str(&format!(" 0x{:x}", val));
+                9
+            }
+            4 => {
+                let val = u32::from_le_bytes(*code[1..].first_chunk::<4>().unwrap());
+                out.push_str(&format!(" 0x{:x}", val));
+                5
+            }
+            2 => {
+                let val = u16::from_le_bytes(*code[1..].first_chunk::<2>().unwrap());
+                out.push_str(&format!(" 0x{:x}", val));
+                3
+            }
+            1 => {
+                out.push_str(&format!(" {}", code[1]));
+                2
+            }
+            _ => 1,
+        }  
+    };
+    out.push('\n');
+    num
+}
+
+pub fn disassemble(code : &[u8]) -> String {
+    let mut s = String::new();
+    let mut pos = 0;
+    while pos < code.len() {
+        let consumed = disassemble_instruction(&code[pos..], &mut s);
+        pos += consumed;
+    }
+    s
 }
 
 // Comparisons
