@@ -15,7 +15,6 @@ fn main() -> io::Result<()> {
     let opts = parse_options();
     let mut rt: Box<dyn Interpreter> = match opts.interpreter {
         Backend::Bytecode => Box::new(nib_core::interpreter::Runtime::new()),
-        Backend::Treewalker => Box::new(nib_core::treewalker::Runtime::new()),
     };
     let prelude_code = include_str!("../../lib/prelude.nib");
     let level = if opts.verbose {
@@ -67,7 +66,6 @@ fn main() -> io::Result<()> {
 }
 
 pub enum Backend {
-    Treewalker,
     Bytecode,
 }
 
@@ -110,7 +108,7 @@ fn parse_options() -> Options {
                 opts.dump_tokens = true;
             }
             _ if arg == "--treewalker" => {
-                opts.interpreter = Backend::Treewalker;
+                println!("The treewalker backend has been removed");
             }
             _ if arg == "--bytecode" => {
                 opts.interpreter = Backend::Bytecode;
