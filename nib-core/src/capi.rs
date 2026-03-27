@@ -7,10 +7,12 @@
 use log::error;
 use std::ffi::{CStr, c_char, c_int};
 
-use crate::{ast::Module, parser::parse_declarations, runtime::Interpreter, treewalker::Runtime};
+use crate::{ast::Module, common::{Error, Symbol, sym}, interpreter::{Runtime, heap::Value}, parser::parse_declarations, runtime::Interpreter};
 
 const NIB_SUCCESS: c_int = 0;
 const NIB_ERROR: c_int = 1;
+
+type CValue = u64;
 
 #[unsafe(no_mangle)]
 pub extern "C" fn nib_parse(source: *const c_char, mod_ptr: *mut *mut Module) -> c_int {
@@ -34,6 +36,7 @@ pub extern "C" fn nib_init() -> *mut Runtime {
     let rt = Box::new(Runtime::new());
     Box::into_raw(rt)
 }
+// nib_load_prelude
 
 #[unsafe(no_mangle)]
 pub extern "C" fn nib_execute(
@@ -55,6 +58,9 @@ pub extern "C" fn nib_execute(
     };
     let res = runtime.add_code(name_str, code);
     if let Err(e) = res {
+        if let Error::NibExit { exit_code } = e {
+            return exit_code as c_int;
+        }
         error!("nib_execute: {}", e);
         NIB_ERROR
     } else {
@@ -66,4 +72,44 @@ pub extern "C" fn nib_execute(
 pub extern "C" fn nib_free(rt: *mut Runtime) {
     let runtime = unsafe { Box::from_raw(rt) };
     drop(runtime); // Not really needed, but make it clear.
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn nib_get_global(rt: *mut Runtime, id: *const c_char) -> CValue {
+    let Some(name) = symbol_from_cstr(id) else {
+        return Value::nil().val;
+    };
+    unsafe { (*rt).get_global(&name).val }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn nib_symbol(id: *const c_char) -> CValue {
+    let Some(name) = symbol_from_cstr(id) else {
+        return Value::nil().val;
+    };
+    Value::symbol(&name).val
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn nib_is_symbol(sym: CValue) -> bool {
+    value(sym).is_symbol()
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn nib_symbol_str(sym: CValue, len: *mut c_int) -> *const c_char {
+    let v = value(sym);
+    let s = v.get_symbol().as_str();
+    unsafe { *len = s.len() as c_int };
+    s.as_ptr() as *const c_char
+}
+
+const fn value(cv : CValue) -> Value {
+    Value { val: cv }
+}
+
+fn symbol_from_cstr(s: *const c_char) -> Option<Symbol> {
+    let Ok(name) = unsafe { CStr::from_ptr(s) }.to_str() else {
+        return None;
+    };
+    Some(sym(name))
 }

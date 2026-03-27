@@ -51,7 +51,7 @@ pub struct Options {
     output_core: bool,
     trace: bool,
     log_missing_keys: bool,
-    trace_gc: bool,
+    trace_gc_level: u8,
 }
 
 const DEFAULT_HEAP_SIZE: usize = 1000000;
@@ -107,7 +107,7 @@ impl Options {
             output_core: false,
             trace: false,
             log_missing_keys: true,
-            trace_gc: false,
+            trace_gc_level: 0,
         }
     }
 }
@@ -156,8 +156,8 @@ impl Runtime {
         self.options.log_missing_keys = log;
     }
 
-    pub fn set_trace_gc(&mut self, trace: bool) {
-        self.options.trace_gc = trace;
+    pub fn set_trace_gc(&mut self, trace: u8) {
+        self.options.trace_gc_level = trace;
     }
 
     pub fn package_name(&mut self, path: &Path) -> Result<Symbol> {

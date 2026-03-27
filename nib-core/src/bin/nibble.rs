@@ -74,7 +74,6 @@ pub enum Backend {
 pub struct Options {
     pub no_prelude: bool,
     pub verbose: bool,
-    pub use_treewalker: bool,
     pub output_core: bool,
     pub dump_tokens: bool,
     pub interpreter: Backend,
@@ -86,10 +85,9 @@ impl Options {
         Options {
             no_prelude: false,
             verbose: false,
-            use_treewalker: true,
             output_core: false,
             dump_tokens: false,
-            interpreter: Backend::Treewalker,
+            interpreter: Backend::Bytecode,
             files: Vec::new(),
         }
     }

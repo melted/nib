@@ -26,6 +26,10 @@ struct Options {
     #[arg(long)]
     bytecode: bool,
 
+    /// Use Treewalker backend
+    #[arg(long)]
+    treewalker: bool,
+
     /// The nibble executable to use
     #[arg(long)]
     nibble_path: Option<PathBuf>,
@@ -105,6 +109,9 @@ fn run_test(opts: &Options, nib_path: &PathBuf, test: &PathBuf) -> io::Result<bo
     if opts.bytecode {
         command.arg("--bytecode");
     }
+    if opts.treewalker {
+        command.arg("--treewalker");
+    }
     let out = command.output()?;
     let out_str = str::from_utf8(&out.stdout).map_err(io::Error::other)?;
     let error_str = str::from_utf8(&out.stderr).map_err(io::Error::other)?;
@@ -127,10 +134,10 @@ fn run_test(opts: &Options, nib_path: &PathBuf, test: &PathBuf) -> io::Result<bo
         if res && res_error && res_status {
             println!("{} [{}] ... OK", &meta.name, &meta.file.to_string_lossy());
         } else if opts.update {
-            println!("Updating {}", &meta.name);
+            println!("Updating {} [{}]", &meta.name, &meta.file.to_string_lossy());
             update_test(test, &test_code, out_str, error_str, status_code)?;
         } else {
-            println!("{} ... Failed", &meta.name);
+            println!("{} [{}] ... Failed", &meta.name, &meta.file.to_string_lossy());
             return Ok(false);
         }
     }

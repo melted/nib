@@ -23,10 +23,54 @@ pub struct BigObject {
     object: Allocation,
 }
 
+pub struct HeapConfig {
+    pub collection_frequency: usize,
+    pub allocation_scale: usize,
+}
+
+impl Default for HeapConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl HeapConfig {
+    pub fn new() -> Self {
+        Self { collection_frequency: 2000000, allocation_scale: 1000000 }
+    }
+}
+
+#[derive(Default)]
+pub struct HeapStats {
+    pub collections: usize,
+    pub allocated: usize,
+    pub allocated_total: usize,
+    pub freed_total: usize,
+}
+
+impl HeapStats {
+    pub fn new() -> Self {
+        HeapStats { collections:0, allocated:0, allocated_total: 0, freed_total:0 }
+    }
+
+    pub fn add_block(&mut self, size: usize) {
+        self.allocated += size;
+        self.allocated_total += size;
+    }
+
+    pub fn add_collect(&mut self, free_size:usize) {
+        self.collections += 1;
+        self.allocated = 0;
+        self.freed_total += free_size;
+    }
+}
+
 pub(super) struct Heap {
     from_space: Space,
     to_space: Space,
     big_objects: HashMap<usize, BigObject>,
+    stats: HeapStats,
+    config: HeapConfig
 }
 
 pub(super) struct Space {
@@ -41,7 +85,15 @@ impl Heap {
             from_space: Space::new(size),
             to_space: Space::new(size),
             big_objects: HashMap::new(),
+            stats: HeapStats::new(),
+            config: HeapConfig::new(),
         }
+    }
+}
+
+impl Heap {
+    fn should_collect(&self, size:usize) -> bool {
+        self.from_space.remaining() < size || self.stats.allocated > self.config.collection_frequency
     }
 }
 
@@ -49,16 +101,16 @@ impl Runtime {
     pub fn allocate<T>(&mut self, size: usize) -> *mut T {
         unsafe {
             let aligned_size = align_int(size, 8);
+            self.heap.stats.add_block(aligned_size);
             if aligned_size > BIG_OBJECT_THRESHOLD {
                 return self.allocate_big_object(aligned_size);
             }
-            if self.heap.from_space.top + aligned_size > self.heap.from_space.size {
+            if self.heap.should_collect(aligned_size) {
                 self.collect(aligned_size);
             }
-            let base_ptr: *mut T = self.heap.from_space.alloc.as_mut_ptr();
-            let top_ptr = base_ptr.byte_add(self.heap.from_space.top);
+            let top_ptr = self.heap.from_space.top_ptr::<T>();
             self.heap.from_space.top += aligned_size;
-            if self.options.trace_gc {
+            if self.options.trace_gc_level > 1 {
                 println!(
                     "allocating {} bytes, aligned to {}, at {:x}",
                     size,
@@ -82,7 +134,7 @@ impl Runtime {
                 object: alloc,
             },
         );
-        if self.options.trace_gc {
+        if self.options.trace_gc_level > 1 {
             println!("allocated big object: {} bytes at {:x}", size, ptr.addr());
         }
         ptr
@@ -90,20 +142,26 @@ impl Runtime {
 
     pub fn collect(&mut self, needed: usize) {
         let new_size = if self.heap.from_space.top > (3 * self.heap.from_space.size) / 4 {
-            self.heap.from_space.size + usize::min(self.heap.from_space.size / 2, 1000000)
+            self.heap.from_space.size + self.heap.config.allocation_scale
         } else {
             self.heap.from_space.size
         };
         if new_size > self.heap.to_space.size {
             self.heap.to_space = Space::new(new_size);
+        } else {
+            self.heap.to_space.reset();
         }
-
-        if self.options.trace_gc {
-            println!("collecting: new_size={}", new_size);
+        if self.options.trace_gc_level > 0 {
+            println!("collecting: top={}, old_size={}, new_size={}", self.heap.from_space.top, self.heap.from_space.size, new_size);
         }
         unsafe {
             self.copy_live();
         }
+        let freed = self.heap.from_space.top - self.heap.to_space.top;
+        if self.options.trace_gc_level > 0 {
+            println!("after collecting: top={}, freed={}", self.heap.to_space.top, freed);
+        }
+        self.heap.stats.add_collect(freed);
         std::mem::swap(&mut self.heap.to_space, &mut self.heap.from_space);
     }
 
@@ -195,7 +253,7 @@ impl Runtime {
                     big_obj.count += 1;
                 }
                 let size = self.trace_object(obj);
-                if self.options.trace_gc {
+                if self.options.trace_gc_level > 1 {
                     println!("traced big object {:x} size={}", obj.addr(), size);
                 }
                 return value;
@@ -205,8 +263,8 @@ impl Runtime {
             }
             let tag = value.get_tag();
             let size = (*obj).size as usize;
-            let dst = self.heap.to_space.get_object_at(self.heap.to_space.top);
-            if self.options.trace_gc {
+            let dst:*mut ObjectHeader = self.heap.to_space.get_object_at(self.heap.to_space.top);
+            if self.options.trace_gc_level > 1 {
                 println!(
                     "copying {} bytes from {:x} to {:x}",
                     size,
@@ -238,12 +296,33 @@ impl Space {
         }
     }
 
-    pub(super) fn get_object_at(&mut self, pos: usize) -> *mut ObjectHeader {
-        unsafe { self.alloc.as_mut_ptr::<ObjectHeader>().byte_add(pos) }
+    pub(super) fn get_object_at<T>(&mut self, pos: usize) -> *mut T {
+        unsafe { self.alloc.as_mut_ptr::<T>().byte_add(pos) }
     }
 
     pub fn contains(&self, ptr: *mut ObjectHeader) -> bool {
         self.alloc.as_range().contains(&ptr.addr())
+    }
+
+    pub fn remaining(&self) -> usize {
+        self.size - self.top
+    }
+
+    pub fn top_ptr<T>(&mut self) -> *mut T {
+        self.get_object_at(self.top)
+    }
+
+    pub fn bump(&mut self, size: usize) -> Option<*mut ObjectHeader> {
+        if size+self.top > self.size {
+            return None;
+        }
+        let ptr = self.top_ptr();
+        self.top += size;
+        Some(ptr)
+    }
+
+    pub fn reset(&mut self) {
+        self.top = 0;
     }
 }
 
