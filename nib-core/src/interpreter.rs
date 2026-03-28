@@ -17,10 +17,9 @@ use crate::interpreter::bytecode::*;
 use crate::interpreter::compile::{Module, compile, compile_expression};
 use crate::interpreter::foreign::call_foreign_function;
 use crate::interpreter::heap::{
-    Array, Bytes, Closure, Heap, TYPE_BYTECODE, TYPE_EXTERN, TYPE_FOREIGN, Table, Value, ValueRepr,
-    set_value,
+    Array, Bytes, Closure, Heap, TYPE_BYTECODE, TYPE_EXTERN, TYPE_EXTERN_CAPI, TYPE_FOREIGN, Table, Value, ValueRepr, set_value
 };
-use crate::interpreter::prims::PrimFn;
+use crate::interpreter::prims::{CapiFn, PrimFn};
 use crate::parser::{parse_declarations, parse_expression};
 use crate::runtime::Interpreter;
 
@@ -771,6 +770,17 @@ impl Runtime {
                 unsafe {
                     let fun: PrimFn = mem::transmute(fun_ptr);
                     fun(self)?;
+                }
+                self.frame_args = old_frame_args;
+            }
+            TYPE_EXTERN_CAPI => {
+                let fun_ptr: *const () = closure.code_value().get_cpointer();
+                unsafe {
+                    let fun: CapiFn = mem::transmute(fun_ptr);
+                    let err = fun(self);
+                    if err != 0 {
+                        return self.error(&format!("Error in C API prim: err={}", err));
+                    }
                 }
                 self.frame_args = old_frame_args;
             }

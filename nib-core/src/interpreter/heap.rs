@@ -1295,6 +1295,7 @@ pub enum Code {
     Bytecode(Vec<u8>),
     Core(*const Vec<Expression>),
     Extern(*const c_void),
+    ExternCapi(*const c_void),
     Foreign(Foreign),
 }
 
@@ -1333,7 +1334,8 @@ pub const TYPE_INCOMPLETE: u16 = 0xffff;
 pub const TYPE_BYTECODE: u16 = 0;
 pub const TYPE_CORE: u16 = 1;
 pub const TYPE_EXTERN: u16 = 2;
-pub const TYPE_FOREIGN: u16 = 3;
+pub const TYPE_EXTERN_CAPI:u16 = 3;
+pub const TYPE_FOREIGN: u16 = 4;
 
 impl Closure {
     pub fn make(
@@ -1410,6 +1412,10 @@ impl Closure {
                 self.set_tag(TYPE_EXTERN);
                 set_value(self.ptr, 1, Value::cpointer(*ptr));
             }
+            Code::ExternCapi(ptr) => {
+                self.set_tag(TYPE_EXTERN_CAPI);
+                set_value(self.ptr, 1, Value::cpointer(*ptr));
+            }
             Code::Foreign(foreign) => {
                 self.set_tag(TYPE_FOREIGN);
                 let mut array = Array::make(rt, 2);
@@ -1429,6 +1435,7 @@ impl Closure {
             }
             TYPE_CORE => Code::Core(val.get_cpointer()),
             TYPE_EXTERN => Code::Extern(val.get_cpointer()),
+            TYPE_EXTERN_CAPI => Code::ExternCapi(val.get_cpointer()),
             _ => panic!("Unexpected code type tag in get_code"),
         }
     }

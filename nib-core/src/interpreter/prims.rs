@@ -1,4 +1,4 @@
-use std::{collections::HashMap, ffi::c_void, path::Path, sync::LazyLock};
+use std::{collections::HashMap, ffi::{c_int, c_void}, path::Path, sync::LazyLock};
 
 use symbol_table::static_symbol;
 
@@ -26,6 +26,7 @@ use crate::{
 };
 
 pub type PrimFn = fn(&mut Runtime) -> Result<()>;
+pub type CapiFn = fn(*mut Runtime) -> c_int;
 
 impl Runtime {
     pub(super) fn register_intrinsics(&mut self) {
@@ -70,6 +71,8 @@ impl Runtime {
         self.register_primitive("_prim_to_char", prim_to_char, Arity::Fixed(1));
         self.register_primitive("_prim_to_pointer", prim_to_pointer, Arity::Fixed(1));
         self.register_primitive("_prim_apply", prim_apply, Arity::Fixed(2));
+        self.register_primitive("_prim_make_primitive", prim_make_primitive, Arity::Fixed(4));
+        self.register_primitive("_prim_make_cprimitive", prim_make_cprimitive, Arity::Fixed(4));
     }
 
     pub(super) fn register_type_tables(&mut self) {
@@ -310,6 +313,30 @@ fn prim_string_print(rt: &mut Runtime) -> Result<()> {
     print!("{}", String::from_utf8_lossy(slice));
     rt.stack_push(Value::nil());
     Ok(())
+}
+
+fn make_prim(rt: &mut Runtime, is_capi:bool) -> Result<()> {
+    let vararg = rt.stack.pop();
+    let arity = rt.stack.pop();
+    let fun_ptr = rt.stack.pop();
+    let _ = rt.stack.pop(); // pop closure
+    ensure_type(&arity, ValueRepr::Integer)?;
+    ensure_type(&fun_ptr, ValueRepr::Pointer)?;
+    let void_ptr = fun_ptr.get_cpointer() as *const c_void;
+    let code = if is_capi { Code::ExternCapi(void_ptr) } else {Code::Extern(void_ptr)};
+    let varg = if vararg.is_false() { None } else { Some(vararg.get_integer() as usize) };
+    let args = arity.get_integer() as usize;
+    let closure = Closure::make(rt, &code, &[], args, varg);
+    rt.stack_push(Value::from(closure));
+    Ok(())
+}
+
+fn prim_make_primitive(rt: &mut Runtime) -> Result<()> {
+    make_prim(rt, false)
+}
+
+fn prim_make_cprimitive(rt: &mut Runtime) -> Result<()> {
+    make_prim(rt, true)
 }
 
 fn prim_to_string(rt: &mut Runtime) -> Result<()> {
