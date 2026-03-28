@@ -407,3 +407,13 @@ fn disassemble_instruction() -> Result<()> {
     print!("{}", asm);
     Ok(())
 }
+
+#[test]
+fn vararg() -> Result<()> {
+    let mut rt = Runtime::new();
+    rt.add_code("test", "mkarr ...x = x\nres = mkarr 1 2 3 4 5")?;
+    let val = rt.get_global(&sym("mkarr"));
+    let code = rt.code;
+    dbg!(code);
+    Ok(())
+}
