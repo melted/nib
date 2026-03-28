@@ -14,10 +14,13 @@ use crate::{
     parser::parse_declarations,
 };
 
-const NIB_SUCCESS: c_int = 0;
-const NIB_ERROR: c_int = 1;
+pub const NIB_SUCCESS: c_int = 0;
+pub const NIB_ERROR: c_int = 1;
 
 type CValue = u64;
+
+
+// Parsing
 
 #[unsafe(no_mangle)]
 pub extern "C" fn nib_parse(source: *const c_char, mod_ptr: *mut *mut Module) -> c_int {
@@ -36,12 +39,13 @@ pub extern "C" fn nib_parse(source: *const c_char, mod_ptr: *mut *mut Module) ->
     }
 }
 
+// Nib runtime execution
+
 #[unsafe(no_mangle)]
 pub extern "C" fn nib_init() -> *mut Runtime {
     let rt = Box::new(Runtime::new());
     Box::into_raw(rt)
 }
-// nib_load_prelude
 
 #[unsafe(no_mangle)]
 pub extern "C" fn nib_execute(
@@ -79,6 +83,8 @@ pub extern "C" fn nib_free(rt: *mut Runtime) {
     drop(runtime); // Not really needed, but make it clear.
 }
 
+// Runtime environment
+
 #[unsafe(no_mangle)]
 pub extern "C" fn nib_get_global(rt: *mut Runtime, id: *const c_char) -> CValue {
     let Some(name) = symbol_from_cstr(id) else {
@@ -87,6 +93,13 @@ pub extern "C" fn nib_get_global(rt: *mut Runtime, id: *const c_char) -> CValue 
     unsafe { (*rt).get_global(&name).val }
 }
 
+
+// nib_load_prelude
+
+
+// Nib data types
+
+// Symbol
 #[unsafe(no_mangle)]
 pub extern "C" fn nib_symbol(id: *const c_char) -> CValue {
     let Some(name) = symbol_from_cstr(id) else {
@@ -107,6 +120,10 @@ pub extern "C" fn nib_symbol_str(sym: CValue, len: *mut c_int) -> *const c_char 
     unsafe { *len = s.len() as c_int };
     s.as_ptr() as *const c_char
 }
+
+
+
+// Helpers
 
 const fn value(cv: CValue) -> Value {
     Value { val: cv }

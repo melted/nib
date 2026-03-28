@@ -1,7 +1,7 @@
 use crate::{
     ast::{
-        Binding, Declaration, ExpressionNode, FunBinding, ModuleDirective, OpBinding, OpClause,
-        Operator, Pattern, PatternNode, UseDirective, VarBinding,
+        Binding, Declaration, ExpressionNode, FunBinding, OpBinding, OpClause,
+        Operator, Pattern, PatternNode, VarBinding,
     },
     common::{Error, Location, Name, Node, Result},
     parser::{
@@ -143,22 +143,6 @@ impl<'a> ParserState<'a> {
         }
     }
 
-    pub(super) fn module_declaration(&mut self, name: Name) -> ModuleDirective {
-        self.counter += 1;
-        ModuleDirective {
-            id: self.counter,
-            name,
-        }
-    }
-
-    pub(super) fn use_declaration(&mut self, name: Name) -> UseDirective {
-        self.counter += 1;
-        UseDirective {
-            id: self.counter,
-            name,
-        }
-    }
-
     pub(super) fn var_binding(&mut self, pat: PatternNode, rhs: ExpressionNode) -> VarBinding {
         self.counter += 1;
         VarBinding {
@@ -211,7 +195,7 @@ impl<'a> ParserState<'a> {
     pub(super) fn resync(&mut self) {
         if let Some(&indent) = self.indent_stack.first() {
             while self.next_indent() >= indent {
-                let tok = self
+                let _ = self
                     .get_next_token()
                     .unwrap_or(Token::from(TokenValue::Eof));
             }

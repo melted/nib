@@ -147,7 +147,7 @@ impl Runtime {
     }
 
     pub fn collect(&mut self, needed: usize) {
-        let new_size = if self.heap.from_space.top > (3 * self.heap.from_space.size) / 4 {
+        let new_size = if self.heap.from_space.top + needed > (3 * self.heap.from_space.size) / 4 {
             self.heap.from_space.size + self.heap.config.allocation_scale
         } else {
             self.heap.from_space.size
@@ -339,6 +339,7 @@ impl Space {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(C)]
 pub struct ObjectHeader {
     size: u32,
     flags: u8,
@@ -392,11 +393,13 @@ pub(super) fn get_object_ptr<T>(base: *mut ObjectHeader, index: usize) -> *mut T
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
+#[repr(C)]
 pub struct Value {
     pub val: u64,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u8)]
 pub enum ValueRepr {
     Nil,
     Undefined,
@@ -927,6 +930,7 @@ fn display_complex_object(
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
+#[repr(C)]
 pub struct Array {
     ptr: *mut ObjectHeader,
 }
@@ -1025,6 +1029,7 @@ impl Array {
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
+#[repr(C)]
 pub struct Table {
     ptr: *mut ObjectHeader,
 }
@@ -1190,6 +1195,7 @@ impl Table {
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
+#[repr(C)]
 pub struct Bytes {
     ptr: *mut ObjectHeader,
 }
@@ -1214,6 +1220,7 @@ impl Display for Bytes {
         write!(f, "]")
     }
 }
+
 impl Bytes {
     pub fn make(rt: &mut Runtime, size: usize, v: u8) -> Self {
         let header = ObjectHeader::make(rt, (size + 2 * CELL_SIZE) as u32, ValueRepr::Bytes);
@@ -1306,6 +1313,7 @@ impl Display for Code {
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
+#[repr(C)]
 pub struct Closure {
     ptr: *mut ObjectHeader,
 }

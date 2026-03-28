@@ -24,7 +24,6 @@ use std::mem;
 use std::sync::LazyLock;
 
 pub fn compile(from: crate::core::Module) -> Result<Module> {
-    let module = Module::new();
     let mut compilation = Compilation::with(from);
     compilation.compile()?;
     Ok(compilation.module)
@@ -155,7 +154,6 @@ pub(super) struct Compilation {
     /// second is the offset in the lambda's environment
     fixups_needed: HashMap<Symbol, Vec<(usize, usize)>>,
     data_symbols: HashMap<Vec<u8>, Symbol>,
-    data: HashMap<Symbol, (Vec<u8>, usize)>,
 }
 
 #[derive(Debug, Default, Clone)]
@@ -175,7 +173,6 @@ impl Compilation {
             future_bindings: HashSet::new(),
             fixups_needed: HashMap::new(),
             data_symbols: HashMap::new(),
-            data: HashMap::new(),
         }
     }
 
@@ -201,7 +198,7 @@ impl Compilation {
             CompilationInput::Bindings(bindings) => {
                 self.collect_binding_names(&bindings);
                 for b in bindings {
-                    self.compile_binding(&b, true, &mut code)?;
+                    self.compile_binding(&b, &mut code)?;
                 }
                 if !self.fixups_needed.is_empty() {
                     let f: Vec<Symbol> = self
@@ -226,7 +223,6 @@ impl Compilation {
     fn compile_binding(
         &mut self,
         binding: &Binding,
-        top_level: bool,
         code: &mut Vec<u8>,
     ) -> Result<()> {
         let binding_name = self.get_binding_name(&binding.binder);
@@ -234,7 +230,7 @@ impl Compilation {
         if let Some(n) = &binding_name
             && !global
         {
-            let l = self.current_context().local_var(&n.top(), false);
+            let _ = self.current_context().local_var(&n.top(), false);
         }
         self.compile_expression(&binding.body, code)?;
         if let Some(name) = binding_name {
@@ -395,7 +391,7 @@ impl Compilation {
         mem::swap(&mut old_future_bindings, &mut self.future_bindings);
         let mut fun_code = Vec::new();
         match &lambda.arity {
-            Arity::Fixed(n) => {
+            Arity::Fixed(_) => {
                 for (i, arg) in lambda.args.iter().enumerate() {
                     self.current_context()
                         .stack_vars
@@ -532,7 +528,7 @@ impl Compilation {
         mem::swap(&mut old_fixups, &mut self.fixups_needed);
         self.collect_binding_names(bindings);
         for b in bindings {
-            self.compile_binding(b, false, code)?;
+            self.compile_binding(b, code)?;
         }
         self.compile_expression(exp, code)?;
         let to_free = self
@@ -623,10 +619,6 @@ impl Compilation {
                 load_constant_int(i, code);
                 code.push(INSTR_GET_ARG);
             }
-            VarLocation::Stack(s) => {
-                load_constant_int(s as i64, code);
-                code.push(INSTR_STACK_LOAD);
-            }
             VarLocation::Env(i) => {
                 get_local(i, code);
             }
@@ -654,7 +646,6 @@ impl Compilation {
 
 enum VarLocation {
     Arg(i64),
-    Stack(usize),
     Env(usize),
     Global,
 }
@@ -734,7 +725,7 @@ fn optimized_jump(op: u8, n: i64, code: &mut Vec<u8>) {
     if let Ok(b) = i8::try_from(n) {
         let sop = short_jump_op(op);
         code.push(sop);
-        code.push(n as u8);
+        code.push(b as u8);
     } else {
         load_constant_int(n, code);
         code.push(op);

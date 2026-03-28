@@ -45,7 +45,7 @@ fn prim_load_library(rt: &mut Runtime) -> Result<()> {
     let str = rt.get_string(&arg)?;
     let out = match Library::load(PathBuf::from(str)) {
         Ok(lib) => Value::cpointer(lib.as_ptr()),
-        Err(err) => Value::bool(false),
+        Err(_) => Value::bool(false),
     };
     rt.stack_push(out);
     Ok(())

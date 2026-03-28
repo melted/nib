@@ -272,7 +272,7 @@ impl Name {
     pub fn path(&self) -> Vec<Symbol> {
         match self {
             Name::Qualified(path, _) => path.clone(),
-            Name::Plain(global_symbol) => vec![],
+            Name::Plain(_) => vec![],
         }
     }
 

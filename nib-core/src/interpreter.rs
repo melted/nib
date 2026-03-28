@@ -353,6 +353,7 @@ impl Runtime {
             let exit = match instr {
                 INSTR_PUSH_ZERO..=INSTR_PUSH_LAST_SMALL => self.op_push_small(instr),
                 INSTR_NOP => Ok(false),
+                INSTR_HALT => Ok(true),
                 INSTR_GT..=INSTR_LTE => self.op_compare(instr),
                 INSTR_BITAND..=INSTR_BITSHIFT => self.op_bitops(instr),
                 INSTR_BITNOT => self.op_bitnot(),
@@ -1179,10 +1180,6 @@ impl Runtime {
         Ok(false)
     }
 
-    fn op_halt(&mut self) -> Result<bool> {
-        Ok(true)
-    }
-
     fn op_get_local(&mut self) -> Result<bool> {
         let index = self.stack.pop().get_integer() as usize;
         let val = self.local_env.get_array().at(index);
@@ -1395,7 +1392,7 @@ impl Stack {
 
     pub(super) fn lift(&mut self, elems: usize, dist: usize) {
         let v = self.take(elems);
-        for i in 0..elems {
+        for _ in 0..dist {
             self.push(Value::nil());
         }
         self.pushv(&v);
@@ -1403,7 +1400,7 @@ impl Stack {
 
     pub(super) fn sink(&mut self, elems: usize, dist: usize) {
         let v = self.take(elems);
-        for i in 0..elems {
+        for _ in 0..dist {
             self.pop();
         }
         self.pushv(&v);

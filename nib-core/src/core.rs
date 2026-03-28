@@ -155,7 +155,7 @@ impl DesugarState {
                         "Failure to match irrefutable varbinding".to_string(),
                     )),
                 ]);
-                let (is_irrefutable, pexpr) =
+                let (_, pexpr) =
                     self.build_pattern_expression(&parts, &app(&var_exp), &on_fail)?;
                 let nam_arr = self.next_local();
                 let local_bind = Binder::Local(nam_arr.clone());
@@ -196,7 +196,6 @@ impl DesugarState {
         pattern: &PatternNode,
         expr: &Expression,
     ) -> Result<Vec<PatternParts>> {
-        let bound_names = pattern.bound_vars();
         match &pattern.pattern {
             Pattern::Alias(pat, alias) => {
                 let Name::Plain(name) = alias else {
@@ -360,7 +359,7 @@ impl DesugarState {
         ])
     }
 
-    fn desugar_funclauses(&mut self, id: Node, clauses: &[ast::FunClause]) -> Result<Function> {
+    fn desugar_funclauses(&mut self, _id: Node, clauses: &[ast::FunClause]) -> Result<Function> {
         let arity = verify_arity(clauses)?;
         let mut exp = None;
         let args = self.args(&arity);
@@ -384,7 +383,7 @@ impl DesugarState {
                 self.current_bindings.insert(Binder::Local(name.clone()));
                 let bind = Binding::make(0, Binder::Local(name), fun(function));
                 match e {
-                    Expression::Where(_, exp, bindings) => {
+                    Expression::Where(_, _, bindings) => {
                         bindings.insert(0, bind);
                     }
                     _ => {
@@ -439,7 +438,7 @@ impl DesugarState {
                     exp = cond(pred, &exp, on_fail);
                 }
                 PatternParts::Bind(var, expression) => {
-                    if let Expression::Var(n, v) = expression {
+                    if let Expression::Var(_, v) = expression {
                         // Just a = b, can rename all 'a' to 'b' instead of
                         // creating a binding.
                         exp = rename(&exp, var, v);
@@ -447,7 +446,7 @@ impl DesugarState {
                         let binding =
                             Binding::make(0, Binder::Local(Name::sym(var)), expression.clone());
                         match &mut exp {
-                            Expression::Where(n, expr, binds) => {
+                            Expression::Where(_, _expr, binds) => {
                                 binds.insert(0, binding);
                             }
                             _ => {
@@ -535,8 +534,8 @@ impl DesugarState {
         locals: &mut HashSet<Symbol>,
     ) {
         match expr {
-            Expression::Literal(_, literal) => {}
-            Expression::Var(_, global_symbol) => {}
+            Expression::Literal(_, _) => {}
+            Expression::Var(_, _) => {}
             Expression::Cond(_, cond) => {
                 self.calculate_captures_expression(&mut cond.pred, locals);
                 self.calculate_captures_expression(&mut cond.if_false, locals);
@@ -569,12 +568,6 @@ impl DesugarState {
         Name::Plain(Symbol::from(id))
     }
 
-    fn next_lambda(&mut self) -> Name {
-        self.last_local += 1;
-        let id = format!("$lambda{}", self.last_local);
-        Name::Plain(Symbol::from(id))
-    }
-
     fn next_arg(&mut self) -> Symbol {
         self.last_arg += 1;
         Symbol::from(format!("$arg{}", self.last_arg))
@@ -600,7 +593,7 @@ impl DesugarState {
             Arity::VarArg(n, _) => *n as usize,
         };
         let mut args = Vec::new();
-        for i in 0..n {
+        for _ in 0..n {
             args.push(self.next_arg());
         }
         args
@@ -1096,7 +1089,7 @@ pub fn free_vars_expression(
     locals: &mut HashMap<Symbol, i32>,
 ) {
     match expr {
-        Expression::Literal(_, literal) => {}
+        Expression::Literal(_, _) => {}
         Expression::Var(_, v) => {
             if locals.get(v).is_none() {
                 vars.insert(*v);
