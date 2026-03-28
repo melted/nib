@@ -60,7 +60,7 @@ impl<'a> ParserState<'a> {
         b: &mut Declaration,
     ) -> bool {
         match (a, b) {
-            (Declaration::Binding(ab), Declaration::Binding(bb)) => self.merge_same_binding(ab, bb)
+            (Declaration::Binding(ab), Declaration::Binding(bb)) => self.merge_same_binding(ab, bb),
         }
     }
 

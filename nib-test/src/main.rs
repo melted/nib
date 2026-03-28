@@ -137,7 +137,11 @@ fn run_test(opts: &Options, nib_path: &PathBuf, test: &PathBuf) -> io::Result<bo
             println!("Updating {} [{}]", &meta.name, &meta.file.to_string_lossy());
             update_test(test, &test_code, out_str, error_str, status_code)?;
         } else {
-            println!("{} [{}] ... Failed", &meta.name, &meta.file.to_string_lossy());
+            println!(
+                "{} [{}] ... Failed",
+                &meta.name,
+                &meta.file.to_string_lossy()
+            );
             return Ok(false);
         }
     }

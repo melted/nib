@@ -437,9 +437,10 @@ impl Compilation {
         }
         self.compile_expression(&lambda.body, &mut fun_code)?;
         if let Some(op) = fun_code.last_mut()
-            && *op == INSTR_CALL {
-                *op = INSTR_CALL_TAIL;
-            }
+            && *op == INSTR_CALL
+        {
+            *op = INSTR_CALL_TAIL;
+        }
         fun_code.push(INSTR_RETURN);
         let env_size = self.current_context().max_var;
         self.contexts.pop();

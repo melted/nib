@@ -393,15 +393,17 @@ fn float_literals() -> Result<()> {
     Ok(())
 }
 
-
 #[test]
 fn disassemble_instruction() -> Result<()> {
     let mut rt = Runtime::new();
     let prelude_code = include_str!("../../lib/prelude.nib");
-    rt.add_code("test", "
+    rt.add_code(
+        "test",
+        "
     add x = { _prim_add a x } 1.0
     res = add 5.0
-    ")?;
+    ",
+    )?;
     let bytecode = rt.code.get_bytes();
     let asm = disassemble(bytecode.get_slice());
     print!("{}", asm);
@@ -413,6 +415,15 @@ fn vararg() -> Result<()> {
     let mut rt = Runtime::new();
     rt.add_code("test", "mkarr ...x = x\nres = mkarr 1 2 3 4 5")?;
     let val = rt.get_global(&sym("res"));
-    assert_eq!(val.get_array().values(), [Value::integer(1), Value::integer(2), Value::integer(3), Value::integer(4), Value::integer(5)]);
+    assert_eq!(
+        val.get_array().values(),
+        [
+            Value::integer(1),
+            Value::integer(2),
+            Value::integer(3),
+            Value::integer(4),
+            Value::integer(5)
+        ]
+    );
     Ok(())
 }

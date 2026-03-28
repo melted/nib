@@ -7,7 +7,13 @@
 use log::error;
 use std::ffi::{CStr, c_char, c_int};
 
-use crate::{ast::Module, common::{Error, Symbol, sym}, interpreter::{Runtime, heap::Value}, parser::parse_declarations, runtime::Interpreter};
+use crate::{
+    ast::Module,
+    common::{Error, Symbol, sym},
+    interpreter::{Runtime, heap::Value},
+    parser::parse_declarations,
+    runtime::Interpreter,
+};
 
 const NIB_SUCCESS: c_int = 0;
 const NIB_ERROR: c_int = 1;
@@ -103,7 +109,7 @@ pub extern "C" fn nib_symbol_str(sym: CValue, len: *mut c_int) -> *const c_char 
     s.as_ptr() as *const c_char
 }
 
-const fn value(cv : CValue) -> Value {
+const fn value(cv: CValue) -> Value {
     Value { val: cv }
 }
 

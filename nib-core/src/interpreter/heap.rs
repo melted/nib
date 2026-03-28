@@ -1,4 +1,3 @@
-
 use region::Allocation;
 use std::{
     collections::{HashMap, HashSet},
@@ -36,7 +35,10 @@ impl Default for HeapConfig {
 
 impl HeapConfig {
     pub fn new() -> Self {
-        Self { collection_frequency: 2000000, allocation_scale: 1000000 }
+        Self {
+            collection_frequency: 2000000,
+            allocation_scale: 1000000,
+        }
     }
 }
 
@@ -50,7 +52,12 @@ pub struct HeapStats {
 
 impl HeapStats {
     pub fn new() -> Self {
-        HeapStats { collections:0, allocated:0, allocated_total: 0, freed_total:0 }
+        HeapStats {
+            collections: 0,
+            allocated: 0,
+            allocated_total: 0,
+            freed_total: 0,
+        }
     }
 
     pub fn add_block(&mut self, size: usize) {
@@ -58,7 +65,7 @@ impl HeapStats {
         self.allocated_total += size;
     }
 
-    pub fn add_collect(&mut self, free_size:usize) {
+    pub fn add_collect(&mut self, free_size: usize) {
         self.collections += 1;
         self.allocated = 0;
         self.freed_total += free_size;
@@ -70,7 +77,7 @@ pub(super) struct Heap {
     to_space: Space,
     big_objects: HashMap<usize, BigObject>,
     stats: HeapStats,
-    config: HeapConfig
+    config: HeapConfig,
 }
 
 pub(super) struct Space {
@@ -92,8 +99,9 @@ impl Heap {
 }
 
 impl Heap {
-    fn should_collect(&self, size:usize) -> bool {
-        self.from_space.remaining() < size || self.stats.allocated > self.config.collection_frequency
+    fn should_collect(&self, size: usize) -> bool {
+        self.from_space.remaining() < size
+            || self.stats.allocated > self.config.collection_frequency
     }
 }
 
@@ -150,14 +158,20 @@ impl Runtime {
             self.heap.to_space.reset();
         }
         if self.options.trace_gc_level > 0 {
-            println!("collecting: top={}, old_size={}, new_size={}", self.heap.from_space.top, self.heap.from_space.size, new_size);
+            println!(
+                "collecting: top={}, old_size={}, new_size={}",
+                self.heap.from_space.top, self.heap.from_space.size, new_size
+            );
         }
         unsafe {
             self.copy_live();
         }
         let freed = self.heap.from_space.top - self.heap.to_space.top;
         if self.options.trace_gc_level > 0 {
-            println!("after collecting: top={}, freed={}", self.heap.to_space.top, freed);
+            println!(
+                "after collecting: top={}, freed={}",
+                self.heap.to_space.top, freed
+            );
         }
         self.heap.stats.add_collect(freed);
         std::mem::swap(&mut self.heap.to_space, &mut self.heap.from_space);
@@ -261,7 +275,7 @@ impl Runtime {
             }
             let tag = value.get_tag();
             let size = (*obj).size as usize;
-            let dst:*mut ObjectHeader = self.heap.to_space.get_object_at(self.heap.to_space.top);
+            let dst: *mut ObjectHeader = self.heap.to_space.get_object_at(self.heap.to_space.top);
             if self.options.trace_gc_level > 1 {
                 println!(
                     "copying {} bytes from {:x} to {:x}",
@@ -311,7 +325,7 @@ impl Space {
     }
 
     pub fn bump(&mut self, size: usize) -> Option<*mut ObjectHeader> {
-        if size+self.top > self.size {
+        if size + self.top > self.size {
             return None;
         }
         let ptr = self.top_ptr();

@@ -2,8 +2,6 @@
 
 use std::{collections::HashMap, fmt::Display, mem, usize};
 
-use crate::common::Result;
-
 pub struct BytecodeBuilder {
     pieces: Vec<Vec<u8>>,
     labels: HashMap<String, usize>,
@@ -70,7 +68,7 @@ pub enum Instruction {
 
     Cmp = 39,
     Eq = 40,
-    NEq = 41, 
+    NEq = 41,
 
     BitAnd = 42,
     BitOr = 43,
@@ -199,7 +197,7 @@ impl Instruction {
             INSTR_LOAD_BYTES8 => 8,
             INSTR_LOAD_BYTES_IMM => usize::MAX,
             INSTR_JUMP_IMM8..=INSTR_JNFALSE_IMM8 => 1,
-            _ => 0
+            _ => 0,
         }
     }
 }
@@ -342,34 +340,34 @@ impl Display for Instruction {
     }
 }
 
-
 impl From<u8> for Instruction {
     fn from(value: u8) -> Self {
         match value {
-            21 | 23..=28 | 65..=66 | 69..=72 | 96..=99 |
-            124..=125 | 145..=151 | 156.. => Instruction::Invalid,
-            _ => unsafe { mem::transmute(value) } 
+            21 | 23..=28 | 65..=66 | 69..=72 | 96..=99 | 124..=125 | 145..=151 | 156.. => {
+                Instruction::Invalid
+            }
+            _ => unsafe { mem::transmute(value) },
         }
     }
 }
 
-fn disassemble_instruction(code : &[u8], out : &mut String) -> usize {
+fn disassemble_instruction(code: &[u8], out: &mut String) -> usize {
     let op = code[0];
     let ins = Instruction::from(op);
     out.push_str(&format!("{}", ins));
     let num = if op == INSTR_LOAD_BYTES_IMM {
         let size = u32::from_le_bytes(*code[1..].first_chunk::<4>().unwrap()) as usize;
-        let bytes = &code[5..5+size];
+        let bytes = &code[5..5 + size];
         out.push_str(&format!("#{}[", size));
         let mut iter = bytes.iter();
         if let Some(b) = iter.next() {
             out.push_str(&format!("{}", b));
             for b in iter {
-                 out.push_str(&format!(", {}", b));
+                out.push_str(&format!(", {}", b));
             }
         }
         out.push_str("]");
-        5+bytes.len()
+        5 + bytes.len()
     } else {
         match ins.trailing_bytes() {
             8 => {
@@ -392,13 +390,13 @@ fn disassemble_instruction(code : &[u8], out : &mut String) -> usize {
                 2
             }
             _ => 1,
-        }  
+        }
     };
     out.push('\n');
     num
 }
 
-pub fn disassemble(code : &[u8]) -> String {
+pub fn disassemble(code: &[u8]) -> String {
     let mut s = String::new();
     let mut pos = 0;
     while pos < code.len() {

@@ -731,7 +731,11 @@ impl Runtime {
             self.stack.push(Value::partial_application(pap));
             return Ok(());
         }
-        let extra_args = if closure.is_vararg() { 0 } else { params - closure.min_args() };
+        let extra_args = if closure.is_vararg() {
+            0
+        } else {
+            params - closure.min_args()
+        };
         let overapplication = extra_args > 0;
         if overapplication {
             let cc = Value::call_continuation(extra_args + 1);
