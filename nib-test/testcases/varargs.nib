@@ -1,0 +1,17 @@
+// @Name: Test varargs
+// @Tags: patterns, varargs
+
+trailing x ...y = [y, x]
+
+leading ...x y = [x, y]
+
+centered x ...y z = [y, x, z]
+
+_ = print (trailing 1 2 3 4 5)
+_ = print (leading  1 2 3 4 5)
+_ = print (centered 1 2 3 4 5)
+
+// @Output:
+// [[2, 3, 4, 5], 1][[1, 2, 3, 4], 5][[2, 3, 4], 1, 5]
+// @EndOutput
+// @ExitCode: 0

@@ -393,6 +393,7 @@ impl Compilation {
         let mut old_future_bindings = HashSet::new();
         self.contexts.push(Context::new());
         mem::swap(&mut old_future_bindings, &mut self.future_bindings);
+        let mut fun_code = Vec::new();
         match &lambda.arity {
             Arity::Fixed(n) => {
                 for (i, arg) in lambda.args.iter().enumerate() {
@@ -413,17 +414,17 @@ impl Compilation {
                             .push((*arg, (i as i64) - (*n as i64)));
                     } else if i == *idx as usize {
                         let varargs = self.current_context().local_var(arg, true);
-                        self.compile_array_slice(code);
-                        code.push(INSTR_STACK_ARRAY);
-                        load_constant_int(*idx as i64, code);
-                        code.push(INSTR_STACK_FRAME);
-                        code.push(INSTR_ADD);
-                        code.push(INSTR_ARG_COUNT);
-                        load_constant_int((n - 1) as i64, code);
-                        code.push(INSTR_SUB);
-                        load_constant_int(4, code);
-                        code.push(INSTR_CALL);
-                        set_local(varargs, code);
+                        self.compile_array_slice(&mut fun_code);
+                        fun_code.push(INSTR_STACK_ARRAY);
+                        load_constant_int((*idx + 1) as i64, &mut fun_code);
+                        fun_code.push(INSTR_STACK_FRAME);
+                        fun_code.push(INSTR_ADD);
+                        fun_code.push(INSTR_ARG_COUNT);
+                        load_constant_int(*n as i64, &mut fun_code);
+                        fun_code.push(INSTR_SUB);
+                        load_constant_int(4, &mut fun_code);
+                        fun_code.push(INSTR_CALL);
+                        set_local(varargs, &mut fun_code);
                     }
                 }
             }
@@ -434,7 +435,6 @@ impl Compilation {
             let addr = self.current_context().local_var(cap, true);
             addrs.push((*cap, addr));
         }
-        let mut fun_code = Vec::new();
         self.compile_expression(&lambda.body, &mut fun_code)?;
         if let Some(op) = fun_code.last_mut()
             && *op == INSTR_CALL {

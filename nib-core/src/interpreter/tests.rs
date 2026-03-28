@@ -412,8 +412,7 @@ fn disassemble_instruction() -> Result<()> {
 fn vararg() -> Result<()> {
     let mut rt = Runtime::new();
     rt.add_code("test", "mkarr ...x = x\nres = mkarr 1 2 3 4 5")?;
-    let val = rt.get_global(&sym("mkarr"));
-    let code = rt.code;
-    dbg!(code);
+    let val = rt.get_global(&sym("res"));
+    assert_eq!(val.get_array().values(), [Value::integer(1), Value::integer(2), Value::integer(3), Value::integer(4), Value::integer(5)]);
     Ok(())
 }

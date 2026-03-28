@@ -597,7 +597,7 @@ impl DesugarState {
     fn args(&mut self, arity: &Arity) -> Vec<Symbol> {
         let n = match arity {
             Arity::Fixed(n) => *n as usize,
-            Arity::VarArg(n, _) => (*n + 1) as usize,
+            Arity::VarArg(n, _) => *n as usize,
         };
         let mut args = Vec::new();
         for i in 0..n {

@@ -731,8 +731,8 @@ impl Runtime {
             self.stack.push(Value::partial_application(pap));
             return Ok(());
         }
-        let extra_args = params - closure.min_args();
-        let overapplication = !closure.is_vararg() && extra_args > 0;
+        let extra_args = if closure.is_vararg() { 0 } else { params - closure.min_args() };
+        let overapplication = extra_args > 0;
         if overapplication {
             let cc = Value::call_continuation(extra_args + 1);
             self.stack_push(cc);
@@ -1207,7 +1207,7 @@ impl Runtime {
     }
 
     fn op_arg_count(&mut self) -> Result<bool> {
-        let index = Value::integer(self.stack.current_frame() as i64);
+        let index = Value::integer(self.frame_args);
         self.stack_push(index);
         Ok(false)
     }
