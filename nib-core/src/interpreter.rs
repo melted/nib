@@ -345,75 +345,71 @@ impl Runtime {
     }
 
     fn run(&mut self) -> Result<()> {
-        while self.ip < self.code.get_bytes().size() {
-            if self.step()? {
-                break;
+        loop {
+            let code = self.code;
+            let instr = code.get_bytes().get_slice()[self.ip];
+            if self.options.trace {
+                dbg!(instr, self.ip);
+                dbg!(&self.stack, &self.call_stack);
+                //            dbg!(&self.local_env);
             }
-        }
-        Ok(())
-    }
-
-    fn step(&mut self) -> Result<bool> {
-        let code = self.code.get_bytes();
-        let instr = code.at(self.ip);
-        if self.options.trace {
-            dbg!(instr, self.ip);
-            dbg!(&self.stack, &self.call_stack);
-            //            dbg!(&self.local_env);
-        }
-        self.ip += 1;
-        match instr {
-            INSTR_PUSH_ZERO..=INSTR_PUSH_LAST_SMALL => self.op_push_small(instr),
-            INSTR_NOP => Ok(false),
-            INSTR_GT..=INSTR_LTE => self.op_compare(instr),
-            INSTR_BITAND..=INSTR_BITSHIFT => self.op_bitops(instr),
-            INSTR_BITNOT => self.op_bitnot(),
-            INSTR_ADD..=INSTR_MOD => self.op_arithmetic(instr),
-            INSTR_NEG => self.op_negate(),
-            INSTR_CMP..=INSTR_NEQ => self.op_compare(instr),
-            INSTR_SIN..=INSTR_EXP => self.op_float(instr),
-            INSTR_TOINT => self.op_toint(),
-            INSTR_CALL..=INSTR_CALL_TAIL => self.op_call(instr),
-            INSTR_RETURN => self.op_return(),
-            INSTR_JUMP | INSTR_JUMP_IMM8 => self.op_jump(instr),
-            INSTR_JZ..=INSTR_JNFALSE | INSTR_JZ_IMM8..=INSTR_JNFALSE_IMM8 => {
-                self.op_conditional_jump(instr)
+            self.ip += 1;
+            let exit = match instr {
+                INSTR_PUSH_ZERO..=INSTR_PUSH_LAST_SMALL => self.op_push_small(instr),
+                INSTR_NOP => Ok(false),
+                INSTR_GT..=INSTR_LTE => self.op_compare(instr),
+                INSTR_BITAND..=INSTR_BITSHIFT => self.op_bitops(instr),
+                INSTR_BITNOT => self.op_bitnot(),
+                INSTR_ADD..=INSTR_MOD => self.op_arithmetic(instr),
+                INSTR_NEG => self.op_negate(),
+                INSTR_CMP..=INSTR_NEQ => self.op_compare(instr),
+                INSTR_SIN..=INSTR_EXP => self.op_float(instr),
+                INSTR_TOINT => self.op_toint(),
+                INSTR_CALL..=INSTR_CALL_TAIL => self.op_call(instr),
+                INSTR_RETURN => self.op_return(),
+                INSTR_JUMP | INSTR_JUMP_IMM8 => self.op_jump(instr),
+                INSTR_JZ..=INSTR_JNFALSE | INSTR_JZ_IMM8..=INSTR_JNFALSE_IMM8 => {
+                    self.op_conditional_jump(instr)
+                },
+                INSTR_STACK_LOAD => self.op_stack_load(),
+                INSTR_STACK_STORE => self.op_put(),
+                INSTR_LOAD_IMM8..=INSTR_LOAD_IMM64 => self.op_load_imm(instr),
+                INSTR_LOAD_BYTES_IMM => self.op_load_bytes(),
+                INSTR_LOAD_BYTES8 => self.op_load_8bytes(),
+                INSTR_DUP => self.op_dup(),
+                INSTR_SWAP => self.op_swap(),
+                INSTR_DROP => self.op_drop(),
+                INSTR_ROT => self.op_rot(),
+                INSTR_DROP_FRAME => self.op_drop_frame(),
+                INSTR_STACK_LIFT => self.op_stack_lift(),
+                INSTR_MAKE_SYMBOL => self.op_make_symbol(),
+                INSTR_TYPE => self.op_type(),
+                INSTR_SET_TYPE => self.op_set_type(),
+                INSTR_ALLOC_FLOAT..=INSTR_ALLOC_CLOSURE => self.op_alloc(instr),
+                INSTR_ARRAY_REF => self.op_array_get(),
+                INSTR_ARRAY_SET => self.op_array_set(),
+                INSTR_ARRAY_SIZE => self.op_array_size(),
+                INSTR_BYTES_REF => self.op_bytes_get(),
+                INSTR_BYTES_SET => self.op_bytes_set(),
+                INSTR_BYTES_SIZE => self.op_bytes_size(),
+                INSTR_TABLE_GET => self.op_table_get(),
+                INSTR_TABLE_SET => self.op_table_set(),
+                INSTR_TABLE_SIZE => self.op_table_size(),
+                INSTR_TABLE_DELETE => self.op_table_delete(),
+                INSTR_GET_LOCAL => self.op_get_local(),
+                INSTR_SET_LOCAL => self.op_set_local(),
+                INSTR_GLOBAL_ENV => self.op_global_env(),
+                INSTR_IS_INTEGER..=INSTR_IS_IMMEDIATE => self.op_type_pred(instr),
+                INSTR_GET_ARG => self.op_get_arg(),
+                INSTR_STACK_ARRAY => self.op_stack_array(),
+                INSTR_STACK_FRAME => self.op_stack_frame(),
+                INSTR_ARG_COUNT => self.op_arg_count(),
+                INSTR_PUSH_MINUS_ONE..=INSTR_PUSH_TRUE => self.op_push_const(instr),
+                _ => self.error(&format!("unimplemented opcode: {}", instr)),
+            }?;
+            if exit || self.ip >= self.code.get_bytes().size() {
+                return Ok(());
             }
-            INSTR_STACK_LOAD => self.op_stack_load(),
-            INSTR_STACK_STORE => self.op_put(),
-            INSTR_LOAD_IMM8..=INSTR_LOAD_IMM64 => self.op_load_imm(instr),
-            INSTR_LOAD_BYTES_IMM => self.op_load_bytes(),
-            INSTR_LOAD_BYTES8 => self.op_load_8bytes(),
-            INSTR_DUP => self.op_dup(),
-            INSTR_SWAP => self.op_swap(),
-            INSTR_DROP => self.op_drop(),
-            INSTR_ROT => self.op_rot(),
-            INSTR_DROP_FRAME => self.op_drop_frame(),
-            INSTR_STACK_LIFT => self.op_stack_lift(),
-            INSTR_MAKE_SYMBOL => self.op_make_symbol(),
-            INSTR_TYPE => self.op_type(),
-            INSTR_SET_TYPE => self.op_set_type(),
-            INSTR_ALLOC_FLOAT..=INSTR_ALLOC_CLOSURE => self.op_alloc(instr),
-            INSTR_ARRAY_REF => self.op_array_get(),
-            INSTR_ARRAY_SET => self.op_array_set(),
-            INSTR_ARRAY_SIZE => self.op_array_size(),
-            INSTR_BYTES_REF => self.op_bytes_get(),
-            INSTR_BYTES_SET => self.op_bytes_set(),
-            INSTR_BYTES_SIZE => self.op_bytes_size(),
-            INSTR_TABLE_GET => self.op_table_get(),
-            INSTR_TABLE_SET => self.op_table_set(),
-            INSTR_TABLE_SIZE => self.op_table_size(),
-            INSTR_TABLE_DELETE => self.op_table_delete(),
-            INSTR_GET_LOCAL => self.op_get_local(),
-            INSTR_SET_LOCAL => self.op_set_local(),
-            INSTR_GLOBAL_ENV => self.op_global_env(),
-            INSTR_IS_INTEGER..=INSTR_IS_IMMEDIATE => self.op_type_pred(instr),
-            INSTR_GET_ARG => self.op_get_arg(),
-            INSTR_STACK_ARRAY => self.op_stack_array(),
-            INSTR_STACK_FRAME => self.op_stack_frame(),
-            INSTR_ARG_COUNT => self.op_arg_count(),
-            INSTR_PUSH_MINUS_ONE..=INSTR_PUSH_TRUE => self.op_push_const(instr),
-            _ => self.error(&format!("unimplemented opcode: {}", instr)),
         }
     }
 
