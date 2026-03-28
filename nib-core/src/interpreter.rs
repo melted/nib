@@ -21,7 +21,6 @@ use crate::interpreter::heap::{
 };
 use crate::interpreter::prims::{CapiFn, PrimFn};
 use crate::parser::{parse_declarations, parse_expression};
-use crate::runtime::Interpreter;
 
 pub mod bytecode;
 pub mod compile;
@@ -53,43 +52,6 @@ pub struct Options {
 const DEFAULT_HEAP_SIZE: usize = 1000000;
 const DEFAULT_STACK_SIZE: usize = 10000;
 const DEFAULT_CALL_STACK_SIZE: usize = 10000;
-
-impl Interpreter for Runtime {
-    fn load(&mut self, path: &Path, reload: bool) -> Result<()> {
-        if self.has_package(path)? && !reload {
-            return Ok(());
-        }
-        let id = self.package_name(path)?;
-        self.package_table()
-            .insert(self, Value::symbol(&id), Value::bool(true));
-        let code = read_to_string(path)?;
-        let file = path
-            .as_os_str()
-            .to_str()
-            .ok_or(self.err("Filenames must be utf-8"))?;
-        self.add_code(file, &code)
-    }
-
-    fn add_code(&mut self, name: &str, code: &str) -> Result<()> {
-        let file = if name.is_empty() {
-            None
-        } else {
-            Some(name.to_owned())
-        };
-        let mut module = ast::Module::new(file, code);
-        parse_declarations(&mut module)?;
-        let core = desugar(module)?;
-        if self.options.output_core {
-            println!("{}", core);
-        }
-        let bytecode = compile(core)?;
-        self.run_module(bytecode)
-    }
-
-    fn set_output_core(&mut self, output: bool) {
-        self.options.output_core = output;
-    }
-}
 
 impl Default for Runtime {
     fn default() -> Self {
@@ -131,6 +93,41 @@ impl Runtime {
         runtime.call_stack = Stack::new(call_stack);
         runtime.register_intrinsics();
         runtime
+    }
+
+    pub fn load(&mut self, path: &Path, reload: bool) -> Result<()> {
+        if self.has_package(path)? && !reload {
+            return Ok(());
+        }
+        let id = self.package_name(path)?;
+        self.package_table()
+            .insert(self, Value::symbol(&id), Value::bool(true));
+        let code = read_to_string(path)?;
+        let file = path
+            .as_os_str()
+            .to_str()
+            .ok_or(self.err("Filenames must be utf-8"))?;
+        self.add_code(file, &code)
+    }
+
+    pub fn add_code(&mut self, name: &str, code: &str) -> Result<()> {
+        let file = if name.is_empty() {
+            None
+        } else {
+            Some(name.to_owned())
+        };
+        let mut module = ast::Module::new(file, code);
+        parse_declarations(&mut module)?;
+        let core = desugar(module)?;
+        if self.options.output_core {
+            println!("{}", core);
+        }
+        let bytecode = compile(core)?;
+        self.run_module(bytecode)
+    }
+
+    pub fn set_output_core(&mut self, output: bool) {
+        self.options.output_core = output;
     }
 
     pub fn package_table(&mut self) -> Table {

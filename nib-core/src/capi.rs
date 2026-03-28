@@ -12,7 +12,6 @@ use crate::{
     common::{Error, Symbol, sym},
     interpreter::{Runtime, heap::Value},
     parser::parse_declarations,
-    runtime::Interpreter,
 };
 
 const NIB_SUCCESS: c_int = 0;

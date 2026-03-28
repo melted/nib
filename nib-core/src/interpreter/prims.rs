@@ -22,7 +22,6 @@ use crate::{
         ensure_type,
         heap::{Array, Bytes, Closure, Code, Table, Value, ValueRepr},
     },
-    runtime::Interpreter,
 };
 
 pub type PrimFn = fn(&mut Runtime) -> Result<()>;

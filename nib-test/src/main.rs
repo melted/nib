@@ -106,12 +106,6 @@ fn run_test(opts: &Options, nib_path: &PathBuf, test: &PathBuf) -> io::Result<bo
     if meta.tags.contains("no_prelude") {
         command.arg("--no-prelude");
     }
-    if opts.bytecode {
-        command.arg("--bytecode");
-    }
-    if opts.treewalker {
-        command.arg("--treewalker");
-    }
     let out = command.output()?;
     let out_str = str::from_utf8(&out.stdout).map_err(io::Error::other)?;
     let error_str = str::from_utf8(&out.stderr).map_err(io::Error::other)?;

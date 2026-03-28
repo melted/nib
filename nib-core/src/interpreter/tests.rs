@@ -7,7 +7,6 @@ use crate::interpreter::bytecode::{INSTR_ADD, disassemble};
 use crate::interpreter::compile::Compilation;
 use crate::interpreter::heap::{Bytes, Space};
 use crate::parser::parse_declarations;
-use crate::runtime::Interpreter;
 use crate::{
     common::{Result, Symbol},
     interpreter::heap::{Array, Table, Value, ValueRepr},
