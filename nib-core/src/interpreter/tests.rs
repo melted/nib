@@ -211,7 +211,7 @@ fn run_lambda_app_multiple_args_expression() -> Result<()> {
 #[test]
 fn run_simple_binding() -> Result<()> {
     let mut rt = Runtime::new();
-    rt.add_code("test", "a=1")?;
+    rt.execute_code("test", "a=1")?;
     let val = rt.get_global(&sym("a"));
     assert_eq!(val.get_integer(), 1);
     Ok(())
@@ -220,7 +220,7 @@ fn run_simple_binding() -> Result<()> {
 #[test]
 fn run_compute_binding() -> Result<()> {
     let mut rt = Runtime::new();
-    rt.add_code("test", "a = _prim_mul 3 5")?;
+    rt.execute_code("test", "a = _prim_mul 3 5")?;
     let val = rt.get_global(&sym("a"));
     assert_eq!(val.get_integer(), 15);
     Ok(())
@@ -229,7 +229,7 @@ fn run_compute_binding() -> Result<()> {
 #[test]
 fn run_globalref_binding() -> Result<()> {
     let mut rt = Runtime::new();
-    rt.add_code("test", "a = system.arch")?;
+    rt.execute_code("test", "a = system.arch")?;
     let val = rt.get_global(&sym("a"));
     dbg!(val);
     Ok(())
@@ -238,7 +238,7 @@ fn run_globalref_binding() -> Result<()> {
 #[test]
 fn run_fun_binding() -> Result<()> {
     let mut rt = Runtime::new();
-    rt.add_code("test", "calc a = _prim_mul a 2\nres = calc 4")?;
+    rt.execute_code("test", "calc a = _prim_mul a 2\nres = calc 4")?;
     let val = rt.get_global(&sym("calc"));
     assert_eq!(val.is_closure(), true);
     Ok(())
@@ -247,7 +247,7 @@ fn run_fun_binding() -> Result<()> {
 #[test]
 fn run_fun_clauses_binding() -> Result<()> {
     let mut rt = Runtime::new();
-    rt.add_code(
+    rt.execute_code(
         "test",
         "fac 0 = 1\nfac n = _prim_mul n (fac (_prim_sub n 1))",
     )?;
@@ -259,7 +259,7 @@ fn run_fun_clauses_binding() -> Result<()> {
 #[test]
 fn run_fun_clauses_app_binding() -> Result<()> {
     let mut rt = Runtime::new();
-    rt.add_code(
+    rt.execute_code(
         "test",
         "fac 0 = 1\nfac n = _prim_mul n (fac (_prim_sub n 1))\nres=fac 5\n",
     )?;
@@ -271,7 +271,7 @@ fn run_fun_clauses_app_binding() -> Result<()> {
 #[test]
 fn run_local_binding() -> Result<()> {
     let mut rt = Runtime::new();
-    rt.add_code("test", "res = a where b = 1; a = _prim_add b 4")?;
+    rt.execute_code("test", "res = a where b = 1; a = _prim_add b 4")?;
     let val = rt.get_global(&sym("res"));
     assert_eq!(val.get_integer(), 5);
     Ok(())
@@ -281,7 +281,7 @@ fn run_local_binding() -> Result<()> {
 fn run_local_clauses_app_binding() -> Result<()> {
     let mut rt = Runtime::new();
     rt.set_output_core(true);
-    rt.add_code(
+    rt.execute_code(
         "test",
         "local.b = 1\nfac n = go n where go 0 = b; go n = _prim_mul n (go (_prim_sub n 1))\nres=fac 5\n",
     )?;
@@ -293,7 +293,7 @@ fn run_local_clauses_app_binding() -> Result<()> {
 #[test]
 fn table_binding() -> Result<()> {
     let mut rt = Runtime::new();
-    rt.add_code("test", "test.a.b = 1")?;
+    rt.execute_code("test", "test.a.b = 1")?;
     let val = rt.get_global(&sym("test"));
     assert_eq!(val.is_table(), true);
     Ok(())
@@ -302,7 +302,7 @@ fn table_binding() -> Result<()> {
 #[test]
 fn local_table_binding() -> Result<()> {
     let mut rt = Runtime::new();
-    rt.add_code("test", "local.test.a.b = 1\nres = test")?;
+    rt.execute_code("test", "local.test.a.b = 1\nres = test")?;
     let val = rt.get_global(&sym("res"));
     assert_eq!(val.is_table(), true);
     Ok(())
@@ -312,14 +312,14 @@ fn local_table_binding() -> Result<()> {
 fn load_prelude() -> Result<()> {
     let mut rt = Runtime::new();
     let prelude_code = include_str!("../../lib/prelude.nib");
-    rt.add_code("test", prelude_code)?;
+    rt.execute_code("test", prelude_code)?;
     Ok(())
 }
 
 #[test]
 fn printing_string() -> Result<()> {
     let mut rt = Runtime::new();
-    rt.add_code("test", "_ = _prim_string_print \"hej\"")?;
+    rt.execute_code("test", "_ = _prim_string_print \"hej\"")?;
     Ok(())
 }
 
@@ -327,8 +327,8 @@ fn printing_string() -> Result<()> {
 fn printing_with_prelude() -> Result<()> {
     let mut rt = Runtime::new();
     let prelude_code = include_str!("../../lib/prelude.nib");
-    rt.add_code("prelude", prelude_code)?;
-    rt.add_code("test", "_ = println \"hej\"")?;
+    rt.execute_code("prelude", prelude_code)?;
+    rt.execute_code("test", "_ = println \"hej\"")?;
     Ok(())
 }
 
@@ -339,17 +339,17 @@ fn test_external_file() -> Result<()> {
     rt.set_output_core(true);
     let prelude_code = include_str!("../../lib/prelude.nib");
     let test_code = include_str!("../../../nib-test/benchmarks/fib.nib");
-    rt.add_code("prelude", prelude_code)?;
+    rt.execute_code("prelude", prelude_code)?;
     //rt.set_tracing(true);
     rt.set_trace_gc(1);
-    rt.add_code("test", test_code)?;
+    rt.execute_code("test", test_code)?;
     Ok(())
 }
 
 #[test]
 fn partial_application() -> Result<()> {
     let mut rt = Runtime::new();
-    rt.add_code(
+    rt.execute_code(
         "test",
         "
     add a b c = _prim_add a (_prim_add b c)
@@ -365,7 +365,7 @@ fn partial_application() -> Result<()> {
 #[test]
 fn over_application() -> Result<()> {
     let mut rt = Runtime::new();
-    rt.add_code(
+    rt.execute_code(
         "test",
         "
     add x = { _prim_add a x }
@@ -380,7 +380,7 @@ fn over_application() -> Result<()> {
 #[test]
 fn float_literals() -> Result<()> {
     let mut rt = Runtime::new();
-    rt.add_code(
+    rt.execute_code(
         "test",
         "
     add x = { _prim_add a x } 1.0
@@ -396,7 +396,7 @@ fn float_literals() -> Result<()> {
 fn disassemble_instruction() -> Result<()> {
     let mut rt = Runtime::new();
     let prelude_code = include_str!("../../lib/prelude.nib");
-    rt.add_code(
+    rt.execute_code(
         "test",
         "
     add x = { _prim_add a x } 1.0
@@ -412,7 +412,7 @@ fn disassemble_instruction() -> Result<()> {
 #[test]
 fn vararg() -> Result<()> {
     let mut rt = Runtime::new();
-    rt.add_code("test", "mkarr ...x = x\nres = mkarr 1 2 3 4 5")?;
+    rt.execute_code("test", "mkarr ...x = x\nres = mkarr 1 2 3 4 5")?;
     let val = rt.get_global(&sym("res"));
     assert_eq!(
         val.get_array().values(),

@@ -33,12 +33,12 @@ fn main() -> io::Result<()> {
         return Ok(());
     }
     if !opts.no_prelude {
-        rt.add_code("prelude", prelude_code)?;
+        rt.execute_code("prelude", prelude_code)?;
     }
     let res = if opts.files.is_empty() {
         let mut buffer = String::new();
         let _read = stdin().read_to_string(&mut buffer)?;
-        rt.add_code("stdin", &buffer)
+        rt.execute_code("stdin", &buffer)
     } else {
         let mut res = Ok(());
         for f in opts.files {

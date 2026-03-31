@@ -5,7 +5,7 @@ use std::ffi::c_void;
 use std::fs::read_to_string;
 use std::mem;
 use std::ops::{Shl, Shr};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use libffi::low::CodePtr;
 use symbol_table::static_symbol;
@@ -47,6 +47,7 @@ pub struct Options {
     trace: bool,
     log_missing_keys: bool,
     trace_gc_level: u8,
+    lib_paths: Vec<String>
 }
 
 const DEFAULT_HEAP_SIZE: usize = 1000000;
@@ -66,6 +67,7 @@ impl Options {
             trace: false,
             log_missing_keys: true,
             trace_gc_level: 0,
+            lib_paths: Vec::new(),
         }
     }
 }
@@ -96,21 +98,60 @@ impl Runtime {
     }
 
     pub fn load(&mut self, path: &Path, reload: bool) -> Result<()> {
-        if self.has_package(path)? && !reload {
-            return Ok(());
-        }
         let id = self.package_name(path)?;
-        self.package_table()
-            .insert(self, Value::symbol(&id), Value::bool(true));
-        let code = read_to_string(path)?;
-        let file = path
-            .as_os_str()
-            .to_str()
-            .ok_or(self.err("Filenames must be utf-8"))?;
-        self.add_code(file, &code)
+        if self.check_package(&id, reload)? {
+            if let Some(libpath) = self.find_lib(path) {
+                let code = read_to_string(&libpath)?;
+                let file = libpath
+                    .as_os_str()
+                    .to_str()
+                    .ok_or(self.err("Filenames must be utf-8"))?;
+                self.execute_code(file, &code)
+            } else {
+                self.error(&format!("couldn't find library {}", path.as_os_str().to_string_lossy()))
+            }
+        } else {
+            Ok(())
+        }
     }
 
-    pub fn add_code(&mut self, name: &str, code: &str) -> Result<()> {
+    fn check_package(&mut self, id:&Symbol, reload: bool) -> Result<bool> {
+        if self.has_package(&id)? && !reload {
+            return Ok(false);
+        }
+        self.package_table()
+            .insert(self, Value::symbol(&id), Value::bool(true));
+        Ok(true)
+    }
+
+    pub fn eval(&mut self, name:&Option<Symbol>, code:&str, reload: bool) -> Result<()> {
+        let s = if let Some(id) = name {
+            if !self.check_package(id, reload)? {
+                return Ok(())
+            }
+            id.as_str()
+        } else {
+            ""
+        };
+        self.execute_code(s, code)
+    }
+
+    pub fn find_lib(&self, path: &Path) -> Option<PathBuf> {
+        let libpath = self.get_name(&Name::str("nib.libpath"))?;
+        let arr = libpath.get_array();
+        for v in arr.values() {
+            if let Some(p) =self.get_string(v).ok()  {
+                let prefix = Path::new(&p);
+                let candidate = prefix.join(path);
+                if candidate.exists() {
+                    return Some(candidate);
+                }
+            }
+        }
+        None
+    }
+
+    pub fn execute_code(&mut self, name: &str, code: &str) -> Result<()> {
         let file = if name.is_empty() {
             None
         } else {
@@ -136,8 +177,7 @@ impl Runtime {
             .get_table()
     }
 
-    pub fn has_package(&mut self, path: &Path) -> Result<bool> {
-        let id = self.package_name(path)?;
+    pub fn has_package(&mut self, id: &Symbol) -> Result<bool> {
         Ok(!self.package_table().get(Value::symbol(&id)).is_nil())
     }
 

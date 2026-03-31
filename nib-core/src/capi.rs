@@ -65,7 +65,7 @@ pub extern "C" fn nib_execute(
         error!("nib_execute: Invalid source string");
         return NIB_ERROR;
     };
-    let res = runtime.add_code(name_str, code);
+    let res = runtime.execute_code(name_str, code);
     if let Err(e) = res {
         if let Error::NibExit { exit_code } = e {
             return exit_code as c_int;
