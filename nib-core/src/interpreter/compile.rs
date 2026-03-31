@@ -200,6 +200,7 @@ impl Compilation {
                 for b in bindings {
                     self.compile_binding(&b, &mut code)?;
                 }
+                push_nil(&mut code);
                 if !self.fixups_needed.is_empty() {
                     let f: Vec<Symbol> = self
                         .fixups_needed

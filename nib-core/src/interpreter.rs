@@ -683,6 +683,18 @@ impl Runtime {
         Ok(false)
     }
 
+    pub(super) fn push_frame(&mut self) {
+        self.ensure_call_stack(4);
+        let frame = vec![
+            self.code,
+            Value::integer(self.ip as i64),
+            Value::integer(self.stack.base as i64),
+            self.local_env,
+        ];
+        self.call_stack.base = self.call_stack.top;
+        self.call_stack.pushv(&frame);
+    }
+
     fn op_call(&mut self, op: u8) -> Result<bool> {
         let count = self.stack.pop();
         let mut args = match count.get_immediate_repr() {
@@ -742,15 +754,7 @@ impl Runtime {
             TYPE_BYTECODE => {
                 if op == INSTR_CALL {
                     // Not a tail call, set up a new frame
-                    self.ensure_call_stack(4);
-                    let frame = vec![
-                        self.code,
-                        Value::integer(self.ip as i64),
-                        Value::integer(self.stack.base as i64),
-                        self.local_env,
-                    ];
-                    self.call_stack.base = self.call_stack.top;
-                    self.call_stack.pushv(&frame);
+                    self.push_frame();
                     self.stack.base = self.stack.top() - (args - extra_args);
                 } else {
                     let stack_array = self.stack.array.values();

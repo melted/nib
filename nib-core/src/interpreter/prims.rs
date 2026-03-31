@@ -118,6 +118,9 @@ impl Runtime {
     pub(super) fn register_nib_namespace(&mut self) -> Result<()> {
         let table = Value::from(Table::make(self));
         self.add_name(&Name::str("nib.packages"), &table)?;
+        let curr_dir = self.make_string(".");
+        let lib_paths = Array::with(self, &[curr_dir]);
+        self.add_name(&Name::str("nib.libpath"), &Value::from(lib_paths))?;
         Ok(())
     }
 
@@ -355,6 +358,7 @@ fn prim_load(rt: &mut Runtime) -> Result<()> {
     let val = rt.stack.pop();
     let _ = rt.stack.pop(); // pop closure
     let file = rt.get_string(&val)?;
+    rt.push_frame();
     rt.load(Path::new(&file), false)?;
     rt.stack_push(Value::nil());
     Ok(())
