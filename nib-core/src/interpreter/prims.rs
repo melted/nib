@@ -58,6 +58,7 @@ impl Runtime {
         self.register_primitive("_prim_bytes_make", prim_bytes_make, Arity::VarArg(1, 0));
         self.register_primitive("_prim_table_keys", prim_table_keys, Arity::Fixed(1));
         self.register_primitive("_prim_table_clear", prim_table_clear, Arity::Fixed(1));
+        self.register_primitive("_prim_table_create", prim_table_create, Arity::Fixed(1));
         self.register_primitive("_prim_exit", prim_exit, Arity::Fixed(1));
         self.register_primitive("_prim_panic", prim_panic, Arity::Fixed(1));
         self.register_primitive("_prim_string_pack", prim_string_pack, Arity::Fixed(1));
@@ -420,6 +421,15 @@ fn prim_table_clear(rt: &mut Runtime) -> Result<()> {
     Ok(())
 }
 
+fn prim_table_create(rt: &mut Runtime) -> Result<()> {
+    let _ = rt.stack.pop();
+    let _ = rt.stack.pop(); // pop closure
+    let table = Table::make(rt);
+    rt.stack_push(Value::from(table));
+    Ok(())
+}
+
+
 fn prim_exit(rt: &mut Runtime) -> Result<()> {
     let exitcode = rt.stack.pop();
     let _ = rt.stack.pop(); // pop closure
@@ -565,7 +575,6 @@ pub fn is_bytecode_primitive(prim: &Symbol) -> Option<u8> {
         prims.insert(static_symbol!("_prim_bytes_set"), INSTR_BYTES_SET);
         prims.insert(static_symbol!("_prim_bytes_create"), INSTR_ALLOC_BYTES);
         prims.insert(static_symbol!("_prim_bytes_size"), INSTR_BYTES_SIZE);
-        prims.insert(static_symbol!("_prim_table_create"), INSTR_ALLOC_TABLE);
         prims.insert(static_symbol!("_prim_table_set"), INSTR_TABLE_SET);
         prims.insert(static_symbol!("_prim_table_size"), INSTR_TABLE_SIZE);
         prims.insert(static_symbol!("_prim_table_get"), INSTR_TABLE_GET);

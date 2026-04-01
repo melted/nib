@@ -1095,7 +1095,9 @@ impl Runtime {
 
                 Value::alloc_float(self, f)
             }
-            INSTR_ALLOC_TABLE => Value::from(Table::make(self)),
+            INSTR_ALLOC_TABLE => {
+                Value::from(Table::make(self))
+            },
             INSTR_ALLOC_CLOSURE => {
                 let code = self.stack.pop();
                 ensure_type(&code, ValueRepr::Bytes)?;

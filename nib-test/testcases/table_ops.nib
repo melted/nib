@@ -1,0 +1,22 @@
+// @Name: Table operations
+// @Tags: table
+
+test.a = 1
+
+// reassignment
+test.a = 2
+
+// using table functions
+_ = table.set test #b 3
+
+// set something locally (shouldn't propagate)
+_ = () where test.c = 4
+
+// set something locally (should propagate)
+_ = () where _ = table.set test #d 5
+
+// set something locally via the global table
+_ = () where t = global.test; t.e = 6
+
+_ = println [test.a, test.b, test.c, test.d, test.e]
+_ = println (table.size test)

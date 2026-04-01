@@ -79,7 +79,7 @@ apply f xs = _prim_apply f xs
 type v = _prim_type v
 
 make_type type_sym name = new where
-                                new = table.create
+                                new = table.create ()
                                 new.type_id = name
                                 _ = table.set global type_sym new
 
@@ -117,6 +117,7 @@ println a =  print a & print "\n"
 table.set tab key value = _prim_table_set value key tab
 table.size t = _prim_table_size t
 table.keys t = _prim_table_keys t
+table.create _ = _prim_table_create ()
 
 // Array functions
 array.ref arr pos = _prim_array_ref pos arr 
