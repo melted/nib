@@ -525,22 +525,13 @@ impl Compilation {
     ) -> Result<()> {
         let mut old_fixups = HashMap::new();
         let mut old_future_bindings = self.future_bindings.clone();
-        let old_used_vars = self.current_context().used_locs.clone();
+        let old_context = self.current_context().clone();
         mem::swap(&mut old_fixups, &mut self.fixups_needed);
         self.collect_binding_names(bindings);
         for b in bindings {
             self.compile_binding(b, code)?;
         }
         self.compile_expression(exp, code)?;
-        let to_free = self
-            .current_context()
-            .used_locs
-            .difference(&old_used_vars)
-            .copied()
-            .collect::<Vec<_>>();
-        for v in to_free {
-            self.current_context().free_location(v);
-        }
         if !self.fixups_needed.is_empty() {
             let f: Vec<Symbol> = self
                 .fixups_needed
@@ -550,6 +541,8 @@ impl Compilation {
                 .collect();
             return self.error(&format!("Missing definition of `{:?}`", f));
         }
+        self.contexts.pop();
+        self.contexts.push(old_context);
         mem::swap(&mut old_fixups, &mut self.fixups_needed);
         mem::swap(&mut old_future_bindings, &mut self.future_bindings);
         Ok(())
