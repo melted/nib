@@ -1086,22 +1086,25 @@ impl Table {
         if 4 * self.size() > 3 * self.capacity() {
             self.resize(rt);
         }
-        let new_size = self.size() + 1;
-        set_value(self.ptr, 1, Value::integer(new_size as i64));
-        Self::store(&mut self.storage(), key, value);
+        let (exists, pos) = Self::store(&mut self.storage(), key, value);
+        if !exists {
+            let new_size = self.size() + 1;
+            set_value(self.ptr, 1, Value::integer(new_size as i64));
+        }
     }
 
-    fn store(storage: &mut Array, key: Value, value: Value) -> usize {
+    fn store(storage: &mut Array, key: Value, value: Value) -> (bool, usize) {
         let hash_index = 2 * (key.hash() % (storage.size() / 2));
         let mut offset: usize = 0;
         let size = storage.size();
         while offset < size {
             let pos = (hash_index + offset) % size;
             let candidate = storage.at(pos);
-            if !Self::valid_key(candidate) {
+            let exists = candidate == key;
+            if exists || !Self::valid_key(candidate) {
                 storage.set(pos, key);
                 storage.set(pos + 1, value);
-                return pos;
+                return (exists, pos);
             }
             offset += 2;
         }
