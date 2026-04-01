@@ -347,7 +347,10 @@ impl DesugarState {
         function: &mut Function,
         locals: &mut HashSet<Symbol>,
     ) -> Result<()> {
-        let free = free_vars(function)?;
+        let mut free = free_vars(function)?;
+        if let Some(name) = function.name {
+            free.remove(&name);
+        }
         function.captures = free.intersection(locals).copied().collect();
         Ok(())
     }

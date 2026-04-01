@@ -136,6 +136,14 @@ impl Context {
         self.max_var += 1;
         n
     }
+
+    fn pop_vars(&mut self, n:usize) {
+        for _ in 0..n {
+            if let Some((v, loc)) = self.local_vars.pop() {
+                self.free_location(loc);
+            }
+        }
+    }
 }
 
 /// State held during compilation. Everything that can be discarded when finished
@@ -426,6 +434,10 @@ impl Compilation {
                 }
             }
         }
+
+        if let Some(fun_name) = lambda.name {
+            self.current_context().stack_vars.push((fun_name, 0));
+        }
         let captures = self.get_all_captures(lambda);
         let mut addrs = Vec::new();
         for cap in captures.iter() {
@@ -525,7 +537,7 @@ impl Compilation {
     ) -> Result<()> {
         let mut old_fixups = HashMap::new();
         let mut old_future_bindings = self.future_bindings.clone();
-        let old_context = self.current_context().clone();
+        let old_len = self.current_context().local_vars.len();
         mem::swap(&mut old_fixups, &mut self.fixups_needed);
         self.collect_binding_names(bindings);
         for b in bindings {
@@ -541,8 +553,8 @@ impl Compilation {
                 .collect();
             return self.error(&format!("Missing definition of `{:?}`", f));
         }
-        self.contexts.pop();
-        self.contexts.push(old_context);
+        let new_len = self.current_context().local_vars.len();
+        self.current_context().pop_vars(new_len-old_len);
         mem::swap(&mut old_fixups, &mut self.fixups_needed);
         mem::swap(&mut old_future_bindings, &mut self.future_bindings);
         Ok(())

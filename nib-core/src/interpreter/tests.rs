@@ -281,6 +281,7 @@ fn run_local_binding() -> Result<()> {
 fn run_local_clauses_app_binding() -> Result<()> {
     let mut rt = Runtime::new();
     rt.set_output_core(true);
+    rt.set_tracing(true);
     rt.execute_code(
         "test",
         "local.b = 1\nfac n = go n where go 0 = b; go n = _prim_mul n (go (_prim_sub n 1))\nres=fac 5\n",
