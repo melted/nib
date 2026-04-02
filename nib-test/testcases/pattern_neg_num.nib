@@ -2,10 +2,14 @@
 // @Tags: patterns
 
 test (-1) = "minus one"
+test [-2,_] = "array with minus 2"
 test _ = "something else"
 
-_ = print (test (-1))
+_ = println (test (-1))
+_ = println (test [-2, 1])
+
 // @Output:
 // minus one
+// array with minus 2
 // @EndOutput
 // @ExitCode: 0
