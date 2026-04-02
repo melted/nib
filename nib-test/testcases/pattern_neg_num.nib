@@ -1,0 +1,11 @@
+// @Name: Test negative numbers in pattern
+// @Tags: patterns
+
+test (-1) = "minus one"
+test _ = "something else"
+
+_ = print (test (-1))
+// @Output:
+// minus one
+// @EndOutput
+// @ExitCode: 0

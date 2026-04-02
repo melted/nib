@@ -1,4 +1,4 @@
-test -1 = "minus one"
+test (-1) = "minus one"
 test _ = "something else"
 
-_ = print (test -1)
+_ = print (test (-1))

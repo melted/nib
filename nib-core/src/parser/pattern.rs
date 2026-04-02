@@ -70,6 +70,22 @@ impl<'a> ParserState<'a> {
     pub(super) fn parse_custom_pattern(&mut self) -> Result<PatternNode> {
         self.expect(TokenValue::LeftParen)?;
         match self.peek_next_token()?.value {
+            TokenValue::Operator(op) if op.as_str() == "-" => {
+                let _ = self.get_next_token()?;
+                let lit = match self.get_next_token()?.value {
+                    TokenValue::Float(x) => {
+                        Literal::Real(-x)
+                    }
+                    TokenValue::Integer(n) => {
+                        Literal::Integer(-n)
+                    }
+                    _ => {
+                        return self.error("Invalid negative pattern, not a literal number");
+                    }
+                };
+                self.expect(TokenValue::RightParen)?;
+                Ok(self.literal_pattern(lit))
+            }
             TokenValue::Identifier(_) => {
                 let name = self.parse_qualified_name()?;
                 let mut pats = Vec::new();
