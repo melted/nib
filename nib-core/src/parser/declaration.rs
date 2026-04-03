@@ -1,7 +1,7 @@
 use crate::{
     ast::{
-        Binding, Declaration, ExpressionNode, FunBinding, OpBinding, OpClause,
-        Operator, Pattern, PatternNode, VarBinding,
+        Binding, Declaration, ExpressionNode, FunBinding, OpBinding, OpClause, Operator, Pattern,
+        PatternNode, VarBinding,
     },
     common::{Error, Location, Name, Node, Result},
     parser::{

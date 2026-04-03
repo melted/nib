@@ -1,4 +1,9 @@
-use std::{collections::HashMap, ffi::{c_int, c_void}, path::Path, sync::LazyLock};
+use std::{
+    collections::HashMap,
+    ffi::{c_int, c_void},
+    path::Path,
+    sync::LazyLock,
+};
 
 use symbol_table::static_symbol;
 
@@ -8,16 +13,16 @@ use crate::{
     interpreter::{
         Runtime,
         bytecode::{
-            INSTR_ACOS, INSTR_ADD, INSTR_ALLOC_ARRAY, INSTR_ALLOC_BYTES,
-            INSTR_ARRAY_REF, INSTR_ARRAY_SET, INSTR_ARRAY_SIZE, INSTR_ASIN, INSTR_ATAN,
-            INSTR_BITAND, INSTR_BITNOT, INSTR_BITOR, INSTR_BITSHIFT, INSTR_BITXOR, INSTR_BYTES_REF,
-            INSTR_BYTES_SET, INSTR_BYTES_SIZE, INSTR_CALL, INSTR_CEILING, INSTR_CMP, INSTR_COS,
-            INSTR_DIV, INSTR_EQ, INSTR_EXP, INSTR_FLOOR, INSTR_GT, INSTR_GTE, INSTR_IS_ARRAY,
-            INSTR_IS_BOOL, INSTR_IS_BYTES, INSTR_IS_CHAR, INSTR_IS_CLOSURE, INSTR_IS_FLOAT,
-            INSTR_IS_INTEGER, INSTR_IS_NIL, INSTR_IS_PAP, INSTR_IS_POINTER, INSTR_IS_SYMBOL,
-            INSTR_IS_TABLE, INSTR_LOG, INSTR_LT, INSTR_LTE, INSTR_MOD, INSTR_MUL, INSTR_NEG,
-            INSTR_NEQ, INSTR_ROUND, INSTR_SET_TYPE, INSTR_SIN, INSTR_SUB, INSTR_TABLE_DELETE,
-            INSTR_TABLE_GET, INSTR_TABLE_SET, INSTR_TABLE_SIZE, INSTR_TAN, INSTR_TOINT, INSTR_TYPE,
+            INSTR_ACOS, INSTR_ADD, INSTR_ALLOC_ARRAY, INSTR_ALLOC_BYTES, INSTR_ARRAY_REF,
+            INSTR_ARRAY_SET, INSTR_ARRAY_SIZE, INSTR_ASIN, INSTR_ATAN, INSTR_BITAND, INSTR_BITNOT,
+            INSTR_BITOR, INSTR_BITSHIFT, INSTR_BITXOR, INSTR_BYTES_REF, INSTR_BYTES_SET,
+            INSTR_BYTES_SIZE, INSTR_CALL, INSTR_CEILING, INSTR_CMP, INSTR_COS, INSTR_DIV, INSTR_EQ,
+            INSTR_EXP, INSTR_FLOOR, INSTR_GT, INSTR_GTE, INSTR_IS_ARRAY, INSTR_IS_BOOL,
+            INSTR_IS_BYTES, INSTR_IS_CHAR, INSTR_IS_CLOSURE, INSTR_IS_FLOAT, INSTR_IS_INTEGER,
+            INSTR_IS_NIL, INSTR_IS_PAP, INSTR_IS_POINTER, INSTR_IS_SYMBOL, INSTR_IS_TABLE,
+            INSTR_LOG, INSTR_LT, INSTR_LTE, INSTR_MOD, INSTR_MUL, INSTR_NEG, INSTR_NEQ,
+            INSTR_ROUND, INSTR_SET_TYPE, INSTR_SIN, INSTR_SUB, INSTR_TABLE_DELETE, INSTR_TABLE_GET,
+            INSTR_TABLE_SET, INSTR_TABLE_SIZE, INSTR_TAN, INSTR_TOINT, INSTR_TYPE,
         },
         ensure_type,
         heap::{Array, Bytes, Closure, Code, Table, Value, ValueRepr},
@@ -72,7 +77,11 @@ impl Runtime {
         self.register_primitive("_prim_to_pointer", prim_to_pointer, Arity::Fixed(1));
         self.register_primitive("_prim_apply", prim_apply, Arity::Fixed(2));
         self.register_primitive("_prim_make_primitive", prim_make_primitive, Arity::Fixed(4));
-        self.register_primitive("_prim_make_cprimitive", prim_make_cprimitive, Arity::Fixed(4));
+        self.register_primitive(
+            "_prim_make_cprimitive",
+            prim_make_cprimitive,
+            Arity::Fixed(4),
+        );
     }
 
     pub(super) fn register_type_tables(&mut self) {
@@ -318,7 +327,7 @@ fn prim_string_print(rt: &mut Runtime) -> Result<()> {
     Ok(())
 }
 
-fn make_prim(rt: &mut Runtime, is_capi:bool) -> Result<()> {
+fn make_prim(rt: &mut Runtime, is_capi: bool) -> Result<()> {
     let vararg = rt.stack.pop();
     let arity = rt.stack.pop();
     let fun_ptr = rt.stack.pop();
@@ -326,8 +335,16 @@ fn make_prim(rt: &mut Runtime, is_capi:bool) -> Result<()> {
     ensure_type(&arity, ValueRepr::Integer)?;
     ensure_type(&fun_ptr, ValueRepr::Pointer)?;
     let void_ptr = fun_ptr.get_cpointer() as *const c_void;
-    let code = if is_capi { Code::ExternCapi(void_ptr) } else {Code::Extern(void_ptr)};
-    let varg = if vararg.is_false() { None } else { Some(vararg.get_integer() as usize) };
+    let code = if is_capi {
+        Code::ExternCapi(void_ptr)
+    } else {
+        Code::Extern(void_ptr)
+    };
+    let varg = if vararg.is_false() {
+        None
+    } else {
+        Some(vararg.get_integer() as usize)
+    };
     let args = arity.get_integer() as usize;
     let closure = Closure::make(rt, &code, &[], args, varg);
     rt.stack_push(Value::from(closure));
@@ -428,7 +445,6 @@ fn prim_table_create(rt: &mut Runtime) -> Result<()> {
     rt.stack_push(Value::from(table));
     Ok(())
 }
-
 
 fn prim_exit(rt: &mut Runtime) -> Result<()> {
     let exitcode = rt.stack.pop();

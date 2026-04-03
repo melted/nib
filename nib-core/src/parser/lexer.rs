@@ -464,18 +464,18 @@ fn identifier_char(ch: char) -> bool {
 
 fn forbidden_operator_char(ch: char) -> bool {
     ch == '('
-    || ch == ')'
-    || ch == '['
-    || ch == ']'
-    || ch == '{'
-    || ch == '}'
-    || ch == '.'
-    || ch == ','
-    || ch == ';'
-    || ch == '`'
-    || ch == '_'
-    || ch == '"'
-    || ch == '\''
+        || ch == ')'
+        || ch == '['
+        || ch == ']'
+        || ch == '{'
+        || ch == '}'
+        || ch == '.'
+        || ch == ','
+        || ch == ';'
+        || ch == '`'
+        || ch == '_'
+        || ch == '"'
+        || ch == '\''
 }
 
 fn operator_char(ch: char) -> bool {

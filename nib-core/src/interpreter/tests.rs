@@ -431,10 +431,13 @@ fn vararg() -> Result<()> {
 #[test]
 fn local_table_set() -> Result<()> {
     let mut rt = Runtime::new();
-    rt.execute_code("test", "
+    rt.execute_code(
+        "test",
+        "
         test.a = 1
         _ = () where _ = _prim_table_set 2 #b test
-        res = test.b")?;
+        res = test.b",
+    )?;
     let val = rt.get_global(&sym("res"));
     assert_eq!(val, Value::integer(2));
     Ok(())
@@ -443,11 +446,14 @@ fn local_table_set() -> Result<()> {
 #[test]
 fn local_table_leaking() -> Result<()> {
     let mut rt = Runtime::new();
-    rt.execute_code("test", "
+    rt.execute_code(
+        "test",
+        "
         test.a = 1
         _ = () where test.c = 1
         _ = () where _ = _prim_table_set 2 #b test
-        res = global.test.b")?;
+        res = global.test.b",
+    )?;
     let val = rt.get_global(&sym("res"));
     let table = rt.get_global(&sym("test"));
     dbg!(table);

@@ -19,7 +19,6 @@ pub const NIB_ERROR: c_int = 1;
 
 type CValue = u64;
 
-
 // Parsing
 
 #[unsafe(no_mangle)]
@@ -93,9 +92,7 @@ pub extern "C" fn nib_get_global(rt: *mut Runtime, id: *const c_char) -> CValue 
     unsafe { (*rt).get_global(&name).val }
 }
 
-
 // nib_load_prelude
-
 
 // Nib data types
 
@@ -120,8 +117,6 @@ pub extern "C" fn nib_symbol_str(sym: CValue, len: *mut c_int) -> *const c_char 
     unsafe { *len = s.len() as c_int };
     s.as_ptr() as *const c_char
 }
-
-
 
 // Helpers
 

@@ -17,9 +17,7 @@ impl<'a> ParserState<'a> {
                 let lit = self.parse_literal()?;
                 self.literal_pattern(lit)
             }
-            TokenValue::Operator(op) if op.as_str() == "-" => {
-                self.parse_negative_literal()?
-            }
+            TokenValue::Operator(op) if op.as_str() == "-" => self.parse_negative_literal()?,
             TokenValue::Identifier(_) => {
                 let name = self.parse_qualified_name()?;
                 self.var_pattern(name)
@@ -95,19 +93,15 @@ impl<'a> ParserState<'a> {
     fn parse_negative_literal(&mut self) -> Result<PatternNode> {
         let _ = self.get_next_token()?;
         let lit = match self.get_next_token()?.value {
-            TokenValue::Float(x) => {
-                Literal::Real(-x)
-            }
-            TokenValue::Integer(n) => {
-                Literal::Integer(-n)
-            }
+            TokenValue::Float(x) => Literal::Real(-x),
+            TokenValue::Integer(n) => Literal::Integer(-n),
             _ => {
                 return self.error("Invalid negative pattern, not a literal number");
             }
         };
         Ok(self.literal_pattern(lit))
     }
-    
+
     pub(super) fn ellipsis_check(&self, pats: &[PatternNode]) -> Result<()> {
         let ellipses = pats
             .iter()

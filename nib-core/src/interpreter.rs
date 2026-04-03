@@ -10,9 +10,7 @@ use crate::common::{Error, Name, Result, Signature, Symbol, sym};
 use crate::core::{desugar, desugar_expression};
 use crate::interpreter::bytecode::*;
 use crate::interpreter::compile::{Module, compile, compile_expression};
-use crate::interpreter::heap::{
-    Array, Bytes, Heap, Table, Value, ValueRepr, set_value
-};
+use crate::interpreter::heap::{Array, Bytes, Heap, Table, Value, ValueRepr, set_value};
 use crate::interpreter::vm::Stack;
 use crate::parser::{parse_declarations, parse_expression};
 
@@ -21,8 +19,8 @@ pub mod compile;
 pub mod foreign;
 pub mod heap;
 pub mod prims;
-pub mod vm;
 mod tests;
+pub mod vm;
 
 pub struct Runtime {
     heap: Heap,
@@ -42,7 +40,7 @@ pub struct Options {
     trace: bool,
     log_missing_keys: bool,
     trace_gc_level: u8,
-    lib_paths: Vec<String>
+    lib_paths: Vec<String>,
 }
 
 const DEFAULT_HEAP_SIZE: usize = 1000000;
@@ -103,14 +101,17 @@ impl Runtime {
                     .ok_or(self.err("Filenames must be utf-8"))?;
                 self.execute_code(file, &code)
             } else {
-                self.error(&format!("couldn't find library {}", path.as_os_str().to_string_lossy()))
+                self.error(&format!(
+                    "couldn't find library {}",
+                    path.as_os_str().to_string_lossy()
+                ))
             }
         } else {
             Ok(())
         }
     }
 
-    fn check_package(&mut self, id:&Symbol, reload: bool) -> Result<bool> {
+    fn check_package(&mut self, id: &Symbol, reload: bool) -> Result<bool> {
         if self.has_package(id)? && !reload {
             return Ok(false);
         }
@@ -119,10 +120,10 @@ impl Runtime {
         Ok(true)
     }
 
-    pub fn eval(&mut self, name:&Option<Symbol>, code:&str, reload: bool) -> Result<()> {
+    pub fn eval(&mut self, name: &Option<Symbol>, code: &str, reload: bool) -> Result<()> {
         let s = if let Some(id) = name {
             if !self.check_package(id, reload)? {
-                return Ok(())
+                return Ok(());
             }
             id.as_str()
         } else {
@@ -135,7 +136,7 @@ impl Runtime {
         let libpath = self.get_name(&Name::str("nib.libpath"))?;
         let arr = libpath.get_array();
         for v in arr.values() {
-            if let Ok(p) = self.get_string(v)  {
+            if let Ok(p) = self.get_string(v) {
                 let prefix = Path::new(&p);
                 let candidate = prefix.join(path);
                 if candidate.exists() {
@@ -374,10 +375,7 @@ impl Runtime {
         }
         Ok(tid.get_symbol())
     }
-
 }
-
-
 
 pub(super) fn ensure_type(val: &Value, repr: ValueRepr) -> Result<()> {
     if val.get_repr() != repr {

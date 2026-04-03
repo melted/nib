@@ -1345,7 +1345,7 @@ pub const TYPE_INCOMPLETE: u16 = 0xffff;
 pub const TYPE_BYTECODE: u16 = 0;
 pub const TYPE_CORE: u16 = 1;
 pub const TYPE_EXTERN: u16 = 2;
-pub const TYPE_EXTERN_CAPI:u16 = 3;
+pub const TYPE_EXTERN_CAPI: u16 = 3;
 pub const TYPE_FOREIGN: u16 = 4;
 
 impl Closure {

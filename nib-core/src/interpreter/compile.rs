@@ -13,7 +13,8 @@ use crate::interpreter::bytecode::{
     INSTR_JUMP_IMM8, INSTR_JZ, INSTR_JZ_IMM8, INSTR_LOAD_BYTES_IMM, INSTR_LOAD_BYTES8,
     INSTR_LOAD_IMM8, INSTR_LOAD_IMM16, INSTR_LOAD_IMM32, INSTR_LOAD_IMM64, INSTR_MAKE_SYMBOL,
     INSTR_PUSH_FALSE, INSTR_PUSH_LAST_SMALL, INSTR_PUSH_MINUS_ONE, INSTR_PUSH_NIL, INSTR_PUSH_TRUE,
-    INSTR_RETURN, INSTR_SET_LOCAL, INSTR_SET_TYPE, INSTR_STACK_ARRAY, INSTR_STACK_FRAME, INSTR_SUB, INSTR_TABLE_GET, INSTR_TABLE_SET,
+    INSTR_RETURN, INSTR_SET_LOCAL, INSTR_SET_TYPE, INSTR_STACK_ARRAY, INSTR_STACK_FRAME, INSTR_SUB,
+    INSTR_TABLE_GET, INSTR_TABLE_SET,
 };
 use crate::interpreter::heap::{Value, ValueRepr};
 use crate::interpreter::prims::is_bytecode_primitive;
@@ -136,7 +137,7 @@ impl Context {
         n
     }
 
-    fn pop_vars(&mut self, n:usize) {
+    fn pop_vars(&mut self, n: usize) {
         for _ in 0..n {
             if let Some((v, loc)) = self.local_vars.pop() {
                 self.free_location(loc);
@@ -228,11 +229,7 @@ impl Compilation {
         Ok(())
     }
 
-    fn compile_binding(
-        &mut self,
-        binding: &Binding,
-        code: &mut Vec<u8>,
-    ) -> Result<()> {
+    fn compile_binding(&mut self, binding: &Binding, code: &mut Vec<u8>) -> Result<()> {
         let binding_name = self.get_binding_name(&binding.binder);
         let global = matches!(&binding.binder, Binder::Public(_));
         if let Some(n) = &binding_name
@@ -553,7 +550,7 @@ impl Compilation {
             return self.error(&format!("Missing definition of `{:?}`", f));
         }
         let new_len = self.current_context().local_vars.len();
-        self.current_context().pop_vars(new_len-old_len);
+        self.current_context().pop_vars(new_len - old_len);
         mem::swap(&mut old_fixups, &mut self.fixups_needed);
         mem::swap(&mut old_future_bindings, &mut self.future_bindings);
         Ok(())

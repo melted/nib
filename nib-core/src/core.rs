@@ -155,8 +155,7 @@ impl DesugarState {
                         "Failure to match irrefutable varbinding".to_string(),
                     )),
                 ]);
-                let (_, pexpr) =
-                    self.build_pattern_expression(&parts, &app(&var_exp), &on_fail)?;
+                let (_, pexpr) = self.build_pattern_expression(&parts, &app(&var_exp), &on_fail)?;
                 let nam_arr = self.next_local();
                 let local_bind = Binder::Local(nam_arr.clone());
                 self.current_bindings.insert(local_bind.clone());

@@ -1,14 +1,31 @@
-use std::{cmp::Ordering, ffi::c_void, mem, ops::{Shl, Shr}};
+use std::{
+    cmp::Ordering,
+    ffi::c_void,
+    mem,
+    ops::{Shl, Shr},
+};
 
 use libffi::low::CodePtr;
 use symbol_table::static_symbol;
 
-use crate::{common::{Error, Result, get_symbol, symbol_id}, interpreter::{Runtime, bytecode::*, ensure_type, foreign::call_foreign_function, heap::{Array, Bytes, Closure, TYPE_BYTECODE, TYPE_EXTERN, TYPE_EXTERN_CAPI, TYPE_FOREIGN, Table, Value, ValueRepr}, prims::{CapiFn, PrimFn}, set_value}};
-
+use crate::{
+    common::{Error, Result, get_symbol, symbol_id},
+    interpreter::{
+        Runtime,
+        bytecode::*,
+        ensure_type,
+        foreign::call_foreign_function,
+        heap::{
+            Array, Bytes, Closure, TYPE_BYTECODE, TYPE_EXTERN, TYPE_EXTERN_CAPI, TYPE_FOREIGN,
+            Table, Value, ValueRepr,
+        },
+        prims::{CapiFn, PrimFn},
+        set_value,
+    },
+};
 
 impl Runtime {
-
-   pub(super) fn run(&mut self) -> Result<()> {
+    pub(super) fn run(&mut self) -> Result<()> {
         loop {
             let code = self.code;
             let instr = code.get_bytes().get_slice()[self.ip];
@@ -35,7 +52,7 @@ impl Runtime {
                 INSTR_JUMP | INSTR_JUMP_IMM8 => self.op_jump(instr),
                 INSTR_JZ..=INSTR_JNFALSE | INSTR_JZ_IMM8..=INSTR_JNFALSE_IMM8 => {
                     self.op_conditional_jump(instr)
-                },
+                }
                 INSTR_STACK_LOAD => self.op_stack_load(),
                 INSTR_STACK_STORE => self.op_put(),
                 INSTR_LOAD_IMM8..=INSTR_LOAD_IMM64 => self.op_load_imm(instr),
@@ -723,9 +740,7 @@ impl Runtime {
 
                 Value::alloc_float(self, f)
             }
-            INSTR_ALLOC_TABLE => {
-                Value::from(Table::make(self))
-            },
+            INSTR_ALLOC_TABLE => Value::from(Table::make(self)),
             INSTR_ALLOC_CLOSURE => {
                 let code = self.stack.pop();
                 ensure_type(&code, ValueRepr::Bytes)?;
@@ -950,7 +965,6 @@ pub struct Stack {
     base: usize,
 }
 
-
 impl Stack {
     pub(super) fn new(stack: Value) -> Self {
         Self {
@@ -1082,7 +1096,6 @@ impl Stack {
     }
 }
 
-
 fn get_float(val: Value) -> f64 {
     if val.is_immediate_integer() {
         val.get_integer() as f64
@@ -1090,7 +1103,6 @@ fn get_float(val: Value) -> f64 {
         val.get_float()
     }
 }
-
 
 fn ordering_to_int(order: Ordering) -> i64 {
     match order {
