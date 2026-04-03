@@ -113,7 +113,7 @@ _ = print (size 11)
 //z = 9876
 //_ = print mmmm.abba
 
-res = _prim_load "nib-core/testdata/littler.nib"
+res = _prim_load "nib-core/testdata/littler.nib" false
 
 _ = print res
 _ = print thing

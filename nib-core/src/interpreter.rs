@@ -144,10 +144,15 @@ impl Runtime {
     pub fn find_lib(&self, path: &Path) -> Option<PathBuf> {
         let libpath = self.get_name(&Name::str("nib.libpath"))?;
         let arr = libpath.get_array();
+        let ext_path = if path.extension().is_none() {
+            path.with_extension("nib")
+        } else {
+            path.to_path_buf()
+        };
         for v in arr.values() {
             if let Ok(p) = self.get_string(v) {
                 let prefix = Path::new(&p);
-                let candidate = prefix.join(path);
+                let candidate = prefix.join(&ext_path);
                 if candidate.exists() {
                     return Some(candidate);
                 }

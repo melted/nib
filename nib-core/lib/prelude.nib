@@ -7,6 +7,12 @@ panic v = _prim_panic v
 /// argument will be used.
 exit c = _prim_exit c
 
+/// Load a Nib library
+load p = _prim_load p false
+
+/// Load a Nib library, even if it has been loaded before
+reload p = _prim_load p true
+
 /// Add two numbers
 a + b = _prim_add a b
 

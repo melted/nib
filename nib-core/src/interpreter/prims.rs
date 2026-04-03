@@ -45,7 +45,7 @@ impl Runtime {
         self.register_primitive("_prim_match", prim_match, Arity::Fixed(1));
         self.register_primitive("_prim_string_print", prim_string_print, Arity::Fixed(1));
         self.register_primitive("_prim_to_string", prim_to_string, Arity::Fixed(1));
-        self.register_primitive("_prim_load", prim_load, Arity::Fixed(1));
+        self.register_primitive("_prim_load", prim_load, Arity::Fixed(2));
         self.register_primitive("_prim_symbol_make", prim_symbol_make, Arity::Fixed(1));
         self.register_primitive("_prim_symbol_name", prim_symbol_name, Arity::Fixed(1));
         self.register_primitive("_prim_get_path", prim_get_path, Arity::VarArg(2, 1));
@@ -362,11 +362,12 @@ fn prim_to_string(rt: &mut Runtime) -> Result<()> {
 }
 
 fn prim_load(rt: &mut Runtime) -> Result<()> {
+    let reload = rt.stack.pop();
     let val = rt.stack.pop();
     let _ = rt.stack.pop(); // pop closure
     let file = rt.get_string(&val)?;
     rt.push_frame();
-    rt.load(Path::new(&file), false)?;
+    rt.load(Path::new(&file), reload.get_bool())?;
     rt.stack_push(Value::nil());
     Ok(())
 }
@@ -527,7 +528,7 @@ fn prim_apply(rt: &mut Runtime) -> Result<()> {
     let array = args.get_array();
     let quit = rt.call_function(&fun, array.values())?;
     if quit {
-        // TODO: Harmonize prims and intstructions return values
+        // TODO: Harmonize prims and instruction return values
         // Should probably always signal exit with Err.
         Err(crate::common::Error::NibExit { exit_code: 0 })
     } else {
