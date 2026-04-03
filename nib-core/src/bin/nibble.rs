@@ -6,7 +6,7 @@ use std::process::exit;
 
 use nib_core::common::Error;
 use nib_core::interpreter::Runtime;
-use nib_core::parser::dump_lex;
+use nib_core::parser::{dump_lex, is_binding};
 
 /// Simple runner of Nib code. Anything more elaborate goes into
 /// another crate, where it can pull in dependencies and go wild
@@ -37,7 +37,14 @@ fn main() -> io::Result<()> {
     let res = if opts.files.is_empty() {
         let mut buffer = String::new();
         let _read = stdin().read_to_string(&mut buffer)?;
-        rt.execute_code("stdin", &buffer)
+        let is_bind = is_binding(&buffer)?;
+        if is_bind {
+            rt.execute_code("stdin", &buffer)
+        } else {
+            let val = rt.run_expression(&buffer)?;
+            println!("\n{}", val);
+            Ok(())
+        }
     } else {
         let mut res = Ok(());
         for f in opts.files {
