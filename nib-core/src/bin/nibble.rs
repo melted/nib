@@ -14,7 +14,6 @@ use nib_core::parser::dump_lex;
 fn main() -> io::Result<()> {
     let opts = parse_options();
     let mut rt = Runtime::new();
-    let prelude_code = include_str!("../../lib/prelude.nib");
     let level = if opts.verbose {
         log::Level::Info
     } else {
@@ -33,7 +32,7 @@ fn main() -> io::Result<()> {
         return Ok(());
     }
     if !opts.no_prelude {
-        rt.execute_code("prelude", prelude_code)?;
+        rt.load(&Path::new("prelude"), false)?;
     }
     let res = if opts.files.is_empty() {
         let mut buffer = String::new();

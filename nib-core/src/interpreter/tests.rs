@@ -1,4 +1,6 @@
 #![cfg(test)]
+use std::path::Path;
+
 use crate::ast::Module;
 use crate::common::sym;
 use crate::core::desugar;
@@ -458,5 +460,12 @@ fn local_table_leaking() -> Result<()> {
     let table = rt.get_global(&sym("test"));
     dbg!(table);
     assert_eq!(val, Value::integer(2));
+    Ok(())
+}
+
+#[test]
+fn load_internal_lib() -> Result<()> {
+    let mut rt = Runtime::new();
+    rt.load(Path::new("prelude"), false)?;
     Ok(())
 }

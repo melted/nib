@@ -1,5 +1,6 @@
 //! Compile code to bytecode then run it
 
+use std::collections::HashMap;
 use std::fs::read_to_string;
 use std::path::{Path, PathBuf};
 
@@ -33,14 +34,16 @@ pub struct Runtime {
     frame_args: i64,
     ffi_signatures: Vec<Signature>,
     options: Options,
+    internal_libs: HashMap<Symbol, String>
 }
 
 pub struct Options {
+    lib_paths: Vec<String>,
+    log_missing_keys: bool,
     output_core: bool,
     trace: bool,
-    log_missing_keys: bool,
     trace_gc_level: u8,
-    lib_paths: Vec<String>,
+    use_internal_stdlib: bool,
 }
 
 const DEFAULT_HEAP_SIZE: usize = 1000000;
@@ -56,11 +59,12 @@ impl Default for Runtime {
 impl Options {
     fn new() -> Self {
         Options {
+            lib_paths: Vec::new(),
+            log_missing_keys: true,
             output_core: false,
             trace: false,
-            log_missing_keys: true,
             trace_gc_level: 0,
-            lib_paths: Vec::new(),
+            use_internal_stdlib: true,
         }
     }
 }
@@ -79,6 +83,7 @@ impl Runtime {
             frame_args: 0,
             ffi_signatures: Vec::new(),
             options: Options::new(),
+            internal_libs: HashMap::new()
         };
         let global_env = Value::from(Table::make(&mut runtime));
         let stack = Value::from(Array::make(&mut runtime, DEFAULT_STACK_SIZE));
@@ -87,13 +92,17 @@ impl Runtime {
         runtime.stack = Stack::new(stack);
         runtime.call_stack = Stack::new(call_stack);
         runtime.register_intrinsics();
+        runtime.register_internal_stdlib();
         runtime
     }
 
     pub fn load(&mut self, path: &Path, reload: bool) -> Result<()> {
         let id = self.package_name(path)?;
         if self.check_package(&id, reload)? {
-            if let Some(libpath) = self.find_lib(path) {
+            if self.options.use_internal_stdlib && self.internal_libs.contains_key(&id) {
+                let code = self.internal_libs.get(&id).unwrap().clone();
+                self.execute_code(id.as_str(), &code)
+            } else if let Some(libpath) = self.find_lib(path) {
                 let code = read_to_string(&libpath)?;
                 let file = libpath
                     .as_os_str()
@@ -145,6 +154,13 @@ impl Runtime {
             }
         }
         None
+    }
+
+    fn register_internal_stdlib(&mut self) {
+        let prelude_code = include_str!("../lib/prelude.nib");
+        self.internal_libs.insert(sym("prelude"), prelude_code.to_owned());
+        let io_code = include_str!("../lib/io.nib");
+        self.internal_libs.insert(sym("io"), io_code.to_owned());
     }
 
     pub fn execute_code(&mut self, name: &str, code: &str) -> Result<()> {
