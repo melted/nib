@@ -1,1 +1,13 @@
 // IO library
+
+
+libc = _prim_load_library "libc.so.6" || { _prim_load_library "msvcrt" }
+
+libc_malloc = _prim_foreign_import libc "malloc" [ffi.uint64] ffi.ptr
+libc_free = _prim_foreign_import libc "free" [ffi.ptr] ffi.void
+
+cchar_ptr str = to_ptr (str ++ "\0")
+
+libc_fopen = _prim_foreign_import libc "fopen" [ffi.ptr, ffi.ptr] ffi.ptr
+libc_fclose = _prim_foreign_import libc "fclose" [ffi.ptr] ffi.int32
+

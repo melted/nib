@@ -41,7 +41,7 @@ fn main() -> io::Result<()> {
     } else {
         let mut res = Ok(());
         for f in opts.files {
-            res = rt.load(Path::new(&f), false);
+            res = rt.load(Path::new(&f), true);
             if res.is_err() {
                 break;
             }
