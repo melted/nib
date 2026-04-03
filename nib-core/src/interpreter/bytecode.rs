@@ -366,7 +366,7 @@ fn disassemble_instruction(code: &[u8], out: &mut String) -> usize {
                 out.push_str(&format!(", {}", b));
             }
         }
-        out.push_str("]");
+        out.push(']');
         5 + bytes.len()
     } else {
         match ins.trailing_bytes() {
