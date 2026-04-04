@@ -1,0 +1,3 @@
+_ = load "io"
+
+_ = libc_fputs (to_ptr "hello, world\n") libc_stdout

@@ -50,6 +50,7 @@ impl Runtime {
         self.register_primitive("_prim_symbol_name", prim_symbol_name, Arity::Fixed(1));
         self.register_primitive("_prim_get_path", prim_get_path, Arity::VarArg(2, 1));
         self.register_primitive("_prim_bytes_make", prim_bytes_make, Arity::VarArg(1, 0));
+        self.register_primitive("_prim_bytes_equal", prim_bytes_equal, Arity::Fixed(2));
         self.register_primitive("_prim_table_keys", prim_table_keys, Arity::Fixed(1));
         self.register_primitive("_prim_table_clear", prim_table_clear, Arity::Fixed(1));
         self.register_primitive("_prim_table_create", prim_table_create, Arity::Fixed(1));
@@ -407,6 +408,17 @@ fn prim_bytes_make(rt: &mut Runtime) -> Result<()> {
     }
     let out = Bytes::with(rt, &bytes);
     rt.stack_push(Value::from(out));
+    Ok(())
+}
+
+fn prim_bytes_equal(rt: &mut Runtime) -> Result<()> {
+    let right = rt.stack.pop();
+    let left = rt.stack.pop();
+    let _ = rt.stack.pop(); // pop closure
+    ensure_type(&right, ValueRepr::Bytes);
+    ensure_type(&left, ValueRepr::Bytes);
+    let res = right.get_bytes().get_slice() == left.get_bytes().get_slice();
+    rt.stack.push(Value::bool(res));
     Ok(())
 }
 

@@ -6,6 +6,8 @@ libc = _prim_load_library "libc.so.6" || { _prim_load_library "msvcrt" }
 libc_malloc = _prim_foreign_import libc "malloc" [ffi.uint64] ffi.ptr
 libc_free = _prim_foreign_import libc "free" [ffi.ptr] ffi.void
 
+to_ptr x = _prim_to_pointer x
+
 cchar_ptr str = to_ptr (str ++ "\0")
 
 libc_fopen = _prim_foreign_import libc "fopen" [ffi.ptr, ffi.ptr] ffi.ptr
@@ -24,12 +26,15 @@ libc_seek_end = 2
 
 libc_fseek = _prim_foreign_import libc fseek_name [ffi.ptr, ffi.int64, ffi.int32] ffi.ptr
                 where
-                 fseek_name = sys.os == "windows" => "_fseeki64"; "fseek"
+                 fseek_name = system.os == "windows" => "_fseeki64"; "fseek"
 
-libc_ftell = _prim_foreign_import libc name [ffi.ptr] ffi.int64
+// TODO: 64-bits on windows. Probably have to use fgetpos
+libc_ftell = _prim_foreign_import libc "ftell" [ffi.ptr] ffi.int64
+
+libc_fdopen = _prim_foreign_import libc name [ffi.int32, ffi.ptr] ffi.ptr
                 where
-                 name = sys.os == "windows" => "_ftelli64"; "ftell"
+                 name = system.os == "windows" => "_fdopen"; "fdopen"
 
-libc_fdopen = _prim_foreign_import libc "fdopen" [ffi.int32, ffi.ptr] ffi.ptr
-
-// libc_stdin = 
+libc_stdin = libc_fdopen 0 (to_ptr "rb")
+libc_stdout = libc_fdopen 1 (to_ptr "wb") 
+libc_stderr = libc_fdopen 2 (to_ptr "wb")

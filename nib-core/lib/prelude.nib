@@ -159,6 +159,8 @@ bytes.create sz = _prim_bytes_create sz
 bytes.ref arr pos = _prim_bytes_ref pos arr
 bytes.set arr pos val = _prim_bytes_set val pos arr
 bytes.size b = _prim_bytes_size b
+bytes.__eq = _prim_bytes_equal
+bytes.__neq a b = not (_prim_bytes_equal a b) 
 bytes.copy to from to_start from_start size = 
         go 0 where
             go n | n == size = () 
@@ -175,6 +177,8 @@ bytes.concat x y = merged where
 string.create sz = _prim_bytes_create (sz+1)
 string.ref = bytes.ref
 string.set = bytes.set
+string.__eq = bytes.__eq
+string.__neq = bytes.__neq
 string.size str = _prim_bytes_size str - 1
 string.concat x y = merged where
                         xs = string.size x

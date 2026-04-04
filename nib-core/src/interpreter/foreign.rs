@@ -98,11 +98,10 @@ fn prim_foreign_import(rt: &mut Runtime) -> Result<()> {
         ValueRepr::Pointer => fun_spec.get_pointer(),
         ValueRepr::Bytes if rt.is_type(&fun_spec, &sym("string"))? => {
             let name = rt.get_string(&fun_spec)?;
-            let ptr = get_foreign_symbol(rt, &name, lib_ptr.get_pointer())?;
-            if ptr.is_null() {
-                return rt.error("Function pointer in prim_foreign_import is null");
-            }
-            ptr
+            get_named_function(rt, lib_ptr, &name)?
+        }
+        ValueRepr::Symbol => {
+            get_named_function(rt, lib_ptr, fun_spec.get_symbol().as_str())?
         }
         _ => {
             return rt
@@ -119,6 +118,14 @@ fn prim_foreign_import(rt: &mut Runtime) -> Result<()> {
     let closure = Closure::make(rt, &code_object, &[], arity, None);
     rt.stack_push(Value::from(closure));
     Ok(())
+}
+
+fn get_named_function(rt: &mut Runtime, lib_ptr: Value, name: &str) -> Result<*mut c_void> {
+    let ptr = get_foreign_symbol(rt, name, lib_ptr.get_pointer())?;
+    if ptr.is_null() {
+        return rt.error(&format!("Can't find {name} in foreign lib {lib_ptr}"));
+    }
+    Ok(ptr)
 }
 
 fn make_signature(rt: &mut Runtime, args: &[Value], ret: &Value) -> Result<Signature> {
