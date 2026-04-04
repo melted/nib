@@ -315,7 +315,8 @@ fn prim_string_print(rt: &mut Runtime) -> Result<()> {
     let _ = rt.stack.pop(); // pop closure
     ensure_type(&val, ValueRepr::Bytes)?;
     let bytes = val.get_bytes();
-    let slice = bytes.get_slice();
+    let end = bytes.size()-1;
+    let slice = &bytes.get_slice()[0..end];
     print!("{}", String::from_utf8_lossy(slice));
     rt.stack_push(Value::nil());
     Ok(())
