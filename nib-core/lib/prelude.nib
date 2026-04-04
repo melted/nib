@@ -159,7 +159,7 @@ array.concat x y = merged where
 array.match v | type v == array = v
 array.match _ = false
 
-bytes.create sz = _prim_bytes_create sz
+bytes.create sz v = _prim_bytes_create sz v
 bytes.ref arr pos = _prim_bytes_ref pos arr
 bytes.set arr pos val = _prim_bytes_set val pos arr
 bytes.size b = _prim_bytes_size b
@@ -175,7 +175,9 @@ bytes.concat x y = merged where
                         _ = bytes.copy merged x 0 0 xs
                         _ = bytes.copy merged y xs 0 ys
 
-string.create sz = _prim_bytes_create (sz+1)
+string.create sz = out where
+                        out = bytes.create (sz+1) 0
+                        _ = set_type out string
 string.ref = bytes.ref
 string.set = bytes.set
 string.__eq = bytes.__eq
@@ -185,7 +187,7 @@ string.concat x y = merged where
                         xs = string.size x
                         ys = string.size y
                         cs = xs + ys
-                        merged = string.create cs 0
+                        merged = string.create cs
                         _ = bytes.copy merged x 0 0 xs
                         _ = bytes.copy merged y xs 0 ys 
 string.substring = _prim_string_substring

@@ -1,0 +1,31 @@
+// @Name: Test string operations
+// @Tags: string, stdlib
+
+a = "hello"
+b = ", world"
+
+c = string.concat a b 
+
+d = string.substring c 2 5
+
+e = _prim_to_int "111"
+
+f = _prim_string_tofloat "1.6"
+
+g = nil == _prim_to_int "qqq" // should give nil, not crash
+
+_ = println c
+_ = println d
+_ = println (string.size c)
+_ = println e
+_ = println f
+_ = println g
+// @Output:
+// hello, world
+// llo
+// 12
+// 111
+// 1.6
+// true
+// @EndOutput
+// @ExitCode: 0

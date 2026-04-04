@@ -60,6 +60,7 @@ impl Runtime {
         self.register_primitive("_prim_string_pack", prim_string_pack, Arity::Fixed(1));
         self.register_primitive("_prim_string_unpack", prim_string_unpack, Arity::Fixed(1));
         self.register_primitive("_prim_string_toint", prim_string_toint, Arity::Fixed(1));
+        self.register_primitive("_prim_string_tofloat", prim_string_tofloat, Arity::Fixed(1));
         self.register_primitive(
             "_prim_string_substring",
             prim_string_substring,
@@ -513,6 +514,19 @@ fn prim_string_toint(rt: &mut Runtime) -> Result<()> {
     let res = s.parse::<i64>();
     let val = match res {
         Ok(n) => Value::integer(n),
+        Err(_) => Value::nil()
+    };
+    rt.stack_push(val);
+    Ok(())
+}
+
+fn prim_string_tofloat(rt: &mut Runtime) -> Result<()> {
+    let num = rt.stack.pop();
+    let _ = rt.stack.pop(); // pop closure
+    let s = rt.get_string(&num)?;
+    let res = s.parse::<f64>();
+    let val = match res {
+        Ok(x) => Value::alloc_float(rt, x),
         Err(_) => Value::nil()
     };
     rt.stack_push(val);

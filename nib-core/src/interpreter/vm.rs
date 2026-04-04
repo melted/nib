@@ -725,8 +725,8 @@ impl Runtime {
                 Value::from(arr)
             }
             INSTR_ALLOC_BYTES => {
-                let size = self.stack.pop();
                 let fill = self.stack.pop().get_integer() as u8;
+                let size = self.stack.pop();
                 ensure_type(&size, ValueRepr::Integer)?;
                 let bytes = Bytes::make(self, size.get_integer() as usize, fill);
                 Value::from(bytes)
