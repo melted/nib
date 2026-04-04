@@ -342,7 +342,8 @@ impl Compilation {
                 load_constant_value(&Value::char(*c), code);
             }
             Literal::String(str) => {
-                let bytes = str.as_bytes().to_vec();
+                let mut bytes = str.as_bytes().to_vec();
+                bytes.push(0);
                 self.compile_literal(&Literal::Bytearray(bytes), code)?;
                 code.push(INSTR_DUP);
                 self.compile_literal(&Literal::Symbol(Symbol::from("string")), code)?;
@@ -576,7 +577,11 @@ impl Compilation {
     fn get_literal_symbol(&mut self, lit: &Literal) -> Symbol {
         match lit {
             Literal::Bytearray(c) => self.get_data_symbol(c),
-            Literal::String(s) => self.get_data_symbol(s.as_bytes()),
+            Literal::String(s) => {
+                let mut b = s.as_bytes().to_vec();
+                b.push(0);
+                self.get_data_symbol(&b)
+            },
             _ => {
                 panic!("Invalid literal in get_literal_symbol");
             }

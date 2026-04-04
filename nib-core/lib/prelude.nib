@@ -159,25 +159,30 @@ bytes.create sz = _prim_bytes_create sz
 bytes.ref arr pos = _prim_bytes_ref pos arr
 bytes.set arr pos val = _prim_bytes_set val pos arr
 bytes.size b = _prim_bytes_size b
+bytes.copy to from to_start from_start size = 
+        go 0 where
+            go n | n == size = () 
+            go n = bytes.set to (to_start + n) (bytes.ref from (from_start+n))
+
 bytes.concat x y = merged where
                         xs = bytes.size x
                         ys = bytes.size y
                         cs = xs + ys
                         merged = bytes.create cs 0
-                        go n | n == cs = ()
-                        go n | n < xs =  go (n + 1)
-                                            where _ = bytes.set merged n (bytes.ref x n)
-                        go n = go (n + 1)
-                                    where _ = bytes.set merged n (bytes.ref y (n - xs))
-                        _ = go 0
+                        _ = bytes.copy merged x 0 0 xs
+                        _ = bytes.copy merged y xs 0 ys
 
-string.create sz = _prim_bytes_create sz
+string.create sz = _prim_bytes_create (sz+1)
 string.ref = bytes.ref
 string.set = bytes.set
-string.size str = _prim_bytes_size str
-string.concat x y = cc where
-                        cc = bytes.concat x y
-                        _ = set_type cc string
+string.size str = _prim_bytes_size str - 1
+string.concat x y = merged where
+                        xs = string.size x
+                        ys = string.size y
+                        cs = xs + ys
+                        merged = string.create cs 0
+                        _ = bytes.copy merged x 0 0 xs
+                        _ = bytes.copy merged y xs 0 ys 
 string.substring = _prim_string_substring
 
 to_string v = _prim_to_string v

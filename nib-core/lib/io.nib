@@ -11,3 +11,25 @@ cchar_ptr str = to_ptr (str ++ "\0")
 libc_fopen = _prim_foreign_import libc "fopen" [ffi.ptr, ffi.ptr] ffi.ptr
 libc_fclose = _prim_foreign_import libc "fclose" [ffi.ptr] ffi.int32
 
+libc_fwrite = _prim_foreign_import libc "fwrite" [ffi.ptr, ffi.uint64, ffi.uint64, ffi.ptr] ffi.uint64
+libc_fread = _prim_foreign_import libc "fread" [ffi.ptr, ffi.uint64, ffi.uint64, ffi.ptr] ffi.uint64
+
+libc_fgets = _prim_foreign_import libc "fgets" [ffi.ptr, ffi.uint64, ffi.ptr] ffi.ptr
+libc_fputs = _prim_foreign_import libc "fputs" [ffi.ptr, ffi.ptr] ffi.int32
+
+
+libc_seek_set = 0
+libc_seek_cur = 1
+libc_seek_end = 2
+
+libc_fseek = _prim_foreign_import libc fseek_name [ffi.ptr, ffi.int64, ffi.int32] ffi.ptr
+                where
+                 fseek_name = sys.os == "windows" => "_fseeki64"; "fseek"
+
+libc_ftell = _prim_foreign_import libc name [ffi.ptr] ffi.int64
+                where
+                 name = sys.os == "windows" => "_ftelli64"; "ftell"
+
+libc_fdopen = _prim_foreign_import libc "fdopen" [ffi.int32, ffi.ptr] ffi.ptr
+
+// libc_stdin = 

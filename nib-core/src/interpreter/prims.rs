@@ -144,7 +144,9 @@ impl Runtime {
     }
 
     pub fn make_string(&mut self, s: &str) -> Value {
-        let mut b = Bytes::with(self, s.as_bytes());
+        let mut b = Bytes::make(self, s.len() + 1, 0);
+        let slice = &mut b.get_slice_mut()[0..s.len()];
+        slice.copy_from_slice(s.as_bytes());
         let type_table = self
             .get_module_path(&[static_symbol!("string")], self.global_env)
             .unwrap_or(Value::nil());
@@ -180,7 +182,7 @@ impl Runtime {
     pub fn get_string(&self, value: &Value) -> Result<String> {
         if self.is_type(value, &sym("string"))? {
             let bytes = value.get_bytes();
-            str::from_utf8(bytes.get_slice())
+            str::from_utf8(&bytes.get_slice()[0..bytes.size()-1])
                 .map_err(|_| self.err("Not an utf-8 string"))
                 .map(|s| s.to_owned())
         } else {
@@ -386,7 +388,7 @@ fn prim_symbol_make(rt: &mut Runtime) -> Result<()> {
     let _ = rt.stack.pop(); // pop closure
     ensure_type(&arg, ValueRepr::Bytes)?;
     let bytes = arg.get_bytes();
-    let str = str::from_utf8(bytes.get_slice()).unwrap_or_default();
+    let str = str::from_utf8(&bytes.get_slice()[0..bytes.size()-1]).unwrap_or_default();
     let sym = rt.make_symbol(str);
     rt.stack_push(sym);
     Ok(())
