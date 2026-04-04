@@ -54,10 +54,12 @@ impl Runtime {
         self.register_primitive("_prim_table_keys", prim_table_keys, Arity::Fixed(1));
         self.register_primitive("_prim_table_clear", prim_table_clear, Arity::Fixed(1));
         self.register_primitive("_prim_table_create", prim_table_create, Arity::Fixed(1));
+        self.register_primitive("_prim_cmdline", prim_cmdline, Arity::Fixed(1));
         self.register_primitive("_prim_exit", prim_exit, Arity::Fixed(1));
         self.register_primitive("_prim_panic", prim_panic, Arity::Fixed(1));
         self.register_primitive("_prim_string_pack", prim_string_pack, Arity::Fixed(1));
         self.register_primitive("_prim_string_unpack", prim_string_unpack, Arity::Fixed(1));
+        self.register_primitive("_prim_string_toint", prim_string_toint, Arity::Fixed(1));
         self.register_primitive(
             "_prim_string_substring",
             prim_string_substring,
@@ -319,6 +321,18 @@ fn prim_string_print(rt: &mut Runtime) -> Result<()> {
     Ok(())
 }
 
+fn prim_cmdline(rt: &mut Runtime) -> Result<()> {
+    let val = rt.stack.pop();
+    let _ = rt.stack.pop(); // pop closure
+    let mut args = Vec::new();
+    for a in std::env::args() {
+        args.push(rt.make_string(&a));
+    }
+    let argv = Array::with(rt, &args);
+    rt.stack_push(Value::from(argv));
+    Ok(())
+}
+
 fn make_prim(rt: &mut Runtime, is_capi: bool) -> Result<()> {
     let vararg = rt.stack.pop();
     let arity = rt.stack.pop();
@@ -415,8 +429,8 @@ fn prim_bytes_equal(rt: &mut Runtime) -> Result<()> {
     let right = rt.stack.pop();
     let left = rt.stack.pop();
     let _ = rt.stack.pop(); // pop closure
-    ensure_type(&right, ValueRepr::Bytes);
-    ensure_type(&left, ValueRepr::Bytes);
+    ensure_type(&right, ValueRepr::Bytes)?;
+    ensure_type(&left, ValueRepr::Bytes)?;
     let res = right.get_bytes().get_slice() == left.get_bytes().get_slice();
     rt.stack.push(Value::bool(res));
     Ok(())
@@ -488,6 +502,19 @@ fn prim_string_unpack(rt: &mut Runtime) -> Result<()> {
         arr.set(i, Value::char(ch));
     }
     rt.stack_push(Value::from(arr));
+    Ok(())
+}
+
+fn prim_string_toint(rt: &mut Runtime) -> Result<()> {
+    let num = rt.stack.pop();
+    let _ = rt.stack.pop(); // pop closure
+    let s = rt.get_string(&num)?;
+    let res = s.parse::<i64>();
+    let val = match res {
+        Ok(n) => Value::integer(n),
+        Err(_) => Value::nil()
+    };
+    rt.stack_push(val);
     Ok(())
 }
 

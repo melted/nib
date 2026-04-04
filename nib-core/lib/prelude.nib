@@ -188,6 +188,7 @@ string.concat x y = merged where
                         _ = bytes.copy merged x 0 0 xs
                         _ = bytes.copy merged y xs 0 ys 
 string.substring = _prim_string_substring
+string.__toint = _prim_string_toint
 
 to_string v = _prim_to_string v
 
