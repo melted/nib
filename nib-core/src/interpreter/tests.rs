@@ -155,7 +155,7 @@ fn run_literal_expression_bytes() -> Result<()> {
 fn run_literal_expression_string() -> Result<()> {
     let mut rt = Runtime::new();
     let val = rt.run_expression("\"hej\"")?;
-    assert_eq!(val.get_bytes().get_slice(), [104, 101, 106]);
+    assert_eq!(val.get_bytes().get_slice(), [104, 101, 106, 0]);
     Ok(())
 }
 
